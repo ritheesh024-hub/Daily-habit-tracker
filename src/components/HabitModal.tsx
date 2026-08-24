@@ -1,0 +1,325 @@
+import React, { useState, useEffect } from 'react';
+import { X, Trash2, AlertCircle } from 'lucide-react';
+import { HabitItem } from '../types';
+import { AVAILABLE_ICONS, HabitIcon } from './HabitIcon';
+
+interface HabitModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSave: (habitData: { name: string; target: string; icon: string; reminderEnabled?: boolean; reminderTime?: string }) => void;
+  onDelete?: (habitId: string) => void;
+  initialHabit?: HabitItem | null;
+  isSaving?: boolean;
+}
+
+const PRESET_EXAMPLES = [
+  { name: 'Meditation', target: '20 mins', icon: 'activity', reminderTime: '07:00' },
+  { name: 'Walking', target: '30 mins', icon: 'footprints', reminderTime: '17:30' },
+  { name: 'Study', target: '2 hours', icon: 'brain', reminderTime: '19:00' },
+  { name: 'Cold Shower', target: '5 mins', icon: 'droplet', reminderTime: '07:30' },
+  { name: 'Journaling', target: '10 mins', icon: 'book', reminderTime: '21:00' },
+];
+
+export const HabitModal: React.FC<HabitModalProps> = ({
+  isOpen,
+  onClose,
+  onSave,
+  onDelete,
+  initialHabit,
+  isSaving = false,
+}) => {
+  const [name, setName] = useState('');
+  const [target, setTarget] = useState('');
+  const [selectedIcon, setSelectedIcon] = useState('check');
+  const [reminderEnabled, setReminderEnabled] = useState(false);
+  const [reminderTime, setReminderTime] = useState('08:00');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const isEditing = !!initialHabit;
+
+  useEffect(() => {
+    if (initialHabit) {
+      setName(initialHabit.name || '');
+      setTarget(initialHabit.target || '');
+      setSelectedIcon(initialHabit.icon || 'check');
+      setReminderEnabled(!!initialHabit.reminderEnabled);
+      setReminderTime(initialHabit.reminderTime || '08:00');
+    } else {
+      setName('');
+      setTarget('');
+      setSelectedIcon('check');
+      setReminderEnabled(false);
+      setReminderTime('08:00');
+    }
+    setShowDeleteConfirm(false);
+    setError(null);
+  }, [initialHabit, isOpen]);
+
+  if (!isOpen) return null;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmedName = name.trim();
+    if (!trimmedName) {
+      setError('Please enter a habit name');
+      return;
+    }
+    onSave({
+      name: trimmedName,
+      target: target.trim(),
+      icon: selectedIcon,
+      reminderEnabled,
+      reminderTime,
+    });
+  };
+
+  const handleApplyPreset = (preset: typeof PRESET_EXAMPLES[0]) => {
+    setName(preset.name);
+    setTarget(preset.target);
+    setSelectedIcon(preset.icon);
+    if (preset.reminderTime) {
+      setReminderTime(preset.reminderTime);
+    }
+    setError(null);
+  };
+
+  return (
+    <div
+      id="habit-modal-backdrop"
+      className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4 backdrop-blur-[1px] animate-fadeIn"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !isSaving) onClose();
+      }}
+    >
+      <div
+        id="habit-modal-card"
+        className="w-full max-w-md bg-white border border-zinc-200 rounded-xl shadow-lg overflow-hidden flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-200">
+          <h2 id="modal-title" className="text-base font-semibold text-zinc-900">
+            {isEditing ? 'Edit Habit' : 'Add Habit'}
+          </h2>
+          <button
+            id="modal-close-btn"
+            type="button"
+            onClick={onClose}
+            disabled={isSaving}
+            className="text-zinc-400 hover:text-zinc-700 p-1 rounded transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Delete Confirmation View */}
+        {showDeleteConfirm && isEditing && initialHabit ? (
+          <div id="delete-confirmation-view" className="p-5 space-y-4">
+            <div className="flex items-start gap-3 p-3 bg-red-50 border border-red-200 rounded-lg text-red-800">
+              <AlertCircle className="w-5 h-5 shrink-0 text-red-600 mt-0.5" />
+              <div className="text-xs space-y-1">
+                <p className="font-semibold text-red-900">Delete habit "{initialHabit.name}"?</p>
+                <p className="text-red-700">
+                  This will remove it from your active daily list. Past completion records in history will be preserved.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                id="cancel-delete-btn"
+                type="button"
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={isSaving}
+                className="px-3 py-2 text-xs font-medium text-zinc-700 bg-zinc-100 hover:bg-zinc-200 rounded-md border border-zinc-200 transition-colors"
+              >
+                Keep Habit
+              </button>
+              <button
+                id="confirm-delete-btn"
+                type="button"
+                onClick={() => onDelete && onDelete(initialHabit.id)}
+                disabled={isSaving}
+                className="px-3 py-2 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors"
+              >
+                {isSaving ? 'Deleting...' : 'Yes, Delete Habit'}
+              </button>
+            </div>
+          </div>
+        ) : (
+          /* Main Edit/Add Form */
+          <form onSubmit={handleSubmit} className="p-5 space-y-4">
+            {/* Quick Presets (Only on Add) */}
+            {!isEditing && (
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-medium text-zinc-500 uppercase tracking-wider">
+                  Quick Suggestions
+                </label>
+                <div className="flex flex-wrap gap-1.5">
+                  {PRESET_EXAMPLES.map((p) => (
+                    <button
+                      key={p.name}
+                      type="button"
+                      onClick={() => handleApplyPreset(p)}
+                      className="inline-flex items-center gap-1.5 px-2 py-1 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded text-xs border border-zinc-200/70 transition-colors cursor-pointer"
+                    >
+                      <HabitIcon name={p.icon} className="w-3 h-3 text-zinc-500" />
+                      <span>{p.name}</span>
+                      <span className="text-zinc-400 font-mono text-[10px]">({p.target})</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Habit Name Field */}
+            <div className="space-y-1">
+              <label htmlFor="habit-name-input" className="text-xs font-medium text-zinc-700">
+                Habit Name <span className="text-red-500">*</span>
+              </label>
+              <input
+                id="habit-name-input"
+                type="text"
+                value={name}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  if (error) setError(null);
+                }}
+                placeholder="e.g. Meditation, Walking, Read a chapter"
+                className="w-full px-3 py-2 text-sm text-zinc-900 bg-white border border-zinc-300 rounded-md focus:outline-none focus:ring-1 focus:ring-zinc-900 focus:border-zinc-900 placeholder:text-zinc-400"
+                autoFocus
+              />
+            </div>
+
+            {/* Target / Value Field */}
+            <div className="space-y-1">
+              <label htmlFor="habit-target-input" className="text-xs font-medium text-zinc-700">
+                Target / Goal <span className="text-zinc-400 font-normal">(optional)</span>
+              </label>
+              <input
+                id="habit-target-input"
+                type="text"
+                value={target}
+                onChange={(e) => setTarget(e.target.value)}
+                placeholder="e.g. 20 mins, 8 glasses, 10:30 PM, 1 hour"
+                className="w-full px-3 py-2 text-sm text-zinc-900 bg-white border border-zinc-300 rounded-md focus:outline-none focus:ring-1 focus:ring-zinc-900 focus:border-zinc-900 placeholder:text-zinc-400"
+              />
+            </div>
+
+            {/* Optional Icon Selector */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-zinc-700">
+                Icon <span className="text-zinc-400 font-normal">(optional)</span>
+              </label>
+              <div
+                id="icon-picker-grid"
+                className="grid grid-cols-6 sm:grid-cols-9 gap-1.5 p-2 bg-zinc-50 border border-zinc-200 rounded-md max-h-32 overflow-y-auto"
+              >
+                {AVAILABLE_ICONS.map((item) => {
+                  const isSelected = selectedIcon === item.name;
+                  const Icon = item.icon;
+                  return (
+                    <button
+                      key={item.name}
+                      type="button"
+                      title={item.label}
+                      onClick={() => setSelectedIcon(item.name)}
+                      className={`p-2 rounded flex items-center justify-center transition-colors cursor-pointer ${
+                        isSelected
+                          ? 'bg-zinc-900 text-white shadow-xs'
+                          : 'bg-white text-zinc-600 hover:bg-zinc-200/70 border border-zinc-200/80'
+                      }`}
+                    >
+                      <Icon className="w-4 h-4" />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Reminder Setting inside Form */}
+            <div className="p-3 bg-zinc-50 border border-zinc-200 rounded-lg space-y-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-medium text-zinc-800 block">Daily Reminder</span>
+                  <span className="text-[10px] text-zinc-500">Get notified at scheduled time</span>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    id="modal-reminder-toggle"
+                    checked={reminderEnabled}
+                    onChange={(e) => setReminderEnabled(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-zinc-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-zinc-900"></div>
+                </label>
+              </div>
+
+              {reminderEnabled && (
+                <div className="pt-2 border-t border-zinc-200/70 flex items-center justify-between">
+                  <label htmlFor="modal-reminder-time" className="text-xs text-zinc-600">
+                    Reminder Time:
+                  </label>
+                  <input
+                    id="modal-reminder-time"
+                    type="time"
+                    value={reminderTime}
+                    onChange={(e) => setReminderTime(e.target.value)}
+                    className="px-2.5 py-1 text-xs font-mono bg-white border border-zinc-300 rounded focus:outline-none focus:ring-1 focus:ring-zinc-900"
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Error Message */}
+            {error && (
+              <p id="modal-error-message" className="text-xs text-red-600 font-medium">
+                {error}
+              </p>
+            )}
+
+            {/* Footer actions */}
+            <div className="pt-3 border-t border-zinc-200 flex items-center justify-between gap-3">
+              {isEditing && onDelete ? (
+                <button
+                  id="delete-habit-btn"
+                  type="button"
+                  onClick={() => setShowDeleteConfirm(true)}
+                  disabled={isSaving}
+                  className="inline-flex items-center gap-1.5 text-xs font-medium text-red-600 hover:text-red-700 hover:bg-red-50 px-2.5 py-1.5 rounded transition-colors"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Delete habit</span>
+                </button>
+              ) : (
+                <div />
+              )}
+
+              <div className="flex items-center gap-2">
+                <button
+                  id="modal-cancel-btn"
+                  type="button"
+                  onClick={onClose}
+                  disabled={isSaving}
+                  className="px-3 py-1.5 text-xs font-medium text-zinc-700 bg-zinc-100 hover:bg-zinc-200 rounded-md border border-zinc-200 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  id="modal-save-btn"
+                  type="submit"
+                  disabled={isSaving}
+                  className="px-3.5 py-1.5 text-xs font-medium text-white bg-zinc-900 hover:bg-zinc-800 rounded-md transition-colors disabled:opacity-50"
+                >
+                  {isSaving ? 'Saving...' : 'Save'}
+                </button>
+              </div>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+};

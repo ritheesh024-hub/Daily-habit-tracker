@@ -1,0 +1,6 @@
+{
+  "name": "Daily Habits",
+  "description": "A simple 1-page habit tracking web app with Google authentication and daily history.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

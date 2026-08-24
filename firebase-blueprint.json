@@ -1,0 +1,62 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile document storing basic account and preference info",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "displayName": { "type": "string", "maxLength": 100 },
+        "email": { "type": "string", "maxLength": 200 },
+        "photoURL": { "type": "string", "maxLength": 1000 },
+        "lastLoginAt": { "type": "string", "maxLength": 50 },
+        "updatedAt": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["uid"]
+    },
+    "HabitSetting": {
+      "title": "HabitSetting",
+      "description": "Configured habit with target, icon, order, and reminder schedule",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_-]+$" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "target": { "type": "string", "maxLength": 100 },
+        "icon": { "type": "string", "maxLength": 50 },
+        "order": { "type": "number" },
+        "reminderEnabled": { "type": "boolean" },
+        "reminderTime": { "type": "string", "maxLength": 10 },
+        "createdAt": { "type": "string", "maxLength": 50 },
+        "updatedAt": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["id", "name"]
+    },
+    "DailyHabitLog": {
+      "title": "DailyHabitLog",
+      "description": "Daily habit completion tracking records per date",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string", "maxLength": 10, "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+        "completedHabits": { "type": "object" },
+        "completedCount": { "type": "number" },
+        "totalActiveCount": { "type": "number" },
+        "updatedAt": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["date", "completedHabits", "completedCount", "totalActiveCount"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profile documents isolating user credentials and display info"
+    },
+    "/users/{userId}/habitSettings/{habitId}": {
+      "schema": "HabitSetting",
+      "description": "User individual habit configurations and reminders"
+    },
+    "/users/{userId}/dailyLogs/{date}": {
+      "schema": "DailyHabitLog",
+      "description": "User daily habit completion records indexed by date YYYY-MM-DD"
+    }
+  }
+}
