@@ -7,6 +7,8 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   onAuthStateChanged,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   signOut,
   User,
 } from 'firebase/auth';
@@ -128,8 +130,33 @@ export default function App() {
 
   const isToday = selectedDate === todayDate;
 
-  // Listen to Firebase auth state
+  // Listen to Firebase auth state & handle redirect login result
   useEffect(() => {
+    // Check if user is returning from a redirect login (common on mobile)
+    getRedirectResult(auth)
+      .then(async (result) => {
+        if (result?.user) {
+          const profile = await syncUserProfile(result.user);
+          setCurrentUser(profile);
+          setAuthError(null);
+        }
+      })
+      .catch((error) => {
+        console.error('Redirect sign-in error:', error);
+        if (error.code === 'auth/unauthorized-domain') {
+          const currentDomain = typeof window !== 'undefined' ? window.location.hostname : 'your domain';
+          setAuthError(
+            `Domain "${currentDomain}" is not authorized. In Firebase Console, go to Authentication > Settings > Authorized domains and add "${currentDomain}".`
+          );
+        } else if (error.code === 'auth/operation-not-allowed') {
+          setAuthError(
+            'Google Sign-in provider is disabled. In Firebase Console, go to Authentication > Sign-in method and enable Google.'
+          );
+        } else {
+          setAuthError(error.message || 'Authentication redirect error');
+        }
+      });
+
     const unsubscribe = onAuthStateChanged(
       auth,
       async (user: User | null) => {
@@ -295,7 +322,7 @@ export default function App() {
     return () => clearInterval(timer);
   }, [habits]);
 
-  // Handle Google Sign-in
+  // Handle Google Sign-in with automatic mobile redirect fallback
   const handleGoogleSignIn = async () => {
     setIsAuthLoading(true);
     setAuthError(null);
@@ -305,15 +332,42 @@ export default function App() {
       setCurrentUser(profile);
     } catch (error: any) {
       console.error('Google Sign-in failed:', error);
-      if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
-        // User voluntarily closed popup - do not show scary error
+      if (
+        error.code === 'auth/popup-closed-by-user' ||
+        error.code === 'auth/cancelled-popup-request'
+      ) {
+        // User voluntarily dismissed popup
         setAuthError(null);
+      } else if (
+        error.code === 'auth/popup-blocked' ||
+        error.code === 'auth/cancelled-popup-request'
+      ) {
+        // Fall back to redirect sign-in for mobile browsers that block popups
+        try {
+          await signInWithRedirect(auth, googleProvider);
+          return;
+        } catch (redirectErr: any) {
+          setAuthError(redirectErr?.message || 'Login redirect failed.');
+        }
+      } else if (error.code === 'auth/unauthorized-domain') {
+        const currentDomain = typeof window !== 'undefined' ? window.location.hostname : 'your domain';
+        setAuthError(
+          `Domain "${currentDomain}" is not authorized. In Firebase Console, go to Authentication > Settings > Authorized domains and add "${currentDomain}".`
+        );
+      } else if (error.code === 'auth/operation-not-allowed') {
+        setAuthError(
+          'Google Sign-in provider is disabled. In Firebase Console, go to Authentication > Sign-in method and enable Google.'
+        );
+      } else if (error.code === 'auth/invalid-api-key') {
+        setAuthError(
+          'Invalid Firebase API Key. Please check your VITE_FIREBASE_API_KEY environment variable in Vercel.'
+        );
       } else if (error.code === 'auth/network-request-failed') {
-        setAuthError('Network error. Please check your internet connection and try again.');
-      } else if (error.code === 'auth/popup-blocked') {
-        setAuthError('Popup was blocked by your browser. Please allow popups for this site and try again.');
+        setAuthError('Network connection error. Please check your internet connection.');
       } else {
-        setAuthError('Could not sign in with Google. Please check your connection and try again.');
+        const detailMsg = error?.message || 'Could not sign in with Google.';
+        const errCode = error?.code ? ` [${error.code}]` : '';
+        setAuthError(`${detailMsg}${errCode}`);
       }
     } finally {
       setIsAuthLoading(false);
