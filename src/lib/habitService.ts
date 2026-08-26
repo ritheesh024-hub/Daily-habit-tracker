@@ -77,11 +77,13 @@ export function createDefaultDailyLog(
   };
 }
 
-export async function syncUserProfile(user: User): Promise<UserProfile> {
+export function syncUserProfile(user: User): UserProfile {
   const now = new Date().toISOString();
+  const cached = getCachedUserProfile(user.uid);
+
   const profile: UserProfile = {
     uid: user.uid,
-    displayName: user.displayName || 'User',
+    displayName: cached?.displayName || user.displayName || 'User',
     email: user.email || null,
     photoURL: user.photoURL || null,
     lastLoginAt: now,
@@ -90,50 +92,26 @@ export async function syncUserProfile(user: User): Promise<UserProfile> {
   // Cache immediately under user's UID
   setCachedUserProfile(profile);
 
-  // Background sync to users/{uid}
+  // Background non-blocking sync to users/{uid} in Firestore
   const userRef = doc(db, 'users', user.uid);
-  try {
-    const existingSnap = await getDoc(userRef);
-    if (existingSnap.exists()) {
-      const data = existingSnap.data();
-      if (data.displayName) {
-        profile.displayName = data.displayName;
-        setCachedUserProfile(profile);
-      }
-      await setDoc(
-        userRef,
-        {
-          uid: user.uid,
-          displayName: profile.displayName || 'User',
-          email: user.email || null,
-          photoURL: user.photoURL || null,
-          lastLoginAt: now,
-          updatedAt: now,
-        },
-        { merge: true }
-      );
-    } else {
-      await setDoc(
-        userRef,
-        {
-          uid: user.uid,
-          displayName: profile.displayName || 'User',
-          email: user.email || null,
-          photoURL: user.photoURL || null,
-          createdAt: now,
-          updatedAt: now,
-          lastLoginAt: now,
-          settings: {
-            theme: 'light',
-            dailyResetHour: 0,
-          },
-        },
-        { merge: true }
-      );
-    }
-  } catch (e: any) {
-    console.warn('Profile sync notice:', e);
-  }
+  setDoc(
+    userRef,
+    {
+      uid: user.uid,
+      displayName: profile.displayName || 'User',
+      email: user.email || null,
+      photoURL: user.photoURL || null,
+      lastLoginAt: now,
+      updatedAt: now,
+      settings: {
+        theme: 'light',
+        dailyResetHour: 0,
+      },
+    },
+    { merge: true }
+  ).catch((e) => {
+    console.warn('Background profile sync notice:', e);
+  });
 
   return profile;
 }

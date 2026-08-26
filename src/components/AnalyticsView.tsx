@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Flame,
   Award,
@@ -62,7 +62,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
   // Inspect details for selected date
   const inspectedLog = rawLogsMap[inspectedDate];
   const inspectedCompletedHabits = inspectedLog?.completedHabits || {};
-  const activeHabitIds = habits.map((h) => h.id);
+  const activeHabitIds = useMemo(() => habits.map((h) => h.id), [habits]);
   const inspectedCompletedCount = inspectedLog
     ? typeof inspectedLog.completedCount === 'number'
       ? inspectedLog.completedCount
@@ -75,14 +75,19 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
     ? Math.round((inspectedCompletedCount / inspectedTotalCount) * 100)
     : 0;
 
-  const completedHabitsList = habits.filter((h) => inspectedCompletedHabits[h.id]);
-  const incompleteHabitsList = habits.filter((h) => !inspectedCompletedHabits[h.id]);
+  const completedHabitsList = useMemo(
+    () => habits.filter((h) => inspectedCompletedHabits[h.id]),
+    [habits, inspectedCompletedHabits]
+  );
+  const incompleteHabitsList = useMemo(
+    () => habits.filter((h) => !inspectedCompletedHabits[h.id]),
+    [habits, inspectedCompletedHabits]
+  );
 
   // Calendar days grid
-  const calendarDays = getMonthCalendarDays(
-    currentYearMonth.year,
-    currentYearMonth.monthIndex,
-    todayDate
+  const calendarDays = useMemo(
+    () => getMonthCalendarDays(currentYearMonth.year, currentYearMonth.monthIndex, todayDate),
+    [currentYearMonth.year, currentYearMonth.monthIndex, todayDate]
   );
 
   // Check if completely empty state

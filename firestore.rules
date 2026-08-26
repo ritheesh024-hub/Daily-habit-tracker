@@ -36,6 +36,11 @@ service cloud.firestore {
       match /reminderSettings/{habitId} {
         allow read, write: if isOwner(userId);
       }
+
+      // User settings subcollection
+      match /settings/{settingId} {
+        allow read, write: if isOwner(userId);
+      }
     }
   }
 }

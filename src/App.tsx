@@ -166,7 +166,7 @@ export default function App() {
     getRedirectResult(auth)
       .then(async (result) => {
         if (result?.user) {
-          const profile = await syncUserProfile(result.user);
+          const profile = syncUserProfile(result.user);
           setCurrentUser(profile);
           setCachedUserProfile(profile);
           setAuthError(null);
@@ -201,9 +201,9 @@ export default function App() {
 
     const unsubscribe = onAuthStateChanged(
       auth,
-      async (user: User | null) => {
+      (user: User | null) => {
         if (user) {
-          const profile = await syncUserProfile(user);
+          const profile = syncUserProfile(user);
           setCurrentUser(profile);
           setCachedUserProfile(profile);
           setAuthError(null);
@@ -309,6 +309,7 @@ export default function App() {
   }, [currentUser?.uid]);
 
   // Sync full history in background on initial login or date roll (Data Saver: 35 days limit)
+  const habitsKey = habits.map((h) => `${h.id}_${h.name}`).join('|');
   useEffect(() => {
     if (!currentUser?.uid || habits.length === 0) return;
 
@@ -323,7 +324,7 @@ export default function App() {
       .catch((err) => {
         console.warn('Background history sync:', err);
       });
-  }, [currentUser?.uid, todayDate, habits]);
+  }, [currentUser?.uid, todayDate, habitsKey]);
 
   // Instant switch when selectedDate changes (Data-Saver: 0 internet calls when in memory / local storage)
   useEffect(() => {
@@ -414,7 +415,7 @@ export default function App() {
     setAuthError(null);
     try {
       const result = await signInWithPopup(auth, googleProvider);
-      const profile = await syncUserProfile(result.user);
+      const profile = syncUserProfile(result.user);
       setCurrentUser(profile);
       setCachedUserProfile(profile);
     } catch (error: any) {
