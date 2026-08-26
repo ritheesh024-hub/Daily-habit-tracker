@@ -46,9 +46,28 @@ export const LoginView: React.FC<LoginViewProps> = ({
         {error && (
           <div
             id="auth-error-banner"
-            className="mb-4 p-3 rounded bg-red-50 border border-red-200 text-xs text-red-700"
+            className="mb-4 p-3.5 rounded-lg bg-red-50 border border-red-200 text-xs text-red-800 space-y-2"
           >
-            {error}
+            <div className="font-medium flex items-start gap-2">
+              <span className="text-red-600 font-bold shrink-0">⚠️</span>
+              <span className="leading-relaxed">{error}</span>
+            </div>
+            {typeof window !== 'undefined' && error.includes('Authorized domains') && (
+              <div className="pt-1 flex items-center justify-between gap-2 bg-white/70 p-2 rounded border border-red-200/60">
+                <code className="text-[11px] font-mono text-zinc-800 truncate select-all">
+                  {window.location.hostname}
+                </code>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(window.location.hostname);
+                  }}
+                  className="px-2 py-1 bg-red-100 hover:bg-red-200 active:bg-red-300 text-red-900 rounded text-[10px] font-semibold tracking-wide transition-colors cursor-pointer shrink-0"
+                >
+                  Copy Domain
+                </button>
+              </div>
+            )}
           </div>
         )}
 

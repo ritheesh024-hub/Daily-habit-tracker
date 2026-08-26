@@ -27,8 +27,21 @@ import {
   getLastNDays,
   getPreviousDateString,
   getTodayDateString,
+  getLocalDateKey,
   formatWeekday,
 } from './dateUtils';
+import {
+  getCachedHabits,
+  setCachedHabits,
+  getCachedDailyLog,
+  setCachedDailyLog,
+  getCachedHistoryBundle,
+  setCachedHistoryBundle,
+  getCachedUserProfile,
+  setCachedUserProfile,
+} from './cacheService';
+
+export { getLocalDateKey };
 
 export function countCompletedInMap(
   completedMap: Record<string, boolean>,
@@ -37,13 +50,25 @@ export function countCompletedInMap(
   if (activeHabitIds && activeHabitIds.length > 0) {
     return activeHabitIds.reduce((acc, id) => acc + (completedMap[id] ? 1 : 0), 0);
   }
-  return Object.values(completedMap).filter(Boolean).length;
+  return Object.values(completedMap || {}).filter(Boolean).length;
+}
+
+export function calculateDailyProgress(
+  completedHabits: Record<string, boolean>,
+  activeHabitIds: string[] = []
+): { completedCount: number; totalCount: number; percentage: number; isCompleted: boolean } {
+  const completedCount = countCompletedInMap(completedHabits, activeHabitIds);
+  const totalCount = activeHabitIds.length;
+  const percentage = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+  const isCompleted = totalCount > 0 && completedCount >= totalCount;
+  return { completedCount, totalCount, percentage, isCompleted };
 }
 
 export function createDefaultDailyLog(
-  date: string = getTodayDateString(),
+  dateInput: string = getTodayDateString(),
   activeHabitsCount: number = DEFAULT_HABITS.length
 ): DailyLogData {
+  const date = getLocalDateKey(dateInput);
   return {
     date,
     completedHabits: {},
@@ -53,46 +78,83 @@ export function createDefaultDailyLog(
 }
 
 export async function syncUserProfile(user: User): Promise<UserProfile> {
-  const userRef = doc(db, 'users', user.uid);
-  let displayName = user.displayName;
+  const now = new Date().toISOString();
+  const profile: UserProfile = {
+    uid: user.uid,
+    displayName: user.displayName || 'User',
+    email: user.email || null,
+    photoURL: user.photoURL || null,
+    lastLoginAt: now,
+  };
 
+  // Cache immediately under user's UID
+  setCachedUserProfile(profile);
+
+  // Background sync to users/{uid}
+  const userRef = doc(db, 'users', user.uid);
   try {
     const existingSnap = await getDoc(userRef);
     if (existingSnap.exists()) {
       const data = existingSnap.data();
       if (data.displayName) {
-        displayName = data.displayName;
+        profile.displayName = data.displayName;
+        setCachedUserProfile(profile);
       }
+      await setDoc(
+        userRef,
+        {
+          uid: user.uid,
+          displayName: profile.displayName || 'User',
+          email: user.email || null,
+          photoURL: user.photoURL || null,
+          lastLoginAt: now,
+          updatedAt: now,
+        },
+        { merge: true }
+      );
+    } else {
+      await setDoc(
+        userRef,
+        {
+          uid: user.uid,
+          displayName: profile.displayName || 'User',
+          email: user.email || null,
+          photoURL: user.photoURL || null,
+          createdAt: now,
+          updatedAt: now,
+          lastLoginAt: now,
+          settings: {
+            theme: 'light',
+            dailyResetHour: 0,
+          },
+        },
+        { merge: true }
+      );
     }
-  } catch (e) {
-    console.error('Error reading existing profile:', e);
-  }
-
-  const profile: UserProfile = {
-    uid: user.uid,
-    displayName: displayName || user.displayName,
-    email: user.email,
-    photoURL: user.photoURL,
-    lastLoginAt: new Date().toISOString(),
-  };
-
-  try {
-    await setDoc(userRef, profile, { merge: true });
-  } catch (error) {
-    console.error('Error syncing user profile to Firestore:', error);
+  } catch (e: any) {
+    console.warn('Profile sync notice:', e);
   }
 
   return profile;
 }
 
 export async function updateUserDisplayName(userId: string, displayName: string): Promise<void> {
-  const userRef = doc(db, 'users', userId);
-  await setDoc(userRef, { displayName, updatedAt: new Date().toISOString() }, { merge: true });
+  const cached = getCachedUserProfile(userId);
+  if (cached) {
+    cached.displayName = displayName;
+    setCachedUserProfile(cached);
+  }
+  try {
+    const userRef = doc(db, 'users', userId);
+    await setDoc(userRef, { displayName, updatedAt: new Date().toISOString() }, { merge: true });
+  } catch (error) {
+    console.warn('Update user profile notice (cached locally):', error);
+  }
 }
 
 /**
  * Loads user habit settings from users/{userId}/habitSettings.
- * If none exist (new user), seeds the default 8 habits and returns them.
+ * Uses local cache first for instant loading, then updates in background.
  */
 export async function fetchUserHabitSettings(userId: string): Promise<HabitItem[]> {
   try {
@@ -108,7 +170,7 @@ export async function fetchUserHabitSettings(userId: string): Promise<HabitItem[
           id: docSnap.id,
           name: data.name || 'Untitled Habit',
           target: data.target || '',
-          icon: data.icon || '',
+          icon: data.icon || 'check',
           order: typeof data.order === 'number' ? data.order : habits.length,
           reminderEnabled: typeof data.reminderEnabled === 'boolean' ? data.reminderEnabled : false,
           reminderTime: data.reminderTime || '08:00',
@@ -116,15 +178,22 @@ export async function fetchUserHabitSettings(userId: string): Promise<HabitItem[
           updatedAt: data.updatedAt,
         });
       });
-      return habits.sort((a, b) => a.order - b.order);
+      const sorted = habits.sort((a, b) => a.order - b.order);
+      setCachedHabits(userId, sorted);
+      return sorted;
     }
 
-    // Seed default habits if no habits found
+    // Seed default habits if no habits found for this user
     const batch = writeBatch(db);
     const now = new Date().toISOString();
     const seededHabits: HabitItem[] = DEFAULT_HABITS.map((item, idx) => ({
-      ...item,
+      id: item.id,
+      name: item.name,
+      target: item.target || '',
+      icon: item.icon || 'check',
       order: idx,
+      reminderEnabled: typeof item.reminderEnabled === 'boolean' ? item.reminderEnabled : false,
+      reminderTime: item.reminderTime || '08:00',
       createdAt: now,
       updatedAt: now,
     }));
@@ -132,111 +201,217 @@ export async function fetchUserHabitSettings(userId: string): Promise<HabitItem[
     for (const item of seededHabits) {
       const itemRef = doc(db, 'users', userId, 'habitSettings', item.id);
       batch.set(itemRef, item);
+
+      // Also seed reminder settings subcollection
+      const reminderRef = doc(db, 'users', userId, 'reminderSettings', item.id);
+      batch.set(reminderRef, {
+        habitId: item.id,
+        reminderEnabled: !!item.reminderEnabled,
+        reminderTime: item.reminderTime || '08:00',
+        updatedAt: now,
+      });
     }
 
     await batch.commit();
+    setCachedHabits(userId, seededHabits);
     return seededHabits;
   } catch (error) {
-    console.error('Error fetching habit settings:', error);
-    return DEFAULT_HABITS;
+    console.warn('Error fetching habit settings from network, using cached:', error);
+    return getCachedHabits(userId);
   }
 }
 
 /**
- * Saves or updates a single habit setting.
+ * Saves or updates a single habit setting and its reminder settings document.
  */
 export async function saveHabitSetting(userId: string, habit: HabitItem): Promise<void> {
-  const habitRef = doc(db, 'users', userId, 'habitSettings', habit.id);
-  const payload: HabitItem = {
-    ...habit,
-    updatedAt: new Date().toISOString(),
+  const now = new Date().toISOString();
+  const payload = {
+    id: habit.id,
+    name: habit.name,
+    target: habit.target || '',
+    icon: habit.icon || 'check',
+    order: typeof habit.order === 'number' ? habit.order : 0,
+    reminderEnabled: typeof habit.reminderEnabled === 'boolean' ? habit.reminderEnabled : false,
+    reminderTime: habit.reminderTime || '08:00',
+    createdAt: habit.createdAt || now,
+    updatedAt: now,
   };
-  await setDoc(habitRef, payload, { merge: true });
+
+  try {
+    const habitRef = doc(db, 'users', userId, 'habitSettings', habit.id);
+    await setDoc(habitRef, payload, { merge: true });
+  } catch (error) {
+    console.warn('Save habit setting notice:', error);
+  }
+
+  // Sync to reminderSettings subcollection
+  try {
+    const reminderRef = doc(db, 'users', userId, 'reminderSettings', habit.id);
+    await setDoc(
+      reminderRef,
+      {
+        habitId: habit.id,
+        reminderEnabled: typeof habit.reminderEnabled === 'boolean' ? habit.reminderEnabled : false,
+        reminderTime: habit.reminderTime || '08:00',
+        updatedAt: now,
+      },
+      { merge: true }
+    );
+  } catch (reminderErr) {
+    console.warn('Reminder sync notice:', reminderErr);
+  }
 }
 
 /**
- * Deletes a habit from users/{userId}/habitSettings.
- * Does not remove historical completion logs so historical dates stay intact.
+ * Deletes a habit from users/{userId}/habitSettings and users/{userId}/reminderSettings.
  */
 export async function deleteHabitSetting(userId: string, habitId: string): Promise<void> {
-  const habitRef = doc(db, 'users', userId, 'habitSettings', habitId);
-  await deleteDoc(habitRef);
+  try {
+    const habitRef = doc(db, 'users', userId, 'habitSettings', habitId);
+    await deleteDoc(habitRef);
+  } catch (error) {
+    console.warn('Delete habit setting notice:', error);
+  }
+
+  try {
+    const reminderRef = doc(db, 'users', userId, 'reminderSettings', habitId);
+    await deleteDoc(reminderRef);
+  } catch (reminderErr) {
+    console.warn('Reminder delete notice:', reminderErr);
+  }
 }
 
 /**
  * Fetches daily habit completion logs for a specific date.
- * Checks users/{userId}/dailyLogs/{date} with fallback to users/{userId}/habits/{date}.
+ * Uses local cache first if available to save bandwidth.
  */
 export async function fetchDailyLog(
   userId: string,
-  date: string,
-  activeHabits: HabitItem[]
+  dateInput: string,
+  activeHabits: HabitItem[] = []
 ): Promise<DailyLogData> {
+  const date = getLocalDateKey(dateInput);
   const activeIds = activeHabits.map((h) => h.id);
 
+  // Check local cache first
+  const cached = getCachedDailyLog(userId, date);
+  if (cached) {
+    const progress = calculateDailyProgress(cached.completedHabits || {}, activeIds);
+    const updated = {
+      ...cached,
+      date,
+      completedCount: progress.completedCount,
+      totalActiveCount: activeHabits.length,
+    };
+    return updated;
+  }
+
   try {
-    // 1. Try dailyLogs/{date}
     const logDocRef = doc(db, 'users', userId, 'dailyLogs', date);
     const logSnap = await getDoc(logDocRef);
 
     if (logSnap.exists()) {
       const data = logSnap.data();
       const completedHabits: Record<string, boolean> = data.completedHabits || {};
-      const completedCount = countCompletedInMap(completedHabits, activeIds);
-      return {
+      const progress = calculateDailyProgress(completedHabits, activeIds);
+      const logData: DailyLogData = {
         date,
         completedHabits,
-        completedCount,
+        completedCount: progress.completedCount,
         totalActiveCount: activeHabits.length,
         updatedAt: data.updatedAt,
       };
-    }
-
-    // 2. Fallback to legacy habits/{date} if existed
-    const legacyDocRef = doc(db, 'users', userId, 'habits', date);
-    const legacySnap = await getDoc(legacyDocRef);
-    if (legacySnap.exists()) {
-      const legacyData = legacySnap.data() as Record<string, any>;
-      const completedHabits: Record<string, boolean> = {};
-
-      ['wakeUp', 'water', 'gym', 'breakfast', 'lunch', 'dinner', 'reading', 'sleep'].forEach(
-        (k) => {
-          if (legacyData[k]) {
-            completedHabits[k] = true;
-          }
-        }
-      );
-
-      const completedCount = countCompletedInMap(completedHabits, activeIds);
-      return {
-        date,
-        completedHabits,
-        completedCount,
-        totalActiveCount: activeHabits.length,
-        updatedAt: legacyData.updatedAt,
-      };
+      setCachedDailyLog(userId, date, logData);
+      return logData;
     }
   } catch (error) {
-    console.error(`Error fetching daily log for ${date}:`, error);
+    console.warn(`Error fetching daily log for ${date}:`, error);
   }
 
-  return createDefaultDailyLog(date, activeHabits.length);
+  const fallback = createDefaultDailyLog(date, activeHabits.length);
+  setCachedDailyLog(userId, date, fallback);
+  return fallback;
 }
 
+export const getDailyLog = fetchDailyLog;
+
 /**
- * Saves the daily completion log to Firestore.
+ * Saves the daily completion log to Firestore and local storage cache.
+ * Fully date-isolated: guarantees writes target only users/{userId}/dailyLogs/{date}.
  */
-export async function saveDailyLog(userId: string, log: DailyLogData): Promise<void> {
+export async function saveDailyLog(
+  userId: string,
+  dateOrLog: string | DailyLogData,
+  maybeLog?: DailyLogData
+): Promise<void> {
+  if (!userId) return;
+
+  let date: string;
+  let log: DailyLogData;
+
+  if (typeof dateOrLog === 'string' && maybeLog) {
+    date = getLocalDateKey(dateOrLog);
+    log = { ...maybeLog, date };
+  } else if (typeof dateOrLog === 'object' && dateOrLog !== null) {
+    date = getLocalDateKey(dateOrLog.date);
+    log = { ...dateOrLog, date };
+  } else {
+    return;
+  }
+
+  // Write to local cache immediately with strictly isolated key
+  setCachedDailyLog(userId, date, log);
+
   const payload = {
-    date: log.date,
-    completedHabits: log.completedHabits,
-    completedCount: log.completedCount,
-    totalActiveCount: log.totalActiveCount,
+    date,
+    completedHabits: log.completedHabits || {},
+    completedCount: typeof log.completedCount === 'number' ? log.completedCount : 0,
+    totalActiveCount: typeof log.totalActiveCount === 'number' ? log.totalActiveCount : 0,
     updatedAt: new Date().toISOString(),
   };
 
-  const logDocRef = doc(db, 'users', userId, 'dailyLogs', log.date);
-  await setDoc(logDocRef, payload, { merge: true });
+  try {
+    const logDocRef = doc(db, 'users', userId, 'dailyLogs', date);
+    await setDoc(logDocRef, payload, { merge: true });
+  } catch (error) {
+    console.warn(`Save daily log notice for ${date}:`, error);
+  }
+}
+
+/**
+ * Pure helper to toggle a habit for a specific date log.
+ */
+export function toggleHabit(
+  userId: string,
+  dateInput: string,
+  habitId: string,
+  currentLog: DailyLogData,
+  habits: HabitItem[]
+): { updatedLog: DailyLogData; completedCount: number; totalCount: number } {
+  const date = getLocalDateKey(dateInput);
+  const currentCompleted = !!(currentLog.completedHabits && currentLog.completedHabits[habitId]);
+  const updatedCompletedHabits: Record<string, boolean> = {
+    ...(currentLog.completedHabits || {}),
+    [habitId]: !currentCompleted,
+  };
+
+  const activeHabitIds = habits.map((h) => h.id);
+  const progress = calculateDailyProgress(updatedCompletedHabits, activeHabitIds);
+
+  const updatedLog: DailyLogData = {
+    date,
+    completedHabits: updatedCompletedHabits,
+    completedCount: progress.completedCount,
+    totalActiveCount: habits.length,
+    updatedAt: new Date().toISOString(),
+  };
+
+  return {
+    updatedLog,
+    completedCount: progress.completedCount,
+    totalCount: progress.totalCount,
+  };
 }
 
 /**
@@ -483,7 +658,8 @@ export function calculateAnalytics(
 export async function fetchHabitHistoryAndStreaks(
   userId: string,
   todayDate: string,
-  habits: HabitItem[]
+  habits: HabitItem[],
+  forceRefresh: boolean = false
 ): Promise<{
   history7Days: DayHistorySummary[];
   historyMap: Record<string, { completed: number; total: number }>;
@@ -491,6 +667,39 @@ export async function fetchHabitHistoryAndStreaks(
   streaks: StreakStats;
   analytics: AnalyticsStats;
 }> {
+  const normalizedToday = getLocalDateKey(todayDate);
+
+  // Check local cache bundle first
+  if (!forceRefresh) {
+    const cachedBundle = getCachedHistoryBundle(userId);
+    if (cachedBundle) {
+      // Re-calculate today's streak & weekday mapping in case date rolled over
+      const recalculatedStreaks = calculateStreaks(cachedBundle.historyMap, normalizedToday);
+      const last7Dates = getLast7Days(normalizedToday);
+      const history7Days: DayHistorySummary[] = last7Dates.map((date) => {
+        const record = cachedBundle.historyMap[date];
+        const completedCount = record ? record.completed : 0;
+        const totalCount = record ? record.total : habits.length;
+        const percentage = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+        const isCompleted = totalCount > 0 && completedCount >= totalCount;
+        return {
+          date,
+          weekday: formatWeekday(date),
+          completedCount,
+          totalCount,
+          percentage,
+          isCompleted,
+        };
+      });
+
+      return {
+        ...cachedBundle,
+        history7Days,
+        streaks: recalculatedStreaks,
+      };
+    }
+  }
+
   const historyMap: Record<string, { completed: number; total: number }> = {};
   const rawLogsMap: Record<string, DailyLogData> = {};
   const activeIds = habits.map((h) => h.id);
@@ -503,16 +712,22 @@ export async function fetchHabitHistoryAndStreaks(
     totalActiveCount: number;
   }> = [];
 
-  // 1. Fetch from dailyLogs
+  // 1. Fetch lightweight 35-day window from dailyLogs
   try {
     const logsCol = collection(db, 'users', userId, 'dailyLogs');
-    const q = query(logsCol, orderBy('date', 'desc'), limit(150));
-    const snapshot = await getDocs(q);
+    let snapshot;
+    try {
+      const q = query(logsCol, orderBy('date', 'desc'), limit(35));
+      snapshot = await getDocs(q);
+    } catch {
+      const fallbackQ = query(logsCol, limit(50));
+      snapshot = await getDocs(fallbackQ);
+    }
 
     snapshot.forEach((d) => {
       const dData = d.data();
-      const dDate = d.id;
-      const completedHabits = dData.completedHabits || {};
+      const dDate = getLocalDateKey(d.id || dData.date);
+      const completedHabits: Record<string, boolean> = dData.completedHabits || {};
       const completed = typeof dData.completedCount === 'number'
         ? dData.completedCount
         : countCompletedInMap(completedHabits, activeIds);
@@ -521,12 +736,14 @@ export async function fetchHabitHistoryAndStreaks(
         : totalHabitsCount;
 
       historyMap[dDate] = { completed, total };
-      rawLogsMap[dDate] = {
+      const logData: DailyLogData = {
         date: dDate,
         completedHabits,
         completedCount: completed,
         totalActiveCount: total,
       };
+      rawLogsMap[dDate] = logData;
+      setCachedDailyLog(userId, dDate, logData);
       rawLogs.push({
         date: dDate,
         completedHabits,
@@ -535,51 +752,14 @@ export async function fetchHabitHistoryAndStreaks(
       });
     });
   } catch (error) {
-    console.error('Error fetching dailyLogs history:', error);
+    console.warn('Error fetching dailyLogs history:', error);
   }
 
-  // 2. Fetch from legacy habits if any
-  try {
-    const legacyCol = collection(db, 'users', userId, 'habits');
-    const qLegacy = query(legacyCol, orderBy('date', 'desc'), limit(150));
-    const legacySnapshot = await getDocs(qLegacy);
+  // 2. Compute Streaks
+  const streaks = calculateStreaks(historyMap, normalizedToday);
 
-    legacySnapshot.forEach((d) => {
-      const dDate = d.id;
-      if (!historyMap[dDate]) {
-        const dData = d.data();
-        const completedHabits: Record<string, boolean> = {};
-        ['wakeUp', 'water', 'gym', 'breakfast', 'lunch', 'dinner', 'reading', 'sleep'].forEach(
-          (k) => {
-            if (dData[k]) completedHabits[k] = true;
-          }
-        );
-        const completed = countCompletedInMap(completedHabits, activeIds);
-        const total = totalHabitsCount || 8;
-        historyMap[dDate] = { completed, total };
-        rawLogsMap[dDate] = {
-          date: dDate,
-          completedHabits,
-          completedCount: completed,
-          totalActiveCount: total,
-        };
-        rawLogs.push({
-          date: dDate,
-          completedHabits,
-          completedCount: completed,
-          totalActiveCount: total,
-        });
-      }
-    });
-  } catch (error) {
-    console.error('Error fetching legacy habits history:', error);
-  }
-
-  // 3. Compute Streaks
-  const streaks = calculateStreaks(historyMap, todayDate);
-
-  // 4. Generate 7-Day History
-  const last7Dates = getLast7Days(todayDate);
+  // 3. Generate 7-Day History
+  const last7Dates = getLast7Days(normalizedToday);
   const history7Days: DayHistorySummary[] = last7Dates.map((date) => {
     const record = historyMap[date];
     const completedCount = record ? record.completed : 0;
@@ -597,14 +777,18 @@ export async function fetchHabitHistoryAndStreaks(
     };
   });
 
-  // 5. Compute Full Analytics
-  const analytics = calculateAnalytics(rawLogs, habits, todayDate, streaks);
+  // 4. Compute Full Analytics
+  const analytics = calculateAnalytics(rawLogs, habits, normalizedToday, streaks);
 
-  return {
+  const resultBundle = {
     history7Days,
     historyMap,
     rawLogsMap,
     streaks,
     analytics,
   };
+
+  setCachedHistoryBundle(userId, resultBundle);
+
+  return resultBundle;
 }

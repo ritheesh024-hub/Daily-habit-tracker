@@ -2,15 +2,17 @@
   "entities": {
     "UserProfile": {
       "title": "UserProfile",
-      "description": "User profile document storing basic account and preference info",
+      "description": "User profile document storing basic account and preference info scoped by auth UID",
       "type": "object",
       "properties": {
         "uid": { "type": "string", "maxLength": 128 },
         "displayName": { "type": "string", "maxLength": 100 },
         "email": { "type": "string", "maxLength": 200 },
         "photoURL": { "type": "string", "maxLength": 1000 },
-        "lastLoginAt": { "type": "string", "maxLength": 50 },
-        "updatedAt": { "type": "string", "maxLength": 50 }
+        "createdAt": { "type": "string", "maxLength": 60 },
+        "updatedAt": { "type": "string", "maxLength": 60 },
+        "lastLoginAt": { "type": "string", "maxLength": 60 },
+        "settings": { "type": "object" }
       },
       "required": ["uid"]
     },
@@ -26,8 +28,8 @@
         "order": { "type": "number" },
         "reminderEnabled": { "type": "boolean" },
         "reminderTime": { "type": "string", "maxLength": 10 },
-        "createdAt": { "type": "string", "maxLength": 50 },
-        "updatedAt": { "type": "string", "maxLength": 50 }
+        "createdAt": { "type": "string", "maxLength": 60 },
+        "updatedAt": { "type": "string", "maxLength": 60 }
       },
       "required": ["id", "name"]
     },
@@ -40,23 +42,39 @@
         "completedHabits": { "type": "object" },
         "completedCount": { "type": "number" },
         "totalActiveCount": { "type": "number" },
-        "updatedAt": { "type": "string", "maxLength": 50 }
+        "updatedAt": { "type": "string", "maxLength": 60 }
       },
       "required": ["date", "completedHabits", "completedCount", "totalActiveCount"]
+    },
+    "ReminderSetting": {
+      "title": "ReminderSetting",
+      "description": "User reminder schedules per habit",
+      "type": "object",
+      "properties": {
+        "habitId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_-]+$" },
+        "reminderEnabled": { "type": "boolean" },
+        "reminderTime": { "type": "string", "maxLength": 10 },
+        "updatedAt": { "type": "string", "maxLength": 60 }
+      },
+      "required": ["habitId"]
     }
   },
   "firestore": {
     "/users/{userId}": {
       "schema": "UserProfile",
-      "description": "User profile documents isolating user credentials and display info"
+      "description": "User profile and settings documents isolating user credentials and display info"
     },
     "/users/{userId}/habitSettings/{habitId}": {
       "schema": "HabitSetting",
-      "description": "User individual habit configurations and reminders"
+      "description": "User individual habit configurations"
     },
     "/users/{userId}/dailyLogs/{date}": {
       "schema": "DailyHabitLog",
       "description": "User daily habit completion records indexed by date YYYY-MM-DD"
+    },
+    "/users/{userId}/reminderSettings/{habitId}": {
+      "schema": "ReminderSetting",
+      "description": "User habit reminder schedules"
     }
   }
 }

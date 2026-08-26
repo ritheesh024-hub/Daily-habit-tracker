@@ -16,80 +16,28 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    function isValidId(id) {
-      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
-    }
-
-    function isValidDateStr(dateStr) {
-      return dateStr is string && dateStr.size() == 10 && dateStr.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
-    }
-
-    function incoming() {
-      return request.resource.data;
-    }
-
-    function isValidUserProfile(userId) {
-      return incoming().uid == userId
-        && (!('displayName' in incoming()) || (incoming().displayName is string && incoming().displayName.size() <= 100))
-        && (!('email' in incoming()) || incoming().email == null || (incoming().email is string && incoming().email.size() <= 200))
-        && (!('photoURL' in incoming()) || incoming().photoURL == null || (incoming().photoURL is string && incoming().photoURL.size() <= 1000))
-        && (!('lastLoginAt' in incoming()) || (incoming().lastLoginAt is string && incoming().lastLoginAt.size() <= 60))
-        && (!('updatedAt' in incoming()) || (incoming().updatedAt is string && incoming().updatedAt.size() <= 60));
-    }
-
-    function isValidHabitSetting(habitId) {
-      return incoming().id == habitId
-        && incoming().name is string
-        && incoming().name.size() > 0
-        && incoming().name.size() <= 100
-        && (!('target' in incoming()) || (incoming().target is string && incoming().target.size() <= 100))
-        && (!('icon' in incoming()) || (incoming().icon is string && incoming().icon.size() <= 50))
-        && (!('order' in incoming()) || (incoming().order is number && incoming().order >= 0 && incoming().order <= 1000))
-        && (!('reminderEnabled' in incoming()) || incoming().reminderEnabled is bool)
-        && (!('reminderTime' in incoming()) || (incoming().reminderTime is string && incoming().reminderTime.size() <= 10))
-        && (!('createdAt' in incoming()) || (incoming().createdAt is string && incoming().createdAt.size() <= 60))
-        && (!('updatedAt' in incoming()) || (incoming().updatedAt is string && incoming().updatedAt.size() <= 60));
-    }
-
-    function isValidDailyLog(dateStr) {
-      return incoming().date == dateStr
-        && incoming().completedHabits is map
-        && incoming().completedCount is number
-        && incoming().completedCount >= 0
-        && incoming().totalActiveCount is number
-        && incoming().totalActiveCount >= 0
-        && (!('updatedAt' in incoming()) || (incoming().updatedAt is string && incoming().updatedAt.size() <= 60));
-    }
-
-    // User profile matching
+    // User profile matching - strictly scoped by auth UID
     match /users/{userId} {
-      allow get: if isOwner(userId);
+      allow get, create, update: if isOwner(userId);
       allow list: if false; // Users cannot list other users
-      allow create: if isOwner(userId) && isValidId(userId) && isValidUserProfile(userId);
-      allow update: if isOwner(userId) && isValidId(userId) && isValidUserProfile(userId);
       allow delete: if false; // Prevent accidental account deletion from client
 
       // Habit settings subcollection
       match /habitSettings/{habitId} {
-        allow get, list: if isOwner(userId);
-        allow create: if isOwner(userId) && isValidId(habitId) && isValidHabitSetting(habitId);
-        allow update: if isOwner(userId) && isValidId(habitId) && isValidHabitSetting(habitId);
-        allow delete: if isOwner(userId) && isValidId(habitId);
+        allow read, write: if isOwner(userId);
       }
 
       // Daily habit logs subcollection
       match /dailyLogs/{date} {
-        allow get, list: if isOwner(userId);
-        allow create: if isOwner(userId) && isValidDateStr(date) && isValidDailyLog(date);
-        allow update: if isOwner(userId) && isValidDateStr(date) && isValidDailyLog(date);
-        allow delete: if isOwner(userId) && isValidDateStr(date);
+        allow read, write: if isOwner(userId);
       }
 
-      // Legacy habits subcollection fallback (read-only for migration if needed)
-      match /habits/{date} {
-        allow get, list: if isOwner(userId);
-        allow create, update, delete: if isOwner(userId);
+      // Reminder settings subcollection
+      match /reminderSettings/{habitId} {
+        allow read, write: if isOwner(userId);
       }
     }
   }
 }
+
+

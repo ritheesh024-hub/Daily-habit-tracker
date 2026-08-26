@@ -4,7 +4,7 @@ import { UserProfile } from '../types';
 import { formatHeaderDate } from '../lib/dateUtils';
 
 interface HeaderProps {
-  user: UserProfile;
+  user: UserProfile | null;
   currentDate: string;
   onSignOut: () => void;
   onOpenProfile: () => void;
@@ -51,7 +51,7 @@ export const Header: React.FC<HeaderProps> = ({
             className="flex items-center gap-2 text-right p-1.5 rounded-lg hover:bg-zinc-100 transition-colors cursor-pointer group select-none border border-transparent hover:border-zinc-200 focus-visible:ring-2 focus-visible:ring-zinc-900 focus-visible:outline-none"
             title="Open Profile, Habits & Analytics"
           >
-            {user.photoURL ? (
+            {user?.photoURL ? (
               <img
                 id="user-avatar"
                 src={user.photoURL}
@@ -65,7 +65,7 @@ export const Header: React.FC<HeaderProps> = ({
                 aria-hidden="true"
                 className="w-8 h-8 rounded-full bg-zinc-200 text-zinc-700 flex items-center justify-center text-xs font-medium"
               >
-                {(user.displayName || user.email || 'U')[0].toUpperCase()}
+                {((user?.displayName || user?.email || 'U')[0] || 'U').toUpperCase()}
               </div>
             )}
             <div className="text-left hidden xs:block">
@@ -73,7 +73,7 @@ export const Header: React.FC<HeaderProps> = ({
                 id="user-display-name"
                 className="block text-xs sm:text-sm font-medium text-zinc-800 group-hover:text-zinc-900 max-w-[120px] sm:max-w-[150px] truncate"
               >
-                {user.displayName || user.email?.split('@')[0] || 'User'}
+                {user?.displayName || user?.email?.split('@')[0] || 'User'}
               </span>
               <span className="block text-[10px] text-zinc-500 font-mono">
                 Profile & Settings

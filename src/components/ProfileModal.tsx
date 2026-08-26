@@ -33,7 +33,7 @@ import {
 interface ProfileModalProps {
   isOpen: boolean;
   onClose: () => void;
-  user: UserProfile;
+  user: UserProfile | null;
   onUpdateDisplayName: (newName: string) => Promise<void>;
   habits: HabitItem[];
   onSaveHabit: (
@@ -86,10 +86,12 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   const [isRequestingPermission, setIsRequestingPermission] = useState(false);
 
   useEffect(() => {
-    if (user.displayName) {
+    if (user?.displayName) {
       setDisplayNameInput(user.displayName);
-    } else if (user.email) {
+    } else if (user?.email) {
       setDisplayNameInput(user.email.split('@')[0]);
+    } else {
+      setDisplayNameInput('');
     }
     setProfileSavedSuccess(false);
     setPermissionStatus(getNotificationPermissionStatus());
@@ -184,7 +186,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
           <div className="p-4 sm:p-5 border-b border-zinc-200 bg-zinc-50/60">
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-3">
-                {user.photoURL ? (
+                {user?.photoURL ? (
                   <img
                     id="profile-modal-avatar"
                     src={user.photoURL}
@@ -194,15 +196,15 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                   />
                 ) : (
                   <div className="w-12 h-12 rounded-full bg-zinc-800 text-white flex items-center justify-center text-base font-semibold">
-                    {(user.displayName || user.email || 'U')[0].toUpperCase()}
+                    {((user?.displayName || user?.email || 'U')[0] || 'U').toUpperCase()}
                   </div>
                 )}
                 <div>
                   <h2 id="profile-modal-name" className="text-base font-bold text-zinc-900 leading-tight">
-                    {user.displayName || user.email?.split('@')[0] || 'User'}
+                    {user?.displayName || user?.email?.split('@')[0] || 'User'}
                   </h2>
                   <p id="profile-modal-email" className="text-xs text-zinc-500 font-mono mt-0.5">
-                    {user.email}
+                    {user?.email || 'No email provided'}
                   </p>
                 </div>
               </div>
@@ -591,7 +593,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                     </label>
                     <input
                       type="text"
-                      value={user.email || ''}
+                      value={user?.email || ''}
                       disabled
                       className="w-full px-3 py-2 text-xs font-mono text-zinc-500 bg-zinc-100 border border-zinc-200 rounded-lg cursor-not-allowed"
                     />

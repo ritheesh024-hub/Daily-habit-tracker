@@ -7,7 +7,6 @@ interface HistoryListProps {
   currentSelectedDate: string;
   todayDate: string;
   onSelectDate: (date: string) => void;
-  isLoading?: boolean;
 }
 
 export const HistoryList: React.FC<HistoryListProps> = ({
@@ -15,7 +14,6 @@ export const HistoryList: React.FC<HistoryListProps> = ({
   currentSelectedDate,
   todayDate,
   onSelectDate,
-  isLoading = false,
 }) => {
   return (
     <section id="seven-day-history-section" className="pt-5 border-t border-zinc-200">
@@ -28,11 +26,7 @@ export const HistoryList: React.FC<HistoryListProps> = ({
         </span>
       </div>
 
-      {isLoading ? (
-        <div id="history-loading" className="py-4 text-center text-xs text-zinc-400 font-mono">
-          Loading 7-day history...
-        </div>
-      ) : history.length === 0 ? (
+      {history.length === 0 ? (
         <div id="history-empty" className="py-4 text-center text-xs text-zinc-500 border border-dashed border-zinc-200 rounded-lg">
           No completed days yet.
         </div>

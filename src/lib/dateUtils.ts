@@ -1,19 +1,42 @@
-export function getTodayDateString(): string {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
+/**
+ * Canonical date formatting helper for local calendar date keys (YYYY-MM-DD).
+ * Ensures zero UTC offset shifting and strict local calendar date alignment.
+ */
+export function getLocalDateKey(input?: Date | string | number): string {
+  if (typeof input === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(input)) {
+    return input;
+  }
+  const dateObj = input instanceof Date
+    ? input
+    : typeof input === 'number'
+    ? new Date(input)
+    : typeof input === 'string' && input.includes('T')
+    ? new Date(input)
+    : new Date();
+
+  if (isNaN(dateObj.getTime())) {
+    const fallback = new Date();
+    const y = fallback.getFullYear();
+    const m = String(fallback.getMonth() + 1).padStart(2, '0');
+    const d = String(fallback.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
+  const year = dateObj.getFullYear();
+  const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const day = String(dateObj.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+}
+
+export function getTodayDateString(): string {
+  return getLocalDateKey();
 }
 
 export function getPreviousDateString(dateString: string): string {
   const [year, month, day] = dateString.split('-').map(Number);
   const date = new Date(year, month - 1, day);
   date.setDate(date.getDate() - 1);
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
+  return getLocalDateKey(date);
 }
 
 export function formatHeaderDate(dateString: string): string {
@@ -58,32 +81,27 @@ export function getLast7Days(todayDateString?: string): string[] {
 }
 
 export function getLastNDays(count: number, todayDateString?: string): string[] {
-  const baseDate = todayDateString || getTodayDateString();
+  const baseDate = todayDateString ? getLocalDateKey(todayDateString) : getLocalDateKey();
   const [year, month, day] = baseDate.split('-').map(Number);
   const dates: string[] = [];
 
   for (let i = count - 1; i >= 0; i--) {
     const d = new Date(year, month - 1, day);
     d.setDate(d.getDate() - i);
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const dayNum = String(d.getDate()).padStart(2, '0');
-    dates.push(`${y}-${m}-${dayNum}`);
+    dates.push(getLocalDateKey(d));
   }
   return dates;
 }
 
 export function getPreviousDates(count: number = 7, fromDate?: string): string[] {
   const dates: string[] = [];
-  const base = fromDate ? new Date(fromDate + 'T00:00:00') : new Date();
+  const baseStr = fromDate ? getLocalDateKey(fromDate) : getLocalDateKey();
+  const [year, month, day] = baseStr.split('-').map(Number);
 
   for (let i = 1; i <= count; i++) {
-    const d = new Date(base);
-    d.setDate(base.getDate() - i);
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    dates.push(`${year}-${month}-${day}`);
+    const d = new Date(year, month - 1, day);
+    d.setDate(d.getDate() - i);
+    dates.push(getLocalDateKey(d));
   }
   return dates;
 }
@@ -102,36 +120,33 @@ export function getMonthCalendarDays(year: number, monthIndex: number, todayStr:
   const startingDayOfWeek = firstDayOfMonth.getDay(); // 0 = Sunday, 1 = Monday, ...
 
   const days: MonthCalendarDay[] = [];
+  const currentTodayKey = getLocalDateKey(todayStr);
 
   // Padding days from previous month
   const prevMonthDaysCount = new Date(year, monthIndex, 0).getDate();
   for (let i = startingDayOfWeek - 1; i >= 0; i--) {
     const dayNum = prevMonthDaysCount - i;
     const prevDate = new Date(year, monthIndex - 1, dayNum);
-    const y = prevDate.getFullYear();
-    const m = String(prevDate.getMonth() + 1).padStart(2, '0');
-    const d = String(dayNum).padStart(2, '0');
-    const dateStr = `${y}-${m}-${d}`;
+    const dateStr = getLocalDateKey(prevDate);
     days.push({
       date: dateStr,
       dayNumber: dayNum,
       isCurrentMonth: false,
-      isToday: dateStr === todayStr,
-      isFuture: dateStr > todayStr,
+      isToday: dateStr === currentTodayKey,
+      isFuture: dateStr > currentTodayKey,
     });
   }
 
   // Days of current month
   for (let dayNum = 1; dayNum <= daysInMonth; dayNum++) {
-    const m = String(monthIndex + 1).padStart(2, '0');
-    const d = String(dayNum).padStart(2, '0');
-    const dateStr = `${year}-${m}-${d}`;
+    const currDate = new Date(year, monthIndex, dayNum);
+    const dateStr = getLocalDateKey(currDate);
     days.push({
       date: dateStr,
       dayNumber: dayNum,
       isCurrentMonth: true,
-      isToday: dateStr === todayStr,
-      isFuture: dateStr > todayStr,
+      isToday: dateStr === currentTodayKey,
+      isFuture: dateStr > currentTodayKey,
     });
   }
 
@@ -140,16 +155,13 @@ export function getMonthCalendarDays(year: number, monthIndex: number, todayStr:
   if (remainingDays < 7) {
     for (let dayNum = 1; dayNum <= remainingDays; dayNum++) {
       const nextDate = new Date(year, monthIndex + 1, dayNum);
-      const y = nextDate.getFullYear();
-      const m = String(nextDate.getMonth() + 1).padStart(2, '0');
-      const d = String(dayNum).padStart(2, '0');
-      const dateStr = `${y}-${m}-${d}`;
+      const dateStr = getLocalDateKey(nextDate);
       days.push({
         date: dateStr,
         dayNumber: dayNum,
         isCurrentMonth: false,
-        isToday: dateStr === todayStr,
-        isFuture: dateStr > todayStr,
+        isToday: dateStr === currentTodayKey,
+        isFuture: dateStr > currentTodayKey,
       });
     }
   }

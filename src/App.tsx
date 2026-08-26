@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import {
   onAuthStateChanged,
   signInWithPopup,
@@ -26,19 +26,33 @@ import { getTodayDateString, formatHeaderDate } from './lib/dateUtils';
 import {
   createDefaultDailyLog,
   countCompletedInMap,
+  calculateDailyProgress,
   fetchUserHabitSettings,
   saveHabitSetting,
   deleteHabitSetting,
   fetchDailyLog,
+  getDailyLog,
   saveDailyLog,
+  toggleHabit,
   syncUserProfile,
   updateUserDisplayName,
   fetchHabitHistoryAndStreaks,
   calculateStreaks,
+  getLocalDateKey,
 } from './lib/habitService';
 import {
-  triggerBrowserNotification,
-} from './lib/reminderService';
+  getCachedUserProfile,
+  setCachedUserProfile,
+  getCachedHabits,
+  setCachedHabits,
+  getCachedDailyLog,
+  setCachedDailyLog,
+  getCachedHistoryBundle,
+  setCachedHistoryBundle,
+  clearUserCache,
+  clearActiveSession,
+} from './lib/cacheService';
+import { triggerBrowserNotification } from './lib/reminderService';
 import { Header } from './components/Header';
 import { ProgressBar } from './components/ProgressBar';
 import { StreakStatsCard } from './components/StreakStatsCard';
@@ -79,28 +93,44 @@ const DEFAULT_ANALYTICS: AnalyticsStats = {
 export default function App() {
   const [todayDate, setTodayDate] = useState<string>(getTodayDateString);
   const [selectedDate, setSelectedDate] = useState<string>(getTodayDateString);
-  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
-  const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
+
+  // Cached-first Auth State: 0ms initial load
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => getCachedUserProfile());
+  const [isAuthLoading, setIsAuthLoading] = useState<boolean>(() => !getCachedUserProfile());
   const [authError, setAuthError] = useState<string | null>(null);
 
-  // User's habit configuration
-  const [habits, setHabits] = useState<HabitItem[]>([]);
-  const [isHabitsConfigLoading, setIsHabitsConfigLoading] = useState<boolean>(true);
+  // Habits configuration: loaded synchronously from cache
+  const [habits, setHabits] = useState<HabitItem[]>(() => getCachedHabits(currentUser?.uid));
 
-  // Daily log state for selected date
-  const [dailyLog, setDailyLog] = useState<DailyLogData>(() =>
-    createDefaultDailyLog(getTodayDateString(), 8)
-  );
-  const [isDailyLogLoading, setIsDailyLogLoading] = useState<boolean>(false);
+  // Daily log state for selected date: loaded synchronously from cache
+  const [dailyLog, setDailyLog] = useState<DailyLogData>(() => {
+    const today = getTodayDateString();
+    const cached = currentUser?.uid ? getCachedDailyLog(currentUser.uid, today) : null;
+    return cached || createDefaultDailyLog(today, habits.length);
+  });
   const [isSavingLog, setIsSavingLog] = useState<boolean>(false);
 
-  // 7-day history & streak states
-  const [history, setHistory] = useState<DayHistorySummary[]>([]);
-  const [historyMap, setHistoryMap] = useState<Record<string, { completed: number; total: number }>>({});
-  const [rawLogsMap, setRawLogsMap] = useState<Record<string, DailyLogData>>({});
-  const [streaks, setStreaks] = useState<StreakStats>({ currentStreak: 0, bestStreak: 0 });
-  const [analytics, setAnalytics] = useState<AnalyticsStats>(DEFAULT_ANALYTICS);
-  const [isHistoryLoading, setIsHistoryLoading] = useState<boolean>(false);
+  // 7-day history & streak states: loaded synchronously from cache
+  const [history, setHistory] = useState<DayHistorySummary[]>(() => {
+    const bundle = currentUser?.uid ? getCachedHistoryBundle(currentUser.uid) : null;
+    return bundle?.history7Days || [];
+  });
+  const [historyMap, setHistoryMap] = useState<Record<string, { completed: number; total: number }>>(() => {
+    const bundle = currentUser?.uid ? getCachedHistoryBundle(currentUser.uid) : null;
+    return bundle?.historyMap || {};
+  });
+  const [rawLogsMap, setRawLogsMap] = useState<Record<string, DailyLogData>>(() => {
+    const bundle = currentUser?.uid ? getCachedHistoryBundle(currentUser.uid) : null;
+    return bundle?.rawLogsMap || {};
+  });
+  const [streaks, setStreaks] = useState<StreakStats>(() => {
+    const bundle = currentUser?.uid ? getCachedHistoryBundle(currentUser.uid) : null;
+    return bundle?.streaks || { currentStreak: 0, bestStreak: 0 };
+  });
+  const [analytics, setAnalytics] = useState<AnalyticsStats>(() => {
+    const bundle = currentUser?.uid ? getCachedHistoryBundle(currentUser.uid) : null;
+    return bundle?.analytics || DEFAULT_ANALYTICS;
+  });
 
   // Profile Modal state
   const [isProfileModalOpen, setIsProfileModalOpen] = useState<boolean>(false);
@@ -109,6 +139,7 @@ export default function App() {
   // Active Toast reminders in state
   const [activeReminders, setActiveReminders] = useState<ActiveReminderNotice[]>([]);
   const notifiedHabitTimesRef = useRef<Record<string, boolean>>({});
+  const currentDateFetchRef = useRef<string>(selectedDate);
 
   // Online / Offline state
   const [isOnline, setIsOnline] = useState<boolean>(() =>
@@ -132,16 +163,27 @@ export default function App() {
 
   // Listen to Firebase auth state & handle redirect login result
   useEffect(() => {
-    // Check if user is returning from a redirect login (common on mobile)
     getRedirectResult(auth)
       .then(async (result) => {
         if (result?.user) {
           const profile = await syncUserProfile(result.user);
           setCurrentUser(profile);
+          setCachedUserProfile(profile);
           setAuthError(null);
         }
       })
       .catch((error) => {
+        const errMsg = error?.message || '';
+        if (
+          errMsg.includes('Database is closing') ||
+          errMsg.includes('IndexedDB') ||
+          error?.name === 'AbortError' ||
+          error?.name === 'InvalidStateError' ||
+          (error?.code === 'auth/internal-error' && errMsg.includes('closing'))
+        ) {
+          return;
+        }
+
         console.error('Redirect sign-in error:', error);
         if (error.code === 'auth/unauthorized-domain') {
           const currentDomain = typeof window !== 'undefined' ? window.location.hostname : 'your domain';
@@ -152,7 +194,7 @@ export default function App() {
           setAuthError(
             'Google Sign-in provider is disabled. In Firebase Console, go to Authentication > Sign-in method and enable Google.'
           );
-        } else {
+        } else if (error.code) {
           setAuthError(error.message || 'Authentication redirect error');
         }
       });
@@ -163,15 +205,49 @@ export default function App() {
         if (user) {
           const profile = await syncUserProfile(user);
           setCurrentUser(profile);
+          setCachedUserProfile(profile);
           setAuthError(null);
+
+          // Load user-specific cached habits or defaults
+          const userHabits = getCachedHabits(user.uid);
+          setHabits(userHabits);
+
+          // Load user-specific daily log
+          const cachedLog = getCachedDailyLog(user.uid, todayDate);
+          if (cachedLog) {
+            setDailyLog(cachedLog);
+          } else {
+            setDailyLog(createDefaultDailyLog(todayDate, userHabits.length));
+          }
+
+          // Load user-specific history bundle
+          const userBundle = getCachedHistoryBundle(user.uid);
+          if (userBundle) {
+            setHistory(userBundle.history7Days || []);
+            setHistoryMap(userBundle.historyMap || {});
+            setRawLogsMap(userBundle.rawLogsMap || {});
+            setStreaks(userBundle.streaks || { currentStreak: 0, bestStreak: 0 });
+            setAnalytics(userBundle.analytics || DEFAULT_ANALYTICS);
+          } else {
+            setHistory([]);
+            setHistoryMap({});
+            setRawLogsMap({});
+            setStreaks({ currentStreak: 0, bestStreak: 0 });
+            setAnalytics(DEFAULT_ANALYTICS);
+          }
         } else {
           setCurrentUser(null);
-          setHabits([]);
+          setCachedUserProfile(null);
+          clearActiveSession();
+          setHabits(getCachedHabits());
+          setDailyLog(createDefaultDailyLog(todayDate, 8));
           setHistory([]);
           setHistoryMap({});
           setRawLogsMap({});
           setStreaks({ currentStreak: 0, bestStreak: 0 });
           setAnalytics(DEFAULT_ANALYTICS);
+          setActiveReminders([]);
+          notifiedHabitTimesRef.current = {};
         }
         setIsAuthLoading(false);
       },
@@ -185,17 +261,15 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // Daily Reset & Midnight Handler: Detect date change when calendar day rolls over or tab regains focus
+  // Daily Reset & Midnight Handler
   useEffect(() => {
     const checkMidnightRollover = () => {
       const realToday = getTodayDateString();
       setTodayDate((prevToday) => {
         if (realToday !== prevToday) {
-          // If the user was on the previous "today", advance their view to the fresh new day
           setSelectedDate((prevSelected) =>
             prevSelected === prevToday ? realToday : prevSelected
           );
-          // Clear reminder notification triggers for new day
           notifiedHabitTimesRef.current = {};
           return realToday;
         }
@@ -203,10 +277,8 @@ export default function App() {
       });
     };
 
-    // Check periodically every 15 seconds
     const interval = setInterval(checkMidnightRollover, 15000);
 
-    // Also check on tab focus / visibility change (e.g. laptop opened in morning)
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
         checkMidnightRollover();
@@ -223,63 +295,82 @@ export default function App() {
     };
   }, []);
 
-  // Load habit settings when user signs in
+  // Background sync for habit settings when user signs in (instant cache first)
   useEffect(() => {
     if (!currentUser?.uid) return;
 
-    let isMounted = true;
-    setIsHabitsConfigLoading(true);
-
     fetchUserHabitSettings(currentUser.uid)
       .then((userHabits) => {
-        if (isMounted) {
-          setHabits(userHabits);
-          setIsHabitsConfigLoading(false);
-        }
+        setHabits(userHabits);
       })
       .catch((err) => {
-        console.error('Failed to load user habit settings:', err);
-        if (isMounted) setIsHabitsConfigLoading(false);
+        console.warn('Background habits sync:', err);
       });
-
-    return () => {
-      isMounted = false;
-    };
   }, [currentUser?.uid]);
 
-  // Load daily log and 7-day history + streaks + analytics
-  const loadDayData = useCallback(
-    async (userId: string, date: string, currentHabits: HabitItem[]) => {
-      setIsDailyLogLoading(true);
-      setIsHistoryLoading(true);
+  // Sync full history in background on initial login or date roll (Data Saver: 35 days limit)
+  useEffect(() => {
+    if (!currentUser?.uid || habits.length === 0) return;
 
-      try {
-        const [log, historyData] = await Promise.all([
-          fetchDailyLog(userId, date, currentHabits),
-          fetchHabitHistoryAndStreaks(userId, todayDate, currentHabits),
-        ]);
-
-        setDailyLog(log);
+    fetchHabitHistoryAndStreaks(currentUser.uid, todayDate, habits)
+      .then((historyData) => {
         setHistory(historyData.history7Days);
         setHistoryMap(historyData.historyMap);
         setRawLogsMap(historyData.rawLogsMap);
         setStreaks(historyData.streaks);
         setAnalytics(historyData.analytics);
-      } catch (err) {
-        console.error('Failed to load day data from Firestore:', err);
-      } finally {
-        setIsDailyLogLoading(false);
-        setIsHistoryLoading(false);
-      }
-    },
-    [todayDate]
-  );
+      })
+      .catch((err) => {
+        console.warn('Background history sync:', err);
+      });
+  }, [currentUser?.uid, todayDate, habits]);
 
+  // Instant switch when selectedDate changes (Data-Saver: 0 internet calls when in memory / local storage)
   useEffect(() => {
-    if (currentUser?.uid && !isHabitsConfigLoading) {
-      loadDayData(currentUser.uid, selectedDate, habits);
+    if (!currentUser?.uid) return;
+
+    currentDateFetchRef.current = selectedDate;
+    const activeIds = habits.map((h) => h.id);
+
+    // 1. Check in-memory rawLogsMap
+    if (rawLogsMap[selectedDate]) {
+      const memoryLog = rawLogsMap[selectedDate];
+      setDailyLog({
+        ...memoryLog,
+        date: selectedDate,
+        completedCount: countCompletedInMap(memoryLog.completedHabits, activeIds),
+        totalActiveCount: habits.length,
+      });
+      return;
     }
-  }, [currentUser?.uid, selectedDate, habits, isHabitsConfigLoading, loadDayData]);
+
+    // 2. Check localStorage
+    const cachedLog = getCachedDailyLog(currentUser.uid, selectedDate);
+    if (cachedLog) {
+      const readyLog = {
+        ...cachedLog,
+        date: selectedDate,
+        completedCount: countCompletedInMap(cachedLog.completedHabits, activeIds),
+        totalActiveCount: habits.length,
+      };
+      setDailyLog(readyLog);
+      setRawLogsMap((prev) => ({ ...prev, [selectedDate]: readyLog }));
+      return;
+    }
+
+    // 3. Set clean blank state immediately so previous day's habits never linger
+    const blankLog = createDefaultDailyLog(selectedDate, habits.length);
+    setDailyLog(blankLog);
+
+    // 4. Fetch document from Firestore if not in cache
+    getDailyLog(currentUser.uid, selectedDate, habits).then((remoteLog) => {
+      // Prevent stale response race condition
+      if (currentDateFetchRef.current === selectedDate) {
+        setDailyLog(remoteLog);
+        setRawLogsMap((prev) => ({ ...prev, [selectedDate]: remoteLog }));
+      }
+    });
+  }, [selectedDate, currentUser?.uid, habits]);
 
   // Habit Reminder Scheduler Loop
   useEffect(() => {
@@ -295,16 +386,12 @@ export default function App() {
       habits.forEach((habit) => {
         if (!habit.reminderEnabled || !habit.reminderTime) return;
 
-        // Check if current time matches scheduled habit reminder time
         if (habit.reminderTime === currentTimeStr) {
           const triggerKey = `${habit.id}_${todayStr}_${currentTimeStr}`;
           if (!notifiedHabitTimesRef.current[triggerKey]) {
             notifiedHabitTimesRef.current[triggerKey] = true;
-
-            // Trigger browser notification
             triggerBrowserNotification(habit);
 
-            // Display in-app reminder toast
             const noticeId = `${habit.id}-${Date.now()}`;
             setActiveReminders((prev) => [
               ...prev.filter((item) => item.habit.id !== habit.id),
@@ -315,14 +402,13 @@ export default function App() {
       });
     };
 
-    // Run reminder check immediately and every 15 seconds
     checkReminders();
     const timer = setInterval(checkReminders, 15000);
 
     return () => clearInterval(timer);
   }, [habits]);
 
-  // Handle Google Sign-in with automatic mobile redirect fallback
+  // Google Sign-in handler
   const handleGoogleSignIn = async () => {
     setIsAuthLoading(true);
     setAuthError(null);
@@ -330,19 +416,18 @@ export default function App() {
       const result = await signInWithPopup(auth, googleProvider);
       const profile = await syncUserProfile(result.user);
       setCurrentUser(profile);
+      setCachedUserProfile(profile);
     } catch (error: any) {
       console.error('Google Sign-in failed:', error);
       if (
         error.code === 'auth/popup-closed-by-user' ||
         error.code === 'auth/cancelled-popup-request'
       ) {
-        // User voluntarily dismissed popup
         setAuthError(null);
       } else if (
         error.code === 'auth/popup-blocked' ||
         error.code === 'auth/cancelled-popup-request'
       ) {
-        // Fall back to redirect sign-in for mobile browsers that block popups
         try {
           await signInWithRedirect(auth, googleProvider);
           return;
@@ -358,30 +443,25 @@ export default function App() {
         setAuthError(
           'Google Sign-in provider is disabled. In Firebase Console, go to Authentication > Sign-in method and enable Google.'
         );
-      } else if (error.code === 'auth/invalid-api-key') {
-        setAuthError(
-          'Invalid Firebase API Key. Please check your VITE_FIREBASE_API_KEY environment variable in Vercel.'
-        );
-      } else if (error.code === 'auth/network-request-failed') {
-        setAuthError('Network connection error. Please check your internet connection.');
       } else {
-        const detailMsg = error?.message || 'Could not sign in with Google.';
-        const errCode = error?.code ? ` [${error.code}]` : '';
-        setAuthError(`${detailMsg}${errCode}`);
+        setAuthError(error?.message || 'Could not sign in with Google.');
       }
     } finally {
       setIsAuthLoading(false);
     }
   };
 
-  // Handle Sign-out
+  // Sign out
   const handleSignOut = async () => {
     try {
+      if (currentUser?.uid) {
+        clearUserCache(currentUser.uid);
+      }
+      clearActiveSession();
       await signOut(auth);
       setCurrentUser(null);
-      setSelectedDate(todayDate);
-      setHabits([]);
-      setDailyLog(createDefaultDailyLog(todayDate, 8));
+      setHabits(getCachedHabits());
+      setDailyLog(createDefaultDailyLog(getTodayDateString(), 8));
       setHistory([]);
       setHistoryMap({});
       setRawLogsMap({});
@@ -389,94 +469,139 @@ export default function App() {
       setAnalytics(DEFAULT_ANALYTICS);
       setIsProfileModalOpen(false);
       setActiveReminders([]);
+      notifiedHabitTimesRef.current = {};
     } catch (error) {
       console.error('Sign out error:', error);
     }
   };
 
-  // Handle Display Name Edit
+  // Update Display Name
   const handleUpdateDisplayName = async (newName: string) => {
     if (!currentUser?.uid) return;
+    const updated = { ...currentUser, displayName: newName };
+    setCurrentUser(updated);
+    setCachedUserProfile(updated);
     await updateUserDisplayName(currentUser.uid, newName);
-    setCurrentUser((prev) => (prev ? { ...prev, displayName: newName } : null));
   };
 
-  // Toggle habit checkbox with immediate optimistic update and Firestore sync
-  const handleToggleHabit = async (habitId: string) => {
+  // Toggle habit checkbox for a specific date: completely isolated by user + targetDate + habitId
+  const handleToggleHabitForDate = async (targetDateInput: string, habitId: string) => {
     if (!currentUser?.uid) return;
 
-    const currentCompleted = !!dailyLog.completedHabits[habitId];
-    const updatedMap = {
-      ...dailyLog.completedHabits,
-      [habitId]: !currentCompleted,
+    const targetDate = getLocalDateKey(targetDateInput);
+
+    // Retrieve the base log specifically for targetDate
+    let baseLog: DailyLogData;
+    if (selectedDate === targetDate && dailyLog.date === targetDate) {
+      baseLog = dailyLog;
+    } else if (rawLogsMap[targetDate]) {
+      baseLog = rawLogsMap[targetDate];
+    } else {
+      const cached = getCachedDailyLog(currentUser.uid, targetDate);
+      baseLog = cached || createDefaultDailyLog(targetDate, habits.length);
+    }
+
+    const { updatedLog, completedCount, totalCount } = toggleHabit(
+      currentUser.uid,
+      targetDate,
+      habitId,
+      baseLog,
+      habits
+    );
+
+    const isCurrentCompleted = !!(baseLog.completedHabits && baseLog.completedHabits[habitId]);
+    const nextCompleted = !isCurrentCompleted;
+
+    // 1. If currently viewing targetDate, update dailyLog immediately
+    if (selectedDate === targetDate) {
+      setDailyLog(updatedLog);
+    }
+
+    // 2. Update rawLogsMap for targetDate
+    const nextRawLogsMap = {
+      ...rawLogsMap,
+      [targetDate]: updatedLog,
     };
+    setRawLogsMap(nextRawLogsMap);
 
-    const activeIds = habits.map((h) => h.id);
-    const completedCount = countCompletedInMap(updatedMap, activeIds);
-    const totalActiveCount = habits.length;
-
-    const updatedLog: DailyLogData = {
-      ...dailyLog,
-      completedHabits: updatedMap,
-      completedCount,
-      totalActiveCount,
-    };
-
-    // Optimistic UI state update for current day log
-    setDailyLog(updatedLog);
-
-    // Update historyMap and recalculate streaks immediately
+    // 3. Update historyMap for targetDate
     const updatedHistoryMap = {
       ...historyMap,
-      [selectedDate]: { completed: completedCount, total: totalActiveCount },
+      [targetDate]: { completed: completedCount, total: totalCount },
     };
     setHistoryMap(updatedHistoryMap);
-    setRawLogsMap((prev) => ({ ...prev, [selectedDate]: updatedLog }));
 
+    // 4. Recalculate streaks
     const newStreaks = calculateStreaks(updatedHistoryMap, todayDate);
     setStreaks(newStreaks);
 
-    // Update 7-day history list in local state immediately
-    const percentage = totalActiveCount > 0 ? Math.round((completedCount / totalActiveCount) * 100) : 0;
-    const isCompleted = totalActiveCount > 0 && completedCount >= totalActiveCount;
+    // 5. Update 7-day history list
+    const percentage = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+    const isCompleted = totalCount > 0 && completedCount >= totalCount;
 
-    setHistory((prevHistory) =>
-      prevHistory.map((item) =>
-        item.date === selectedDate
+    let updatedHistoryList: DayHistorySummary[] = [];
+    setHistory((prevHistory) => {
+      const nextList = prevHistory.map((item) =>
+        item.date === targetDate
           ? {
               ...item,
               completedCount,
-              totalCount: totalActiveCount,
+              totalCount,
               percentage,
               isCompleted,
             }
           : item
-      )
-    );
+      );
+      updatedHistoryList = nextList;
+      return nextList;
+    });
 
-    // Update analytics immediately
-    setAnalytics((prev) => ({
-      ...prev,
-      currentStreak: newStreaks.currentStreak,
-      bestStreak: newStreaks.bestStreak,
-      todayPercentage: selectedDate === todayDate ? percentage : prev.todayPercentage,
-      totalCompletedHabits: !currentCompleted
+    // 6. Update analytics
+    setAnalytics((prev) => {
+      const nextTotalCompleted = nextCompleted
         ? prev.totalCompletedHabits + 1
-        : Math.max(0, prev.totalCompletedHabits - 1),
-    }));
+        : Math.max(0, prev.totalCompletedHabits - 1);
 
-    // Save to Firestore in background
+      const nextAnalytics: AnalyticsStats = {
+        ...prev,
+        currentStreak: newStreaks.currentStreak,
+        bestStreak: newStreaks.bestStreak,
+        todayPercentage: targetDate === todayDate ? percentage : prev.todayPercentage,
+        totalCompletedHabits: nextTotalCompleted,
+      };
+
+      // Persist history bundle cache with latest calculated state
+      setCachedHistoryBundle(currentUser.uid, {
+        history7Days: updatedHistoryList.length > 0 ? updatedHistoryList : history,
+        historyMap: updatedHistoryMap,
+        rawLogsMap: nextRawLogsMap,
+        streaks: newStreaks,
+        analytics: nextAnalytics,
+      });
+
+      return nextAnalytics;
+    });
+
+    // 7. Save to local storage cache specifically for targetDate
+    setCachedDailyLog(currentUser.uid, targetDate, updatedLog);
+
+    // 8. Save to Firestore in background without blocking
     setIsSavingLog(true);
     try {
-      await saveDailyLog(currentUser.uid, updatedLog);
+      await saveDailyLog(currentUser.uid, targetDate, updatedLog);
     } catch (error) {
-      console.error('Failed to save daily log to Firestore:', error);
+      console.warn(`Background daily log save notice for ${targetDate}:`, error);
     } finally {
       setIsSavingLog(false);
     }
   };
 
-  // Save changes from HabitModal in Profile Management (Add or Edit)
+  // Toggle habit on currently selected date
+  const handleToggleHabit = (habitId: string) => {
+    handleToggleHabitForDate(selectedDate, habitId);
+  };
+
+  // Save changes from HabitModal
   const handleSaveHabitFromProfile = async (
     data: { name: string; target: string; icon: string; reminderEnabled?: boolean; reminderTime?: string },
     editingHabit?: HabitItem | null
@@ -484,7 +609,6 @@ export default function App() {
     if (!currentUser?.uid) return;
 
     if (editingHabit) {
-      // Editing existing habit
       const updatedHabit: HabitItem = {
         ...editingHabit,
         name: data.name,
@@ -494,15 +618,11 @@ export default function App() {
         reminderTime: data.reminderTime || editingHabit.reminderTime || '08:00',
       };
 
-      await saveHabitSetting(currentUser.uid, updatedHabit);
-
       const nextHabits = habits.map((h) => (h.id === updatedHabit.id ? updatedHabit : h));
       setHabits(nextHabits);
-
-      // Refresh analytics with updated habit labels
-      loadDayData(currentUser.uid, selectedDate, nextHabits);
+      setCachedHabits(currentUser.uid, nextHabits);
+      await saveHabitSetting(currentUser.uid, updatedHabit);
     } else {
-      // Adding new habit
       const newId = `custom_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
       const newHabit: HabitItem = {
         id: newId,
@@ -515,12 +635,10 @@ export default function App() {
         createdAt: new Date().toISOString(),
       };
 
-      await saveHabitSetting(currentUser.uid, newHabit);
-
       const nextHabits = [...habits, newHabit];
       setHabits(nextHabits);
+      setCachedHabits(currentUser.uid, nextHabits);
 
-      // Update current day log total count
       const activeIds = nextHabits.map((h) => h.id);
       const newCompletedCount = countCompletedInMap(dailyLog.completedHabits, activeIds);
       const updatedLog: DailyLogData = {
@@ -529,9 +647,9 @@ export default function App() {
         totalActiveCount: nextHabits.length,
       };
       setDailyLog(updatedLog);
-      await saveDailyLog(currentUser.uid, updatedLog);
 
-      loadDayData(currentUser.uid, selectedDate, nextHabits);
+      await saveHabitSetting(currentUser.uid, newHabit);
+      await saveDailyLog(currentUser.uid, updatedLog);
     }
   };
 
@@ -552,15 +670,14 @@ export default function App() {
       reminderTime,
     };
 
-    // Optimistic local state update
     const nextHabits = habits.map((h) => (h.id === habitId ? updatedHabit : h));
     setHabits(nextHabits);
+    setCachedHabits(currentUser.uid, nextHabits);
 
-    // Save to Firestore
     try {
       await saveHabitSetting(currentUser.uid, updatedHabit);
     } catch (err) {
-      console.error('Failed to update habit reminder setting:', err);
+      console.warn('Failed to update habit reminder setting:', err);
     }
   };
 
@@ -590,23 +707,22 @@ export default function App() {
     setActiveReminders((prev) => prev.filter((item) => item.id !== noticeId));
   };
 
-  // Mark habit done directly from in-app toast
+  // Mark habit done directly from in-app toast (always applies to today's date)
   const handleCompleteHabitFromToast = (habitId: string) => {
-    if (!dailyLog.completedHabits[habitId]) {
-      handleToggleHabit(habitId);
+    const todayLog = rawLogsMap[todayDate] || (selectedDate === todayDate ? dailyLog : getCachedDailyLog(currentUser?.uid || '', todayDate));
+    if (!todayLog?.completedHabits?.[habitId]) {
+      handleToggleHabitForDate(todayDate, habitId);
     }
   };
 
-  // Delete habit handler from Profile Management
+  // Delete habit handler
   const handleDeleteHabitFromProfile = async (habitId: string) => {
     if (!currentUser?.uid) return;
 
-    await deleteHabitSetting(currentUser.uid, habitId);
-
     const nextHabits = habits.filter((h) => h.id !== habitId);
     setHabits(nextHabits);
+    setCachedHabits(currentUser.uid, nextHabits);
 
-    // Recalculate completed count for current log
     const activeIds = nextHabits.map((h) => h.id);
     const newCompletedCount = countCompletedInMap(dailyLog.completedHabits, activeIds);
     const updatedLog: DailyLogData = {
@@ -616,28 +732,16 @@ export default function App() {
     };
     setDailyLog(updatedLog);
 
+    await deleteHabitSetting(currentUser.uid, habitId);
     await saveDailyLog(currentUser.uid, updatedLog);
-    loadDayData(currentUser.uid, selectedDate, nextHabits);
   };
 
-  // Select a date from history or return to today
+  // Select a date from history or return to today (Instant switch)
   const handleSelectDate = (date: string) => {
     setSelectedDate(date);
   };
 
-  // If checking auth initially
-  if (isAuthLoading) {
-    return (
-      <div className="min-h-screen bg-zinc-50 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-6 h-6 border-2 border-zinc-900 border-t-transparent rounded-full animate-spin" />
-          <span className="text-xs font-mono text-zinc-500">Loading Daily Habits...</span>
-        </div>
-      </div>
-    );
-  }
-
-  // If not authenticated, show minimal Google login view
+  // If not authenticated, show clean Google login view
   if (!currentUser) {
     return (
       <LoginView
@@ -701,7 +805,7 @@ export default function App() {
           </div>
         )}
 
-        {/* Streaks Statistics (Current & Best Streak) */}
+        {/* Streaks Statistics */}
         <StreakStatsCard stats={streaks} />
 
         {/* Daily Completion Progress Section */}
@@ -710,22 +814,18 @@ export default function App() {
           total={totalCount}
         />
 
-        {/* Habit List Section (Clean & Simple: Checkbox, Name, Target) */}
+        {/* Habit List Section */}
         <section id="habit-checklist-section" className="space-y-3">
           <div className="flex items-center justify-between">
             <h2 id="checklist-heading" className="text-sm font-semibold text-zinc-900 uppercase tracking-wider">
               {isToday ? "Today's Checklist" : `Checklist for ${formatHeaderDate(selectedDate)}`}
             </h2>
-            {(isDailyLogLoading || isHabitsConfigLoading) && (
-              <span className="text-xs text-zinc-400 font-mono">Syncing...</span>
-            )}
           </div>
 
           <HabitList
             habits={habits}
             completedHabits={dailyLog.completedHabits}
             onToggleHabit={handleToggleHabit}
-            disabled={isDailyLogLoading || isHabitsConfigLoading}
           />
         </section>
 
@@ -735,7 +835,6 @@ export default function App() {
           currentSelectedDate={selectedDate}
           todayDate={todayDate}
           onSelectDate={handleSelectDate}
-          isLoading={isHistoryLoading}
         />
       </main>
 
