@@ -34,6 +34,9 @@ export interface UserProfile {
   displayName: string | null;
   email: string | null;
   photoURL: string | null;
+  dateOfBirth?: string; // YYYY-MM-DD format
+  createdAt?: string;
+  updatedAt?: string;
   lastLoginAt?: string;
 }
 

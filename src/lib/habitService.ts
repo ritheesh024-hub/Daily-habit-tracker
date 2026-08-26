@@ -10,8 +10,8 @@ import {
   getDocs,
   writeBatch,
 } from 'firebase/firestore';
-import { User } from 'firebase/auth';
-import { db } from './firebase';
+import { User, updateProfile } from 'firebase/auth';
+import { db, auth } from './firebase';
 import {
   DEFAULT_HABITS,
   HabitItem,
@@ -86,48 +86,126 @@ export function syncUserProfile(user: User): UserProfile {
     displayName: cached?.displayName || user.displayName || 'User',
     email: user.email || null,
     photoURL: user.photoURL || null,
+    dateOfBirth: cached?.dateOfBirth,
+    createdAt: cached?.createdAt,
+    updatedAt: cached?.updatedAt,
     lastLoginAt: now,
   };
 
   // Cache immediately under user's UID
   setCachedUserProfile(profile);
 
-  // Background non-blocking sync to users/{uid} in Firestore
+  // Background sync with Firestore users/{uid}
+  // If user doc exists, preserve custom displayName & dateOfBirth and fetch them
   const userRef = doc(db, 'users', user.uid);
-  setDoc(
-    userRef,
-    {
-      uid: user.uid,
-      displayName: profile.displayName || 'User',
-      email: user.email || null,
-      photoURL: user.photoURL || null,
-      lastLoginAt: now,
-      updatedAt: now,
-      settings: {
-        theme: 'light',
-        dailyResetHour: 0,
-      },
-    },
-    { merge: true }
-  ).catch((e) => {
-    console.warn('Background profile sync notice:', e);
-  });
+  getDoc(userRef)
+    .then((snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        const updatedProfile: UserProfile = {
+          uid: user.uid,
+          displayName: data.displayName || cached?.displayName || user.displayName || 'User',
+          email: user.email || data.email || null,
+          photoURL: user.photoURL || data.photoURL || null,
+          dateOfBirth: data.dateOfBirth || cached?.dateOfBirth,
+          createdAt: data.createdAt || cached?.createdAt || now,
+          updatedAt: data.updatedAt || cached?.updatedAt,
+          lastLoginAt: now,
+        };
+        setCachedUserProfile(updatedProfile);
+
+        // Update login metadata without overwriting user-edited displayName or dateOfBirth
+        setDoc(
+          userRef,
+          {
+            uid: user.uid,
+            email: user.email || null,
+            photoURL: user.photoURL || null,
+            lastLoginAt: now,
+          },
+          { merge: true }
+        ).catch((e) => console.warn('Login metadata update notice:', e));
+      } else {
+        // Initial user profile document creation
+        setDoc(
+          userRef,
+          {
+            uid: user.uid,
+            displayName: profile.displayName || 'User',
+            email: user.email || null,
+            photoURL: user.photoURL || null,
+            createdAt: now,
+            updatedAt: now,
+            lastLoginAt: now,
+            settings: {
+              theme: 'light',
+              dailyResetHour: 0,
+            },
+          },
+          { merge: true }
+        ).catch((e) => console.warn('Background profile create notice:', e));
+      }
+    })
+    .catch((e) => {
+      console.warn('Background profile sync notice:', e);
+    });
 
   return profile;
 }
 
-export async function updateUserDisplayName(userId: string, displayName: string): Promise<void> {
+export async function updateUserProfile(
+  userId: string,
+  updates: { displayName: string; dateOfBirth?: string }
+): Promise<UserProfile> {
   const cached = getCachedUserProfile(userId);
-  if (cached) {
-    cached.displayName = displayName;
-    setCachedUserProfile(cached);
+  const now = new Date().toISOString();
+
+  const cleanName = updates.displayName.trim();
+  const cleanDob = updates.dateOfBirth ? updates.dateOfBirth.trim() : undefined;
+
+  const updatedProfile: UserProfile = {
+    uid: userId,
+    displayName: cleanName,
+    email: cached?.email || null,
+    photoURL: cached?.photoURL || null,
+    dateOfBirth: cleanDob,
+    updatedAt: now,
+    lastLoginAt: cached?.lastLoginAt || now,
+    createdAt: cached?.createdAt || now,
+  };
+
+  // 1. Immediate local cache write
+  setCachedUserProfile(updatedProfile);
+
+  // 2. Update Firebase Auth displayName where supported
+  if (auth.currentUser && auth.currentUser.uid === userId) {
+    try {
+      await updateProfile(auth.currentUser, {
+        displayName: cleanName,
+      });
+    } catch (authError) {
+      console.warn('Firebase Auth updateProfile notice:', authError);
+    }
   }
-  try {
-    const userRef = doc(db, 'users', userId);
-    await setDoc(userRef, { displayName, updatedAt: new Date().toISOString() }, { merge: true });
-  } catch (error) {
-    console.warn('Update user profile notice (cached locally):', error);
-  }
+
+  // 3. Persist to Firestore user document with merge: true
+  const userRef = doc(db, 'users', userId);
+  await setDoc(
+    userRef,
+    {
+      uid: userId,
+      displayName: cleanName,
+      dateOfBirth: cleanDob || null,
+      updatedAt: now,
+    },
+    { merge: true }
+  );
+
+  return updatedProfile;
+}
+
+export async function updateUserDisplayName(userId: string, displayName: string): Promise<void> {
+  await updateUserProfile(userId, { displayName });
 }
 
 /**

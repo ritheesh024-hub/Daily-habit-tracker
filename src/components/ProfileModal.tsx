@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   X,
   Plus,
@@ -18,6 +18,7 @@ import {
   Bell,
   BellRing,
   Volume2,
+  Lock,
 } from 'lucide-react';
 import { HabitItem, UserProfile, AnalyticsStats, DailyLogData } from '../types';
 import { HabitIcon } from './HabitIcon';
@@ -29,12 +30,13 @@ import {
   requestNotificationPermission,
   NotificationSupportStatus,
 } from '../lib/reminderService';
+import { calculateAge, isValidDateOfBirth, getLocalDateKey } from '../lib/dateUtils';
 
 interface ProfileModalProps {
   isOpen: boolean;
   onClose: () => void;
   user: UserProfile | null;
-  onUpdateDisplayName: (newName: string) => Promise<void>;
+  onUpdateProfile: (updates: { displayName: string; dateOfBirth?: string }) => Promise<void>;
   habits: HabitItem[];
   onSaveHabit: (
     data: { name: string; target: string; icon: string; reminderEnabled?: boolean; reminderTime?: string },
@@ -56,7 +58,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   isOpen,
   onClose,
   user,
-  onUpdateDisplayName,
+  onUpdateProfile,
   habits,
   onSaveHabit,
   onDeleteHabit,
@@ -64,7 +66,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   onTestNotification,
   analytics,
   rawLogsMap = {},
-  todayDate = new Date().toISOString().substring(0, 10),
+  todayDate = getLocalDateKey(),
   onSignOut,
   initialTab = 'analytics',
 }) => {
@@ -72,8 +74,10 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
   // Edit Profile State
   const [displayNameInput, setDisplayNameInput] = useState('');
+  const [dobInput, setDobInput] = useState('');
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [profileSavedSuccess, setProfileSavedSuccess] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   // Manage Habits Modal State
   const [isHabitFormOpen, setIsHabitFormOpen] = useState(false);
@@ -85,6 +89,11 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   const [permissionStatus, setPermissionStatus] = useState<NotificationSupportStatus>('default');
   const [isRequestingPermission, setIsRequestingPermission] = useState(false);
 
+  // Calculate age live from the currently entered date of birth
+  const liveAge = useMemo(() => {
+    return calculateAge(dobInput);
+  }, [dobInput]);
+
   useEffect(() => {
     if (user?.displayName) {
       setDisplayNameInput(user.displayName);
@@ -93,6 +102,14 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     } else {
       setDisplayNameInput('');
     }
+
+    if (user?.dateOfBirth) {
+      setDobInput(user.dateOfBirth);
+    } else {
+      setDobInput('');
+    }
+
+    setFormError(null);
     setProfileSavedSuccess(false);
     setPermissionStatus(getNotificationPermissionStatus());
   }, [user, isOpen]);
@@ -107,15 +124,37 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!displayNameInput.trim()) return;
+    setFormError(null);
+    setProfileSavedSuccess(false);
+
+    const trimmedName = displayNameInput.trim();
+    if (!trimmedName) {
+      setFormError('Name cannot be empty.');
+      return;
+    }
+
+    if (dobInput) {
+      if (!isValidDateOfBirth(dobInput)) {
+        if (dobInput > todayDate) {
+          setFormError('Date of birth cannot be in the future.');
+        } else {
+          setFormError('Please enter a valid date of birth.');
+        }
+        return;
+      }
+    }
 
     setIsSavingProfile(true);
     try {
-      await onUpdateDisplayName(displayNameInput.trim());
+      await onUpdateProfile({
+        displayName: trimmedName,
+        dateOfBirth: dobInput ? dobInput.trim() : undefined,
+      });
       setProfileSavedSuccess(true);
-      setTimeout(() => setProfileSavedSuccess(false), 3000);
+      setTimeout(() => setProfileSavedSuccess(false), 3500);
     } catch (err) {
       console.error('Error saving profile:', err);
+      setFormError('Unable to update profile. Please try again.');
     } finally {
       setIsSavingProfile(false);
     }
@@ -568,56 +607,156 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
             {/* TAB 4: EDIT PROFILE */}
             {activeTab === 'profile' && (
               <div id="edit-profile-panel" className="space-y-4">
-                <form onSubmit={handleSaveProfile} className="space-y-3">
+                {/* 1. Profile Photo */}
+                <div
+                  id="edit-profile-photo-container"
+                  className="flex items-center gap-3 p-3 bg-zinc-50 border border-zinc-200 rounded-lg"
+                >
+                  {user?.photoURL ? (
+                    <img
+                      id="edit-profile-avatar"
+                      src={user.photoURL}
+                      alt={user.displayName || 'Profile Photo'}
+                      referrerPolicy="no-referrer"
+                      className="w-12 h-12 rounded-full border border-zinc-200 object-cover shadow-2xs shrink-0"
+                    />
+                  ) : (
+                    <div
+                      id="edit-profile-avatar"
+                      className="w-12 h-12 rounded-full bg-zinc-800 text-white flex items-center justify-center text-base font-semibold shrink-0"
+                    >
+                      {((user?.displayName || user?.email || 'U')[0] || 'U').toUpperCase()}
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-semibold text-zinc-900">Profile Photo</p>
+                    <p className="text-[11px] text-zinc-500">
+                      Imported directly from your connected Google Account.
+                    </p>
+                  </div>
+                </div>
+
+                <form onSubmit={handleSaveProfile} className="space-y-3.5">
+                  {/* 2. Name */}
                   <div>
                     <label htmlFor="edit-name-input" className="block text-xs font-medium text-zinc-700 mb-1">
-                      Display Name
+                      Name
                     </label>
                     <input
                       id="edit-name-input"
                       type="text"
                       value={displayNameInput}
-                      onChange={(e) => setDisplayNameInput(e.target.value)}
+                      onChange={(e) => {
+                        setDisplayNameInput(e.target.value);
+                        setFormError(null);
+                      }}
                       placeholder="Your name"
                       className="w-full px-3 py-2 text-xs font-medium border border-zinc-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-zinc-900 bg-white"
-                      maxLength={40}
+                      maxLength={50}
+                      required
                     />
                     <p className="text-[11px] text-zinc-400 mt-1">
-                      This name is displayed in the application header.
+                      Initial name imported from Google. You can customize this display name.
                     </p>
                   </div>
 
+                  {/* 3 & 4. Date of Birth & Automatic Age Calculation */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label htmlFor="edit-dob-input" className="block text-xs font-medium text-zinc-700 mb-1">
+                        Date of Birth
+                      </label>
+                      <input
+                        id="edit-dob-input"
+                        type="date"
+                        value={dobInput}
+                        max={todayDate}
+                        onChange={(e) => {
+                          setDobInput(e.target.value);
+                          setFormError(null);
+                        }}
+                        className="w-full px-3 py-2 text-xs font-mono border border-zinc-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-zinc-900 bg-white"
+                      />
+                      <p className="text-[11px] text-zinc-400 mt-1">
+                        Select your birth date.
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-700 mb-1">
+                        Age <span className="text-zinc-400 font-normal">(read-only)</span>
+                      </label>
+                      <div
+                        id="edit-profile-age-display"
+                        className="w-full px-3 py-2 text-xs font-mono font-medium text-zinc-700 bg-zinc-100 border border-zinc-200 rounded-lg flex items-center justify-between"
+                      >
+                        <span>{liveAge !== null ? `${liveAge} years` : dobInput ? 'Invalid date' : '—'}</span>
+                        <span className="text-[10px] text-zinc-400 font-sans">Auto-calculated</span>
+                      </div>
+                      <p className="text-[11px] text-zinc-400 mt-1">
+                        Automatically calculated from Date of Birth.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* 5. Gmail (Read-Only) */}
                   <div>
-                    <label className="block text-xs font-medium text-zinc-700 mb-1">
-                      Google Account Email
+                    <label htmlFor="edit-email-display" className="block text-xs font-medium text-zinc-700 mb-1">
+                      Gmail
                     </label>
-                    <input
-                      type="text"
-                      value={user?.email || ''}
-                      disabled
-                      className="w-full px-3 py-2 text-xs font-mono text-zinc-500 bg-zinc-100 border border-zinc-200 rounded-lg cursor-not-allowed"
-                    />
+                    <div className="relative">
+                      <input
+                        id="edit-email-display"
+                        type="email"
+                        value={user?.email || ''}
+                        readOnly
+                        disabled
+                        className="w-full px-3 py-2 text-xs font-mono text-zinc-600 bg-zinc-100 border border-zinc-200 rounded-lg cursor-not-allowed select-none pr-8"
+                      />
+                      <Lock className="w-3.5 h-3.5 text-zinc-400 absolute right-3 top-1/2 -translate-y-1/2" />
+                    </div>
                     <p className="text-[11px] text-zinc-400 mt-1">
-                      Google Authentication and profile photo are linked to this Google account.
+                      Read-only Google authentication address.
                     </p>
                   </div>
 
-                  <div className="flex items-center justify-between pt-2">
-                    {profileSavedSuccess ? (
-                      <span className="inline-flex items-center gap-1 text-xs text-emerald-700 font-medium">
-                        <Check className="w-3.5 h-3.5" /> Saved!
-                      </span>
-                    ) : (
-                      <span />
-                    )}
+                  {/* Feedback notices */}
+                  {formError && (
+                    <div
+                      id="profile-form-error"
+                      className="p-2.5 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700 flex items-center gap-2 animate-fadeIn"
+                    >
+                      <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+                      <span>{formError}</span>
+                    </div>
+                  )}
 
+                  {profileSavedSuccess && (
+                    <div
+                      id="profile-form-success"
+                      className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-800 flex items-center gap-2 animate-fadeIn"
+                    >
+                      <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span>Profile updated successfully.</span>
+                    </div>
+                  )}
+
+                  {/* Save Button */}
+                  <div className="flex items-center justify-end pt-1">
                     <button
                       id="save-profile-btn"
                       type="submit"
                       disabled={isSavingProfile || !displayNameInput.trim()}
-                      className="px-4 py-2 bg-zinc-900 hover:bg-black text-white text-xs font-medium rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+                      className="px-4 py-2 bg-zinc-900 hover:bg-black text-white text-xs font-medium rounded-lg transition-colors cursor-pointer disabled:opacity-50 inline-flex items-center gap-1.5"
                     >
-                      {isSavingProfile ? 'Saving...' : 'Save Name'}
+                      {isSavingProfile ? (
+                        <>
+                          <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          <span>Saving...</span>
+                        </>
+                      ) : (
+                        <span>Save</span>
+                      )}
                     </button>
                   </div>
                 </form>

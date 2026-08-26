@@ -35,6 +35,7 @@ import {
   saveDailyLog,
   toggleHabit,
   syncUserProfile,
+  updateUserProfile,
   updateUserDisplayName,
   fetchHabitHistoryAndStreaks,
   calculateStreaks,
@@ -476,13 +477,11 @@ export default function App() {
     }
   };
 
-  // Update Display Name
-  const handleUpdateDisplayName = async (newName: string) => {
+  // Update Profile (Name, Date of Birth)
+  const handleUpdateProfile = async (updates: { displayName: string; dateOfBirth?: string }) => {
     if (!currentUser?.uid) return;
-    const updated = { ...currentUser, displayName: newName };
+    const updated = await updateUserProfile(currentUser.uid, updates);
     setCurrentUser(updated);
-    setCachedUserProfile(updated);
-    await updateUserDisplayName(currentUser.uid, newName);
   };
 
   // Toggle habit checkbox for a specific date: completely isolated by user + targetDate + habitId
@@ -844,7 +843,7 @@ export default function App() {
         isOpen={isProfileModalOpen}
         onClose={() => setIsProfileModalOpen(false)}
         user={currentUser}
-        onUpdateDisplayName={handleUpdateDisplayName}
+        onUpdateProfile={handleUpdateProfile}
         habits={habits}
         onSaveHabit={handleSaveHabitFromProfile}
         onDeleteHabit={handleDeleteHabitFromProfile}

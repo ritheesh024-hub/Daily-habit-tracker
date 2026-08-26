@@ -173,3 +173,47 @@ export function formatMonthYear(year: number, monthIndex: number): string {
   const d = new Date(year, monthIndex, 1);
   return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 }
+
+/**
+ * Accurately calculates age in full completed years from a Date of Birth (YYYY-MM-DD).
+ * Correctly accounts for whether the user's birthday has occurred in the current calendar year.
+ */
+export function calculateAge(dateOfBirth: string | null | undefined): number | null {
+  if (!dateOfBirth || !/^\d{4}-\d{2}-\d{2}$/.test(dateOfBirth)) return null;
+  const [birthYear, birthMonth, birthDay] = dateOfBirth.split('-').map(Number);
+  if (!birthYear || !birthMonth || !birthDay) return null;
+
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const currentMonth = today.getMonth() + 1; // 1-12
+  const currentDay = today.getDate();
+
+  let age = currentYear - birthYear;
+  // If birthday has not occurred yet this calendar year, subtract 1
+  if (currentMonth < birthMonth || (currentMonth === birthMonth && currentDay < birthDay)) {
+    age--;
+  }
+
+  return age >= 0 ? age : null;
+}
+
+/**
+ * Validates date of birth string:
+ * - Must match YYYY-MM-DD
+ * - Must be a valid past or present calendar date (not in future)
+ * - Year must be reasonable (>= 1900)
+ */
+export function isValidDateOfBirth(dateOfBirth: string | null | undefined): boolean {
+  if (!dateOfBirth) return true; // Optional field
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateOfBirth)) return false;
+  const [year, month, day] = dateOfBirth.split('-').map(Number);
+  if (year < 1900 || month < 1 || month > 12 || day < 1 || day > 31) return false;
+
+  const dobDate = new Date(year, month - 1, day);
+  if (isNaN(dobDate.getTime())) return false;
+  if (dobDate.getMonth() !== month - 1 || dobDate.getDate() !== day) return false;
+
+  // Cannot be in the future
+  const todayKey = getLocalDateKey();
+  return dateOfBirth <= todayKey;
+}
