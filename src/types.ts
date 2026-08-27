@@ -122,3 +122,22 @@ export interface UnlockedMilestoneRecord {
   id: string;
   unlockedAt: string;
 }
+
+export interface UserReminderSettings {
+  remindersEnabled: boolean;
+  reminderTime: string; // HH:mm format e.g. "20:00"
+  updatedAt?: string;
+}
+
+export const DEFAULT_REMINDER_SETTINGS: UserReminderSettings = {
+  remindersEnabled: true,
+  reminderTime: '20:00',
+};
+
+export interface ActiveSmartReminderNotice {
+  id: string;
+  title: string;
+  body: string;
+  incompleteHabits: HabitItem[];
+  timestamp: number;
+}

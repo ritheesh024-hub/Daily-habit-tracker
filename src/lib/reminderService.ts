@@ -74,6 +74,60 @@ export async function requestNotificationPermission(): Promise<NotificationSuppo
   }
 }
 
+export function getIncompleteHabits(
+  habits: HabitItem[],
+  completedHabits: Record<string, boolean> = {}
+): HabitItem[] {
+  return habits.filter((habit) => !completedHabits[habit.id]);
+}
+
+export function generateSmartReminderMessage(
+  incompleteHabits: HabitItem[]
+): { title: string; body: string } | null {
+  if (!incompleteHabits || incompleteHabits.length === 0) {
+    return null;
+  }
+
+  const count = incompleteHabits.length;
+  if (count === 1) {
+    const singleHabit = incompleteHabits[0];
+    return {
+      title: 'Daily Habits Reminder',
+      body: `Don't forget to complete ${singleHabit.name} today.`,
+    };
+  }
+
+  const habitNames = incompleteHabits.map((h) => h.name).join(', ');
+  return {
+    title: 'Daily Habits Reminder',
+    body: `${count} habits are still incomplete today: ${habitNames}.`,
+  };
+}
+
+export function triggerSmartBrowserNotification(
+  title: string,
+  body: string,
+  tag = 'daily-smart-reminder'
+): boolean {
+  if (
+    typeof window !== 'undefined' &&
+    'Notification' in window &&
+    Notification.permission === 'granted'
+  ) {
+    try {
+      new Notification(title, {
+        body,
+        icon: '/icon.png',
+        tag,
+      });
+      return true;
+    } catch (e) {
+      console.warn('Native notification failed (possibly iframe restricted):', e);
+    }
+  }
+  return false;
+}
+
 export function triggerBrowserNotification(habit: HabitItem): boolean {
   const emoji = getHabitEmoji(habit.icon);
   const title = `Time for ${habit.name} ${emoji}`;

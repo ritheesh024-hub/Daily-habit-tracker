@@ -58,7 +58,7 @@ export function formatHeaderFullDate(dateString: string): string {
   try {
     const [year, month, day] = dateString.split('-').map(Number);
     const date = new Date(year, month - 1, day);
-    const weekday = date.toLocaleDateString('en-US', { weekday: 'long' });
+    const weekday = date.toLocaleDateString('en-US', { weekday: 'short' });
     const dayNum = date.getDate();
     const monthName = date.toLocaleDateString('en-US', { month: 'long' });
     return `${weekday}, ${dayNum} ${monthName}`;

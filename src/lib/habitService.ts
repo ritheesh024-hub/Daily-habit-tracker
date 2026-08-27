@@ -21,6 +21,8 @@ import {
   UserProfile,
   AnalyticsStats,
   HabitConsistency,
+  UserReminderSettings,
+  DEFAULT_REMINDER_SETTINGS,
 } from '../types';
 import {
   getLast7Days,
@@ -39,6 +41,8 @@ import {
   setCachedHistoryBundle,
   getCachedUserProfile,
   setCachedUserProfile,
+  getCachedReminderSettings,
+  setCachedReminderSettings,
 } from './cacheService';
 
 export { getLocalDateKey };
@@ -77,7 +81,10 @@ export function createDefaultDailyLog(
   };
 }
 
-export function syncUserProfile(user: User): UserProfile {
+export function syncUserProfile(
+  user: User,
+  onProfileLoaded?: (profile: UserProfile) => void
+): UserProfile {
   const now = new Date().toISOString();
   const cached = getCachedUserProfile(user.uid);
 
@@ -113,6 +120,9 @@ export function syncUserProfile(user: User): UserProfile {
           lastLoginAt: now,
         };
         setCachedUserProfile(updatedProfile);
+        if (onProfileLoaded) {
+          onProfileLoaded(updatedProfile);
+        }
 
         // Update login metadata without overwriting user-edited displayName or dateOfBirth
         setDoc(
@@ -437,6 +447,7 @@ export async function saveDailyLog(
     await setDoc(logDocRef, payload, { merge: true });
   } catch (error) {
     console.warn(`Save daily log notice for ${date}:`, error);
+    throw error;
   }
 }
 
@@ -938,4 +949,56 @@ export async function fetchHabitHistoryAndStreaks(
   setCachedHistoryBundle(userId, resultBundle);
 
   return resultBundle;
+}
+
+/**
+ * Loads user reminder preferences from users/{userId}/settings/reminders.
+ * Cache-first for instant UI loading with background synchronization.
+ */
+export async function fetchUserReminderSettings(userId: string): Promise<UserReminderSettings> {
+  const cached = getCachedReminderSettings(userId);
+  try {
+    const settingsDocRef = doc(db, 'users', userId, 'settings', 'reminders');
+    const snap = await getDoc(settingsDocRef);
+    if (snap.exists()) {
+      const data = snap.data();
+      const settings: UserReminderSettings = {
+        remindersEnabled: typeof data.remindersEnabled === 'boolean' ? data.remindersEnabled : true,
+        reminderTime: typeof data.reminderTime === 'string' ? data.reminderTime : '20:00',
+        updatedAt: data.updatedAt,
+      };
+      setCachedReminderSettings(userId, settings);
+      return settings;
+    }
+  } catch (error) {
+    console.warn(`Background reminder settings fetch notice for ${userId}:`, error);
+  }
+  return cached;
+}
+
+/**
+ * Saves user reminder preferences to users/{userId}/settings/reminders.
+ */
+export async function saveUserReminderSettings(
+  userId: string,
+  settings: UserReminderSettings
+): Promise<void> {
+  const now = new Date().toISOString();
+  const payload: UserReminderSettings = {
+    remindersEnabled: settings.remindersEnabled,
+    reminderTime: settings.reminderTime || '20:00',
+    updatedAt: now,
+  };
+
+  // Immediate local cache update
+  setCachedReminderSettings(userId, payload);
+
+  // Background Firestore persistence
+  try {
+    const settingsDocRef = doc(db, 'users', userId, 'settings', 'reminders');
+    await setDoc(settingsDocRef, payload, { merge: true });
+  } catch (error) {
+    console.warn(`Background save reminder settings error for ${userId}:`, error);
+    throw error;
+  }
 }

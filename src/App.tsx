@@ -21,6 +21,9 @@ import {
   HabitItem,
   StreakStats,
   UserProfile,
+  UserReminderSettings,
+  ActiveSmartReminderNotice,
+  DEFAULT_REMINDER_SETTINGS,
 } from './types';
 import { getTodayDateString, formatHeaderDate } from './lib/dateUtils';
 import {
@@ -42,6 +45,8 @@ import {
   fetchHabitHistoryAndStreaks,
   calculateStreaks,
   getLocalDateKey,
+  fetchUserReminderSettings,
+  saveUserReminderSettings,
 } from './lib/habitService';
 import {
   getCachedUserProfile,
@@ -54,6 +59,8 @@ import {
   setCachedHistoryBundle,
   getCachedMilestones,
   setCachedMilestones,
+  getCachedReminderSettings,
+  setCachedReminderSettings,
   clearUserCache,
   clearActiveSession,
 } from './lib/cacheService';
@@ -62,7 +69,12 @@ import {
   fetchUserMilestoneRecords,
   persistUnlockedMilestones,
 } from './lib/milestoneService';
-import { triggerBrowserNotification } from './lib/reminderService';
+import {
+  triggerBrowserNotification,
+  triggerSmartBrowserNotification,
+  getIncompleteHabits,
+  generateSmartReminderMessage,
+} from './lib/reminderService';
 import { Header } from './components/Header';
 import { ProgressBar } from './components/ProgressBar';
 import { StreakStatsCard } from './components/StreakStatsCard';
@@ -153,9 +165,16 @@ export default function App() {
   const [isProfileModalOpen, setIsProfileModalOpen] = useState<boolean>(false);
   const [profileModalTab, setProfileModalTab] = useState<TabType>('analytics');
 
+  // Smart Reminder Settings state
+  const [reminderSettings, setReminderSettings] = useState<UserReminderSettings>(() =>
+    getCachedReminderSettings(currentUser?.uid)
+  );
+
   // Active Toast reminders in state
   const [activeReminders, setActiveReminders] = useState<ActiveReminderNotice[]>([]);
+  const [activeSmartReminders, setActiveSmartReminders] = useState<ActiveSmartReminderNotice[]>([]);
   const notifiedHabitTimesRef = useRef<Record<string, boolean>>({});
+  const smartReminderNotifiedDatesRef = useRef<Record<string, boolean>>({});
   const currentDateFetchRef = useRef<string>(selectedDate);
 
   // Online / Offline state
@@ -183,7 +202,10 @@ export default function App() {
     getRedirectResult(auth)
       .then(async (result) => {
         if (result?.user) {
-          const profile = syncUserProfile(result.user);
+          const profile = syncUserProfile(result.user, (syncedProfile) => {
+            setCurrentUser(syncedProfile);
+            setCachedUserProfile(syncedProfile);
+          });
           setCurrentUser(profile);
           setCachedUserProfile(profile);
           setAuthError(null);
@@ -220,7 +242,10 @@ export default function App() {
       auth,
       (user: User | null) => {
         if (user) {
-          const profile = syncUserProfile(user);
+          const profile = syncUserProfile(user, (syncedProfile) => {
+            setCurrentUser(syncedProfile);
+            setCachedUserProfile(syncedProfile);
+          });
           setCurrentUser(profile);
           setCachedUserProfile(profile);
           setAuthError(null);
@@ -256,6 +281,11 @@ export default function App() {
           // Load user-specific cached milestones
           const cachedMilestones = getCachedMilestones(user.uid);
           setPersistedMilestonesMap(cachedMilestones || {});
+
+          // Fetch and sync user-specific reminder settings
+          fetchUserReminderSettings(user.uid).then((settings) => {
+            setReminderSettings(settings);
+          });
         } else {
           setCurrentUser(null);
           setCachedUserProfile(null);
@@ -268,8 +298,11 @@ export default function App() {
           setStreaks({ currentStreak: 0, bestStreak: 0 });
           setAnalytics(DEFAULT_ANALYTICS);
           setPersistedMilestonesMap({});
+          setReminderSettings(DEFAULT_REMINDER_SETTINGS);
           setActiveReminders([]);
+          setActiveSmartReminders([]);
           notifiedHabitTimesRef.current = {};
+          smartReminderNotifiedDatesRef.current = {};
         }
         setIsAuthLoading(false);
       },
@@ -293,6 +326,7 @@ export default function App() {
             prevSelected === prevToday ? realToday : prevSelected
           );
           notifiedHabitTimesRef.current = {};
+          smartReminderNotifiedDatesRef.current = {};
           return realToday;
         }
         return prevToday;
@@ -444,7 +478,7 @@ export default function App() {
     });
   }, [selectedDate, currentUser?.uid, habits]);
 
-  // Habit Reminder Scheduler Loop
+  // Habit & Smart Reminder Scheduler Loop
   useEffect(() => {
     if (habits.length === 0) return;
 
@@ -455,6 +489,42 @@ export default function App() {
       const currentTimeStr = `${currentHours}:${currentMinutes}`;
       const todayStr = getTodayDateString();
 
+      // 1. Check Smart Reminder
+      if (reminderSettings.remindersEnabled && reminderSettings.reminderTime === currentTimeStr) {
+        if (!smartReminderNotifiedDatesRef.current[todayStr]) {
+          smartReminderNotifiedDatesRef.current[todayStr] = true;
+
+          const todayLog =
+            (selectedDate === todayStr ? dailyLog : rawLogsMap[todayStr]) ||
+            (currentUser?.uid ? getCachedDailyLog(currentUser.uid, todayStr) : null) ||
+            createDefaultDailyLog(todayStr, habits.length);
+
+          const completedMap = todayLog.completedHabits || {};
+          const incomplete = getIncompleteHabits(habits, completedMap);
+
+          // Only send reminder if there are incomplete habits!
+          if (incomplete.length > 0) {
+            const message = generateSmartReminderMessage(incomplete);
+            if (message) {
+              triggerSmartBrowserNotification(message.title, message.body);
+
+              const noticeId = `smart-${todayStr}-${Date.now()}`;
+              setActiveSmartReminders((prev) => [
+                ...prev.filter((item) => !item.id.startsWith(`smart-${todayStr}`)),
+                {
+                  id: noticeId,
+                  title: message.title,
+                  body: message.body,
+                  incompleteHabits: incomplete,
+                  timestamp: Date.now(),
+                },
+              ]);
+            }
+          }
+        }
+      }
+
+      // 2. Check Individual Habit Reminders
       habits.forEach((habit) => {
         if (!habit.reminderEnabled || !habit.reminderTime) return;
 
@@ -478,7 +548,7 @@ export default function App() {
     const timer = setInterval(checkReminders, 15000);
 
     return () => clearInterval(timer);
-  }, [habits]);
+  }, [habits, reminderSettings, dailyLog, rawLogsMap, selectedDate, currentUser?.uid]);
 
   // Google Sign-in handler
   const handleGoogleSignIn = async () => {
@@ -661,6 +731,14 @@ export default function App() {
       await saveDailyLog(currentUser.uid, targetDate, updatedLog);
     } catch (error) {
       console.warn(`Background daily log save notice for ${targetDate}:`, error);
+      // If saving fails while online due to a real error, gracefully rollback optimistic change
+      if (typeof navigator !== 'undefined' && navigator.onLine) {
+        if (selectedDate === targetDate) {
+          setDailyLog(baseLog);
+        }
+        setRawLogsMap((prev) => ({ ...prev, [targetDate]: baseLog }));
+        setCachedDailyLog(currentUser.uid, targetDate, baseLog);
+      }
     } finally {
       setIsSavingLog(false);
     }
@@ -841,6 +919,66 @@ export default function App() {
     }
   };
 
+  // Update user global smart reminder settings
+  const handleUpdateReminderSettings = async (settings: UserReminderSettings) => {
+    setReminderSettings(settings);
+    if (currentUser?.uid) {
+      try {
+        await saveUserReminderSettings(currentUser.uid, settings);
+      } catch (err) {
+        console.warn('Failed to save reminder settings to Firestore:', err);
+      }
+    }
+  };
+
+  // Test Smart Reminder Trigger (evaluates today's unfinished habits)
+  const handleTestSmartReminder = () => {
+    const todayLog =
+      (selectedDate === todayDate ? dailyLog : rawLogsMap[todayDate]) ||
+      (currentUser?.uid ? getCachedDailyLog(currentUser.uid, todayDate) : null) ||
+      createDefaultDailyLog(todayDate, habits.length);
+
+    const completedMap = todayLog.completedHabits || {};
+    const incomplete = getIncompleteHabits(habits, completedMap);
+
+    if (incomplete.length === 0) {
+      // All completed for today
+      triggerSmartBrowserNotification('Daily Habits', 'All habits are completed for today! Keep up the great work.');
+      const noticeId = `smart-test-${Date.now()}`;
+      setActiveSmartReminders((prev) => [
+        ...prev.filter((r) => r.id !== noticeId),
+        {
+          id: noticeId,
+          title: 'Daily Habits',
+          body: 'All habits are completed for today! Keep up the great work.',
+          incompleteHabits: [],
+          timestamp: Date.now(),
+        },
+      ]);
+    } else {
+      const msg = generateSmartReminderMessage(incomplete);
+      if (msg) {
+        triggerSmartBrowserNotification(msg.title, msg.body);
+        const noticeId = `smart-test-${Date.now()}`;
+        setActiveSmartReminders((prev) => [
+          ...prev.filter((r) => r.id !== noticeId),
+          {
+            id: noticeId,
+            title: msg.title,
+            body: msg.body,
+            incompleteHabits: incomplete,
+            timestamp: Date.now(),
+          },
+        ]);
+      }
+    }
+  };
+
+  // Dismiss a smart reminder toast
+  const handleDismissSmartReminder = (noticeId: string) => {
+    setActiveSmartReminders((prev) => prev.filter((item) => item.id !== noticeId));
+  };
+
   // Test Notification Trigger
   const handleTestNotification = () => {
     const sampleHabit: HabitItem = habits[0] || {
@@ -1018,6 +1156,9 @@ export default function App() {
         onDeleteHabit={handleDeleteHabitFromProfile}
         onUpdateHabitReminder={handleUpdateHabitReminder}
         onTestNotification={handleTestNotification}
+        reminderSettings={reminderSettings}
+        onUpdateReminderSettings={handleUpdateReminderSettings}
+        onTestSmartReminder={handleTestSmartReminder}
         analytics={analytics}
         milestones={milestones}
         rawLogsMap={rawLogsMap}
@@ -1029,7 +1170,9 @@ export default function App() {
       {/* Active In-App Reminder Notifications */}
       <ReminderToast
         reminders={activeReminders}
+        smartReminders={activeSmartReminders}
         onDismiss={handleDismissReminder}
+        onDismissSmart={handleDismissSmartReminder}
         onCompleteHabit={handleCompleteHabitFromToast}
       />
 

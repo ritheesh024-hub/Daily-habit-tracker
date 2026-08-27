@@ -11,6 +11,8 @@ import {
   AnalyticsStats,
   DayHistorySummary,
   DEFAULT_HABITS,
+  UserReminderSettings,
+  DEFAULT_REMINDER_SETTINGS,
 } from '../types';
 import { getLocalDateKey } from './dateUtils';
 
@@ -147,6 +149,37 @@ export function setCachedMilestones(userId: string, records: Record<string, stri
   }
 }
 
+export function getCachedReminderSettings(userId?: string): UserReminderSettings {
+  if (!userId) {
+    return { ...DEFAULT_REMINDER_SETTINGS };
+  }
+  try {
+    const raw = localStorage.getItem(`${PREFIX}reminders_${userId}`);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (typeof parsed === 'object' && parsed !== null) {
+        return {
+          remindersEnabled: typeof parsed.remindersEnabled === 'boolean' ? parsed.remindersEnabled : true,
+          reminderTime: typeof parsed.reminderTime === 'string' ? parsed.reminderTime : '20:00',
+          updatedAt: parsed.updatedAt,
+        };
+      }
+    }
+  } catch (e) {
+    console.warn(`Cache read error (reminders for ${userId}):`, e);
+  }
+  return { ...DEFAULT_REMINDER_SETTINGS };
+}
+
+export function setCachedReminderSettings(userId: string, settings: UserReminderSettings): void {
+  if (!userId) return;
+  try {
+    localStorage.setItem(`${PREFIX}reminders_${userId}`, JSON.stringify(settings));
+  } catch (e) {
+    console.warn(`Cache write error (reminders for ${userId}):`, e);
+  }
+}
+
 /**
  * Completely purges all stored cache for a specific user.
  */
@@ -157,6 +190,7 @@ export function clearUserCache(userId: string): void {
     localStorage.removeItem(`${PREFIX}habits_${userId}`);
     localStorage.removeItem(`${PREFIX}history_${userId}`);
     localStorage.removeItem(`${PREFIX}milestones_${userId}`);
+    localStorage.removeItem(`${PREFIX}reminders_${userId}`);
 
     // Clean up all date logs for this user
     const toRemove: string[] = [];

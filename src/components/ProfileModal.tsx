@@ -20,7 +20,7 @@ import {
   Volume2,
   Lock,
 } from 'lucide-react';
-import { HabitItem, UserProfile, AnalyticsStats, DailyLogData, Milestone } from '../types';
+import { HabitItem, UserProfile, AnalyticsStats, DailyLogData, Milestone, UserReminderSettings } from '../types';
 import { HabitIcon } from './HabitIcon';
 import { HabitModal } from './HabitModal';
 import { AnalyticsView } from './AnalyticsView';
@@ -46,6 +46,9 @@ interface ProfileModalProps {
   onDeleteHabit: (habitId: string) => Promise<void>;
   onUpdateHabitReminder: (habitId: string, reminderEnabled: boolean, reminderTime: string) => Promise<void>;
   onTestNotification: () => void;
+  reminderSettings?: UserReminderSettings;
+  onUpdateReminderSettings?: (settings: UserReminderSettings) => Promise<void>;
+  onTestSmartReminder?: () => void;
   analytics: AnalyticsStats;
   milestones?: Milestone[];
   rawLogsMap?: Record<string, DailyLogData>;
@@ -66,6 +69,9 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   onDeleteHabit,
   onUpdateHabitReminder,
   onTestNotification,
+  reminderSettings = { remindersEnabled: true, reminderTime: '20:00' },
+  onUpdateReminderSettings,
+  onTestSmartReminder,
   analytics,
   milestones = [],
   rawLogsMap = {},
@@ -490,82 +496,147 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
               </div>
             )}
 
-            {/* TAB 3: REMINDER SETTINGS (PHASE 5) */}
+            {/* TAB 3: REMINDER SETTINGS */}
             {activeTab === 'reminders' && (
               <div id="reminder-settings-panel" className="space-y-4">
-                {/* Browser Notification Status Banner */}
-                <div className="p-3.5 bg-zinc-50 border border-zinc-200 rounded-lg space-y-2.5">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-md bg-zinc-200/80 flex items-center justify-center text-zinc-700 shrink-0">
-                        <Bell className="w-3.5 h-3.5" />
+                {/* 1. Main Smart Reminders Card */}
+                <div
+                  id="smart-reminders-card"
+                  className="p-4 bg-zinc-50 border border-zinc-200 rounded-xl space-y-4"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-zinc-900 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                        <Bell className="w-4 h-4" />
                       </div>
                       <div>
-                        <span className="text-xs font-semibold text-zinc-900 block">
-                          Browser Notifications
-                        </span>
-                        <span className="text-[11px] text-zinc-500">
-                          {permissionStatus === 'granted'
-                            ? 'Permission granted. Notifications will alert you on time.'
-                            : permissionStatus === 'denied'
-                            ? 'Notifications are blocked in browser settings. In-app alerts will be used.'
-                            : permissionStatus === 'unsupported'
-                            ? 'Browser notifications unavailable. In-app alerts will be used.'
-                            : 'Enable browser notifications for reminders when this tab is open.'}
-                        </span>
+                        <h3 className="text-sm font-bold text-zinc-900 leading-tight">
+                          Smart Reminders
+                        </h3>
+                        <p className="text-[11px] text-zinc-500 mt-0.5">
+                          Reminds you only about habits that are still unfinished today.
+                        </p>
                       </div>
                     </div>
 
-                    <div className="shrink-0">
-                      {permissionStatus === 'granted' ? (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full font-mono">
-                          <Check className="w-3 h-3" /> Allowed
-                        </span>
-                      ) : permissionStatus === 'denied' ? (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full font-mono">
-                          Blocked
-                        </span>
+                    {/* Enable/Disable Toggle */}
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-xs font-semibold font-mono text-zinc-700">
+                        {reminderSettings.remindersEnabled ? 'ON' : 'OFF'}
+                      </span>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          id="smart-reminders-toggle"
+                          checked={reminderSettings.remindersEnabled}
+                          onChange={async (e) => {
+                            const newEnabled = e.target.checked;
+                            if (newEnabled && permissionStatus === 'default') {
+                              const res = await requestNotificationPermission();
+                              setPermissionStatus(res);
+                            }
+                            if (onUpdateReminderSettings) {
+                              await onUpdateReminderSettings({
+                                ...reminderSettings,
+                                remindersEnabled: newEnabled,
+                              });
+                            }
+                          }}
+                          className="sr-only peer"
+                        />
+                        <div className="w-9 h-5 bg-zinc-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-zinc-900"></div>
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* Reminder Time Setting */}
+                  <div className="pt-3 border-t border-zinc-200/80 flex items-center justify-between gap-3">
+                    <div>
+                      <span className="text-xs font-semibold text-zinc-800 block">
+                        Reminder Time
+                      </span>
+                      <span className="text-[11px] text-zinc-500">
+                        Local time: {formatTime12Hour(reminderSettings.reminderTime || '20:00')}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="time"
+                        id="smart-reminder-time-input"
+                        value={reminderSettings.reminderTime || '20:00'}
+                        disabled={!reminderSettings.remindersEnabled}
+                        onChange={async (e) => {
+                          const newTime = e.target.value;
+                          if (!newTime) return;
+                          if (onUpdateReminderSettings) {
+                            await onUpdateReminderSettings({
+                              ...reminderSettings,
+                              reminderTime: newTime,
+                            });
+                          }
+                        }}
+                        className={`px-2.5 py-1.5 text-xs font-mono rounded-lg border transition-colors ${
+                          reminderSettings.remindersEnabled
+                            ? 'bg-white text-zinc-900 border-zinc-300 focus:ring-1 focus:ring-zinc-900'
+                            : 'bg-zinc-100 text-zinc-400 border-zinc-200 cursor-not-allowed'
+                        }`}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Notification Permission & Test Banner */}
+                  <div className="pt-3 border-t border-zinc-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                    <div className="flex items-center gap-2">
+                      {permissionStatus === 'denied' ? (
+                        <div className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-md">
+                          Notifications are disabled in your browser settings.
+                        </div>
+                      ) : permissionStatus === 'granted' ? (
+                        <div className="inline-flex items-center gap-1 text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-md font-mono">
+                          <Check className="w-3 h-3" /> Notifications enabled
+                        </div>
                       ) : (
                         <button
                           type="button"
                           id="request-permission-btn"
                           onClick={handleRequestPermission}
                           disabled={isRequestingPermission}
-                          className="px-2.5 py-1 bg-zinc-900 hover:bg-black text-white text-xs font-medium rounded transition-colors cursor-pointer"
+                          className="px-2.5 py-1 bg-zinc-900 hover:bg-black text-white text-xs font-medium rounded-md transition-colors cursor-pointer"
                         >
-                          {isRequestingPermission ? 'Requesting...' : 'Allow Alerts'}
+                          {isRequestingPermission ? 'Requesting...' : 'Enable Browser Alerts'}
                         </button>
                       )}
                     </div>
-                  </div>
 
-                  {/* Test notification button */}
-                  <div className="pt-2 border-t border-zinc-200/80 flex items-center justify-between">
-                    <span className="text-[11px] text-zinc-500">
-                      Test your notification sound & banner:
-                    </span>
                     <button
                       type="button"
-                      id="test-notification-btn"
-                      onClick={onTestNotification}
-                      className="inline-flex items-center gap-1 text-xs font-medium text-zinc-700 hover:text-zinc-900 bg-white hover:bg-zinc-100 px-2.5 py-1 rounded border border-zinc-300 transition-colors cursor-pointer"
+                      id="test-smart-reminder-btn"
+                      onClick={() => {
+                        if (onTestSmartReminder) {
+                          onTestSmartReminder();
+                        } else {
+                          onTestNotification();
+                        }
+                      }}
+                      className="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-700 hover:text-zinc-900 bg-white hover:bg-zinc-100 px-3 py-1.5 rounded-md border border-zinc-300 transition-colors cursor-pointer self-start sm:self-auto"
                     >
-                      <Volume2 className="w-3 h-3 text-zinc-500" />
-                      <span>Test Reminder</span>
+                      <Volume2 className="w-3.5 h-3.5 text-zinc-500" />
+                      <span>Test Smart Reminder</span>
                     </button>
                   </div>
                 </div>
 
-                {/* Habit Specific Reminder Schedule */}
-                <div className="space-y-2">
+                {/* 2. Habit-Specific Reminder Schedule */}
+                <div className="space-y-2 pt-2">
                   <div className="flex items-center justify-between">
                     <h3 className="text-xs font-semibold text-zinc-800 uppercase tracking-wider">
-                      Habit Reminders
+                      Individual Habit Times
                     </h3>
-                    <span className="text-[11px] text-zinc-400 font-mono">Local Time</span>
+                    <span className="text-[11px] text-zinc-400 font-mono">Optional</span>
                   </div>
 
-                  <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                  <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
                     {habits.map((habit) => {
                       const isEnabled = !!habit.reminderEnabled;
                       const timeValue = habit.reminderTime || '08:00';
@@ -574,10 +645,10 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                         <div
                           key={habit.id}
                           id={`reminder-row-${habit.id}`}
-                          className={`p-3 border rounded-lg flex items-center justify-between gap-3 transition-colors ${
+                          className={`p-2.5 border rounded-lg flex items-center justify-between gap-3 transition-colors ${
                             isEnabled
                               ? 'bg-zinc-50 border-zinc-300'
-                              : 'bg-white border-zinc-200/80 opacity-75 hover:opacity-100'
+                              : 'bg-white border-zinc-200/80 opacity-70 hover:opacity-100'
                           }`}
                         >
                           {/* Habit Info */}
@@ -596,8 +667,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                           </div>
 
                           {/* Controls: Time Picker + Toggle */}
-                          <div className="flex items-center gap-3 shrink-0">
-                            {/* Time Input */}
+                          <div className="flex items-center gap-2.5 shrink-0">
                             <input
                               type="time"
                               id={`reminder-time-input-${habit.id}`}
@@ -611,7 +681,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                               }`}
                             />
 
-                            {/* Toggle Switch */}
                             <label className="relative inline-flex items-center cursor-pointer">
                               <input
                                 type="checkbox"
