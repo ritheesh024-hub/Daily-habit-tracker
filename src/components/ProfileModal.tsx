@@ -20,10 +20,11 @@ import {
   Volume2,
   Lock,
 } from 'lucide-react';
-import { HabitItem, UserProfile, AnalyticsStats, DailyLogData } from '../types';
+import { HabitItem, UserProfile, AnalyticsStats, DailyLogData, Milestone } from '../types';
 import { HabitIcon } from './HabitIcon';
 import { HabitModal } from './HabitModal';
 import { AnalyticsView } from './AnalyticsView';
+import { MilestonesView } from './MilestonesView';
 import {
   formatTime12Hour,
   getNotificationPermissionStatus,
@@ -46,13 +47,14 @@ interface ProfileModalProps {
   onUpdateHabitReminder: (habitId: string, reminderEnabled: boolean, reminderTime: string) => Promise<void>;
   onTestNotification: () => void;
   analytics: AnalyticsStats;
+  milestones?: Milestone[];
   rawLogsMap?: Record<string, DailyLogData>;
   todayDate?: string;
   onSignOut: () => void;
   initialTab?: TabType;
 }
 
-export type TabType = 'analytics' | 'habits' | 'reminders' | 'profile';
+export type TabType = 'analytics' | 'milestones' | 'habits' | 'reminders' | 'profile';
 
 export const ProfileModal: React.FC<ProfileModalProps> = ({
   isOpen,
@@ -65,6 +67,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   onUpdateHabitReminder,
   onTestNotification,
   analytics,
+  milestones = [],
   rawLogsMap = {},
   todayDate = getLocalDateKey(),
   onSignOut,
@@ -277,6 +280,31 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
               <button
                 type="button"
+                id="tab-milestones"
+                onClick={() => setActiveTab('milestones')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer shrink-0 ${
+                  activeTab === 'milestones'
+                    ? 'bg-zinc-900 text-white shadow-2xs'
+                    : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/60'
+                }`}
+              >
+                <Award className="w-3.5 h-3.5" />
+                <span>Milestones</span>
+                {milestones.length > 0 && (
+                  <span
+                    className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                      activeTab === 'milestones'
+                        ? 'bg-zinc-700 text-zinc-100'
+                        : 'bg-zinc-200 text-zinc-700'
+                    }`}
+                  >
+                    {milestones.filter((m) => m.isUnlocked).length}/{milestones.length}
+                  </span>
+                )}
+              </button>
+
+              <button
+                type="button"
                 id="tab-habits"
                 onClick={() => setActiveTab('habits')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer shrink-0 ${
@@ -345,6 +373,11 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                 habits={habits}
                 todayDate={todayDate}
               />
+            )}
+
+            {/* TAB 2: MILESTONES */}
+            {activeTab === 'milestones' && (
+              <MilestonesView milestones={milestones} />
             )}
 
             {/* TAB 2: MANAGE HABITS */}
@@ -604,184 +637,171 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
               </div>
             )}
 
-            {/* TAB 4: EDIT PROFILE */}
-            {activeTab === 'profile' && (
-              <div id="edit-profile-panel" className="space-y-4">
-                {/* 1. Profile Photo */}
-                <div
-                  id="edit-profile-photo-container"
-                  className="flex items-center gap-3 p-3 bg-zinc-50 border border-zinc-200 rounded-lg"
-                >
-                  {user?.photoURL ? (
-                    <img
-                      id="edit-profile-avatar"
-                      src={user.photoURL}
-                      alt={user.displayName || 'Profile Photo'}
-                      referrerPolicy="no-referrer"
-                      className="w-12 h-12 rounded-full border border-zinc-200 object-cover shadow-2xs shrink-0"
-                    />
-                  ) : (
+                {/* TAB 4: EDIT PROFILE */}
+                {activeTab === 'profile' && (
+                  <div id="edit-profile-panel" className="space-y-4">
+                    {/* 1. Profile Photo */}
                     <div
-                      id="edit-profile-avatar"
-                      className="w-12 h-12 rounded-full bg-zinc-800 text-white flex items-center justify-center text-base font-semibold shrink-0"
+                      id="edit-profile-photo-container"
+                      className="flex items-center gap-3 p-3 bg-zinc-50 border border-zinc-200 rounded-lg"
                     >
-                      {((user?.displayName || user?.email || 'U')[0] || 'U').toUpperCase()}
-                    </div>
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-semibold text-zinc-900">Profile Photo</p>
-                    <p className="text-[11px] text-zinc-500">
-                      Imported directly from your connected Google Account.
-                    </p>
-                  </div>
-                </div>
-
-                <form onSubmit={handleSaveProfile} className="space-y-3.5">
-                  {/* 2. Name */}
-                  <div>
-                    <label htmlFor="edit-name-input" className="block text-xs font-medium text-zinc-700 mb-1">
-                      Name
-                    </label>
-                    <input
-                      id="edit-name-input"
-                      type="text"
-                      value={displayNameInput}
-                      onChange={(e) => {
-                        setDisplayNameInput(e.target.value);
-                        setFormError(null);
-                      }}
-                      placeholder="Your name"
-                      className="w-full px-3 py-2 text-xs font-medium border border-zinc-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-zinc-900 bg-white"
-                      maxLength={50}
-                      required
-                    />
-                    <p className="text-[11px] text-zinc-400 mt-1">
-                      Initial name imported from Google. You can customize this display name.
-                    </p>
-                  </div>
-
-                  {/* 3 & 4. Date of Birth & Automatic Age Calculation */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label htmlFor="edit-dob-input" className="block text-xs font-medium text-zinc-700 mb-1">
-                        Date of Birth
-                      </label>
-                      <input
-                        id="edit-dob-input"
-                        type="date"
-                        value={dobInput}
-                        max={todayDate}
-                        onChange={(e) => {
-                          setDobInput(e.target.value);
-                          setFormError(null);
-                        }}
-                        className="w-full px-3 py-2 text-xs font-mono border border-zinc-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-zinc-900 bg-white"
-                      />
-                      <p className="text-[11px] text-zinc-400 mt-1">
-                        Select your birth date.
-                      </p>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-medium text-zinc-700 mb-1">
-                        Age <span className="text-zinc-400 font-normal">(read-only)</span>
-                      </label>
-                      <div
-                        id="edit-profile-age-display"
-                        className="w-full px-3 py-2 text-xs font-mono font-medium text-zinc-700 bg-zinc-100 border border-zinc-200 rounded-lg flex items-center justify-between"
-                      >
-                        <span>{liveAge !== null ? `${liveAge} years` : dobInput ? 'Invalid date' : '—'}</span>
-                        <span className="text-[10px] text-zinc-400 font-sans">Auto-calculated</span>
-                      </div>
-                      <p className="text-[11px] text-zinc-400 mt-1">
-                        Automatically calculated from Date of Birth.
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* 5. Gmail (Read-Only) */}
-                  <div>
-                    <label htmlFor="edit-email-display" className="block text-xs font-medium text-zinc-700 mb-1">
-                      Gmail
-                    </label>
-                    <div className="relative">
-                      <input
-                        id="edit-email-display"
-                        type="email"
-                        value={user?.email || ''}
-                        readOnly
-                        disabled
-                        className="w-full px-3 py-2 text-xs font-mono text-zinc-600 bg-zinc-100 border border-zinc-200 rounded-lg cursor-not-allowed select-none pr-8"
-                      />
-                      <Lock className="w-3.5 h-3.5 text-zinc-400 absolute right-3 top-1/2 -translate-y-1/2" />
-                    </div>
-                    <p className="text-[11px] text-zinc-400 mt-1">
-                      Read-only Google authentication address.
-                    </p>
-                  </div>
-
-                  {/* Feedback notices */}
-                  {formError && (
-                    <div
-                      id="profile-form-error"
-                      className="p-2.5 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700 flex items-center gap-2 animate-fadeIn"
-                    >
-                      <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
-                      <span>{formError}</span>
-                    </div>
-                  )}
-
-                  {profileSavedSuccess && (
-                    <div
-                      id="profile-form-success"
-                      className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-800 flex items-center gap-2 animate-fadeIn"
-                    >
-                      <Check className="w-4 h-4 text-emerald-600 shrink-0" />
-                      <span>Profile updated successfully.</span>
-                    </div>
-                  )}
-
-                  {/* Save Button */}
-                  <div className="flex items-center justify-end pt-1">
-                    <button
-                      id="save-profile-btn"
-                      type="submit"
-                      disabled={isSavingProfile || !displayNameInput.trim()}
-                      className="px-4 py-2 bg-zinc-900 hover:bg-black text-white text-xs font-medium rounded-lg transition-colors cursor-pointer disabled:opacity-50 inline-flex items-center gap-1.5"
-                    >
-                      {isSavingProfile ? (
-                        <>
-                          <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                          <span>Saving...</span>
-                        </>
+                      {user?.photoURL ? (
+                        <img
+                          id="edit-profile-avatar"
+                          src={user.photoURL}
+                          alt={user.displayName || 'Profile Photo'}
+                          referrerPolicy="no-referrer"
+                          className="w-12 h-12 rounded-full border border-zinc-200 object-cover shadow-2xs shrink-0"
+                        />
                       ) : (
-                        <span>Save</span>
+                        <div
+                          id="edit-profile-avatar"
+                          className="w-12 h-12 rounded-full bg-zinc-800 text-white flex items-center justify-center text-base font-semibold shrink-0"
+                        >
+                          {((user?.displayName || user?.email || 'U')[0] || 'U').toUpperCase()}
+                        </div>
                       )}
-                    </button>
-                  </div>
-                </form>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-semibold text-zinc-900">Profile Photo</p>
+                        <p className="text-[11px] text-zinc-500 truncate">
+                          {user?.email || 'Connected Account'}
+                        </p>
+                      </div>
+                    </div>
 
-                {/* Logout Action */}
-                <div className="pt-4 border-t border-zinc-200 flex items-center justify-between">
-                  <div>
-                    <span className="text-xs font-medium text-zinc-800 block">Sign Out</span>
-                    <span className="text-[11px] text-zinc-400">Logout of this session</span>
+                    <form onSubmit={handleSaveProfile} className="space-y-3.5">
+                      {/* 2. Name */}
+                      <div>
+                        <label htmlFor="edit-name-input" className="block text-xs font-medium text-zinc-700 mb-1">
+                          Name
+                        </label>
+                        <input
+                          id="edit-name-input"
+                          type="text"
+                          value={displayNameInput}
+                          onChange={(e) => {
+                            setDisplayNameInput(e.target.value);
+                            setFormError(null);
+                          }}
+                          placeholder="Your name"
+                          className="w-full px-3 py-2 text-xs font-medium border border-zinc-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-zinc-900 bg-white"
+                          maxLength={50}
+                          required
+                        />
+                      </div>
+
+                      {/* 3 & 4. Date of Birth & Automatic Age Calculation */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label htmlFor="edit-dob-input" className="block text-xs font-medium text-zinc-700 mb-1">
+                            Date of Birth
+                          </label>
+                          <input
+                            id="edit-dob-input"
+                            type="date"
+                            value={dobInput}
+                            max={todayDate}
+                            onChange={(e) => {
+                              setDobInput(e.target.value);
+                              setFormError(null);
+                            }}
+                            className="w-full px-3 py-2 text-xs font-mono border border-zinc-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-zinc-900 bg-white"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-medium text-zinc-700 mb-1">
+                            Age
+                          </label>
+                          <div
+                            id="edit-profile-age-display"
+                            className="w-full px-3 py-2 text-xs font-mono font-medium text-zinc-700 bg-zinc-100 border border-zinc-200 rounded-lg flex items-center"
+                          >
+                            <span>{liveAge !== null ? `${liveAge} years` : dobInput ? 'Invalid date' : '—'}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 5. Gmail (Read-Only) */}
+                      <div>
+                        <label htmlFor="edit-email-display" className="block text-xs font-medium text-zinc-700 mb-1">
+                          Gmail
+                        </label>
+                        <div className="relative">
+                          <input
+                            id="edit-email-display"
+                            type="email"
+                            value={user?.email || ''}
+                            readOnly
+                            disabled
+                            className="w-full px-3 py-2 text-xs font-mono text-zinc-600 bg-zinc-100 border border-zinc-200 rounded-lg cursor-not-allowed select-none pr-8"
+                          />
+                          <Lock className="w-3.5 h-3.5 text-zinc-400 absolute right-3 top-1/2 -translate-y-1/2" />
+                        </div>
+                      </div>
+
+                      {/* Feedback notices */}
+                      {formError && (
+                        <div
+                          id="profile-form-error"
+                          className="p-2.5 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700 flex items-center gap-2 animate-fadeIn"
+                        >
+                          <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+                          <span>{formError}</span>
+                        </div>
+                      )}
+
+                      {profileSavedSuccess && (
+                        <div
+                          id="profile-form-success"
+                          className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-800 flex items-center gap-2 animate-fadeIn"
+                        >
+                          <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <span>Profile updated successfully.</span>
+                        </div>
+                      )}
+
+                      {/* Save Button */}
+                      <div className="flex items-center justify-end pt-1">
+                        <button
+                          id="save-profile-btn"
+                          type="submit"
+                          disabled={isSavingProfile || !displayNameInput.trim()}
+                          className="px-4 py-2 bg-zinc-900 hover:bg-black text-white text-xs font-medium rounded-lg transition-colors cursor-pointer disabled:opacity-50 inline-flex items-center gap-1.5"
+                        >
+                          {isSavingProfile ? (
+                            <>
+                              <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                              <span>Saving...</span>
+                            </>
+                          ) : (
+                            <span>Save</span>
+                          )}
+                        </button>
+                      </div>
+                    </form>
+
+                    {/* Logout Action */}
+                    <div className="pt-4 border-t border-zinc-200 flex items-center justify-between">
+                      <div>
+                        <span className="text-xs font-medium text-zinc-800 block">Sign Out</span>
+                        <span className="text-[11px] text-zinc-400">Logout of this session</span>
+                      </div>
+                      <button
+                        id="profile-logout-btn"
+                        type="button"
+                        onClick={() => {
+                          onClose();
+                          onSignOut();
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:text-red-600 bg-zinc-100 hover:bg-red-50 rounded-lg border border-zinc-200 transition-colors cursor-pointer"
+                      >
+                        <LogOut className="w-3.5 h-3.5" />
+                        <span>Logout</span>
+                      </button>
+                    </div>
                   </div>
-                  <button
-                    id="profile-logout-btn"
-                    type="button"
-                    onClick={() => {
-                      onClose();
-                      onSignOut();
-                    }}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:text-red-600 bg-zinc-100 hover:bg-red-50 rounded-lg border border-zinc-200 transition-colors cursor-pointer"
-                  >
-                    <LogOut className="w-3.5 h-3.5" />
-                    <span>Logout</span>
-                  </button>
-                </div>
-              </div>
-            )}
+                )}
           </div>
 
           {/* Modal Footer */}

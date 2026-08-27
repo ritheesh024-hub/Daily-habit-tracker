@@ -41,6 +41,11 @@ service cloud.firestore {
       match /settings/{settingId} {
         allow read, write: if isOwner(userId);
       }
+
+      // Milestones subcollection
+      match /milestones/{milestoneId} {
+        allow read, write: if isOwner(userId);
+      }
     }
   }
 }

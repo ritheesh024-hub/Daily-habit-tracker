@@ -376,6 +376,7 @@ export async function fetchDailyLog(
         completedHabits,
         completedCount: progress.completedCount,
         totalActiveCount: activeHabits.length,
+        note: typeof data.note === 'string' ? data.note : undefined,
         updatedAt: data.updatedAt,
       };
       setCachedDailyLog(userId, date, logData);
@@ -419,7 +420,7 @@ export async function saveDailyLog(
   // Write to local cache immediately with strictly isolated key
   setCachedDailyLog(userId, date, log);
 
-  const payload = {
+  const payload: Record<string, any> = {
     date,
     completedHabits: log.completedHabits || {},
     completedCount: typeof log.completedCount === 'number' ? log.completedCount : 0,
@@ -427,12 +428,99 @@ export async function saveDailyLog(
     updatedAt: new Date().toISOString(),
   };
 
+  if (typeof log.note === 'string') {
+    payload.note = log.note;
+  }
+
   try {
     const logDocRef = doc(db, 'users', userId, 'dailyLogs', date);
     await setDoc(logDocRef, payload, { merge: true });
   } catch (error) {
     console.warn(`Save daily log notice for ${date}:`, error);
   }
+}
+
+/**
+ * Saves or updates a personal daily note for the specific date.
+ * Fully date-isolated and does not affect habit completion status.
+ */
+export async function saveDailyNote(
+  userId: string,
+  dateInput: string,
+  noteText: string
+): Promise<DailyLogData> {
+  const date = getLocalDateKey(dateInput);
+  const trimmed = noteText.slice(0, 500);
+  const cached = getCachedDailyLog(userId, date);
+
+  const updatedLog: DailyLogData = {
+    date,
+    completedHabits: cached?.completedHabits || {},
+    completedCount: typeof cached?.completedCount === 'number' ? cached.completedCount : 0,
+    totalActiveCount: typeof cached?.totalActiveCount === 'number' ? cached.totalActiveCount : 0,
+    note: trimmed,
+    updatedAt: new Date().toISOString(),
+  };
+
+  // Local storage write immediately
+  setCachedDailyLog(userId, date, updatedLog);
+
+  // Firestore background write with merge: true to avoid overwriting habit completions
+  try {
+    const logDocRef = doc(db, 'users', userId, 'dailyLogs', date);
+    await setDoc(
+      logDocRef,
+      {
+        date,
+        note: trimmed,
+        updatedAt: new Date().toISOString(),
+      },
+      { merge: true }
+    );
+  } catch (error) {
+    console.warn(`Save daily note notice for ${date}:`, error);
+  }
+
+  return updatedLog;
+}
+
+/**
+ * Clears the daily note for a specific date without deleting or changing habit progress.
+ */
+export async function clearDailyNote(
+  userId: string,
+  dateInput: string
+): Promise<DailyLogData> {
+  const date = getLocalDateKey(dateInput);
+  const cached = getCachedDailyLog(userId, date);
+
+  const updatedLog: DailyLogData = {
+    date,
+    completedHabits: cached?.completedHabits || {},
+    completedCount: typeof cached?.completedCount === 'number' ? cached.completedCount : 0,
+    totalActiveCount: typeof cached?.totalActiveCount === 'number' ? cached.totalActiveCount : 0,
+    note: '',
+    updatedAt: new Date().toISOString(),
+  };
+
+  setCachedDailyLog(userId, date, updatedLog);
+
+  try {
+    const logDocRef = doc(db, 'users', userId, 'dailyLogs', date);
+    await setDoc(
+      logDocRef,
+      {
+        date,
+        note: '',
+        updatedAt: new Date().toISOString(),
+      },
+      { merge: true }
+    );
+  } catch (error) {
+    console.warn(`Clear daily note notice for ${date}:`, error);
+  }
+
+  return updatedLog;
 }
 
 /**
@@ -460,6 +548,7 @@ export function toggleHabit(
     completedHabits: updatedCompletedHabits,
     completedCount: progress.completedCount,
     totalActiveCount: habits.length,
+    note: typeof currentLog.note === 'string' ? currentLog.note : '',
     updatedAt: new Date().toISOString(),
   };
 
@@ -797,6 +886,8 @@ export async function fetchHabitHistoryAndStreaks(
         completedHabits,
         completedCount: completed,
         totalActiveCount: total,
+        note: typeof dData.note === 'string' ? dData.note : undefined,
+        updatedAt: dData.updatedAt,
       };
       rawLogsMap[dDate] = logData;
       setCachedDailyLog(userId, dDate, logData);

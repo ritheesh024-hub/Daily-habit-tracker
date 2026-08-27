@@ -26,6 +26,7 @@ export interface DailyLogData {
   completedHabits: Record<string, boolean>;
   completedCount: number;
   totalActiveCount: number;
+  note?: string;
   updatedAt?: string;
 }
 
@@ -102,4 +103,22 @@ export interface AnalyticsStats {
   habitBreakdown: HabitConsistency[];
   totalLoggedDays: number;
   hasEnoughData: boolean;
+}
+
+export interface Milestone {
+  id: string;
+  title: string;
+  description: string;
+  icon: string; // 'flame' | 'check' | 'book' | 'target'
+  category: 'streak' | 'perfect_days' | 'completions' | 'consistency';
+  currentValue: number;
+  targetValue: number;
+  isUnlocked: boolean;
+  unlockedAt?: string; // e.g. "Aug 20" or ISO date
+  progressText: string; // e.g. "7 / 7 days", "10 / 10 perfect days"
+}
+
+export interface UnlockedMilestoneRecord {
+  id: string;
+  unlockedAt: string;
 }

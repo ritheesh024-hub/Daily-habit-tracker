@@ -1,6 +1,6 @@
 {
   "name": "Daily Habits",
-  "description": "A simple 1-page habit tracking web app with Google authentication and daily history.",
+  "description": "A clean personal habit tracking app with Google authentication, daily notes, reminders, analytics, and milestones.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import {
   onAuthStateChanged,
   signInWithPopup,
@@ -34,6 +34,8 @@ import {
   getDailyLog,
   saveDailyLog,
   toggleHabit,
+  saveDailyNote,
+  clearDailyNote,
   syncUserProfile,
   updateUserProfile,
   updateUserDisplayName,
@@ -50,14 +52,22 @@ import {
   setCachedDailyLog,
   getCachedHistoryBundle,
   setCachedHistoryBundle,
+  getCachedMilestones,
+  setCachedMilestones,
   clearUserCache,
   clearActiveSession,
 } from './lib/cacheService';
+import {
+  evaluateMilestones,
+  fetchUserMilestoneRecords,
+  persistUnlockedMilestones,
+} from './lib/milestoneService';
 import { triggerBrowserNotification } from './lib/reminderService';
 import { Header } from './components/Header';
 import { ProgressBar } from './components/ProgressBar';
 import { StreakStatsCard } from './components/StreakStatsCard';
 import { HabitList } from './components/HabitList';
+import { DailyNote } from './components/DailyNote';
 import { HistoryList } from './components/HistoryList';
 import { ProfileModal, TabType } from './components/ProfileModal';
 import { LoginView } from './components/LoginView';
@@ -131,6 +141,12 @@ export default function App() {
   const [analytics, setAnalytics] = useState<AnalyticsStats>(() => {
     const bundle = currentUser?.uid ? getCachedHistoryBundle(currentUser.uid) : null;
     return bundle?.analytics || DEFAULT_ANALYTICS;
+  });
+
+  // Milestones persisted unlock mapping: loaded synchronously from cache
+  const [persistedMilestonesMap, setPersistedMilestonesMap] = useState<Record<string, string>>(() => {
+    const cached = currentUser?.uid ? getCachedMilestones(currentUser.uid) : null;
+    return cached || {};
   });
 
   // Profile Modal state
@@ -236,6 +252,10 @@ export default function App() {
             setStreaks({ currentStreak: 0, bestStreak: 0 });
             setAnalytics(DEFAULT_ANALYTICS);
           }
+
+          // Load user-specific cached milestones
+          const cachedMilestones = getCachedMilestones(user.uid);
+          setPersistedMilestonesMap(cachedMilestones || {});
         } else {
           setCurrentUser(null);
           setCachedUserProfile(null);
@@ -247,6 +267,7 @@ export default function App() {
           setRawLogsMap({});
           setStreaks({ currentStreak: 0, bestStreak: 0 });
           setAnalytics(DEFAULT_ANALYTICS);
+          setPersistedMilestonesMap({});
           setActiveReminders([]);
           notifiedHabitTimesRef.current = {};
         }
@@ -326,6 +347,55 @@ export default function App() {
         console.warn('Background history sync:', err);
       });
   }, [currentUser?.uid, todayDate, habitsKey]);
+
+  // Sync persisted milestone records in background
+  useEffect(() => {
+    if (!currentUser?.uid) return;
+
+    fetchUserMilestoneRecords(currentUser.uid)
+      .then((records) => {
+        if (records && Object.keys(records).length > 0) {
+          setPersistedMilestonesMap((prev) => ({ ...prev, ...records }));
+        }
+      })
+      .catch((err) => {
+        console.warn('Background milestone sync notice:', err);
+      });
+  }, [currentUser?.uid]);
+
+  // Evaluate Milestones based on actual daily logs, streaks, and analytics
+  const milestones = useMemo(() => {
+    const result = evaluateMilestones(
+      historyMap,
+      rawLogsMap,
+      analytics,
+      streaks,
+      persistedMilestonesMap,
+      todayDate
+    );
+
+    // If there are newly unlocked milestones, persist them to Firestore & cache
+    if (currentUser?.uid && result.newlyUnlocked.length > 0) {
+      persistUnlockedMilestones(
+        currentUser.uid,
+        result.newlyUnlocked,
+        persistedMilestonesMap,
+        todayDate
+      ).then((updated) => {
+        setPersistedMilestonesMap(updated);
+      });
+    }
+
+    return result.milestones;
+  }, [
+    historyMap,
+    rawLogsMap,
+    analytics,
+    streaks,
+    persistedMilestonesMap,
+    todayDate,
+    currentUser?.uid,
+  ]);
 
   // Instant switch when selectedDate changes (Data-Saver: 0 internet calls when in memory / local storage)
   useEffect(() => {
@@ -601,6 +671,96 @@ export default function App() {
     handleToggleHabitForDate(selectedDate, habitId);
   };
 
+  // State & Handlers for Daily Note (Strictly Date-Isolated)
+  const [isSavingNote, setIsSavingNote] = useState(false);
+
+  const handleSaveDailyNote = async (targetDate: string, noteText: string) => {
+    if (!currentUser?.uid) return;
+    const dateKey = getLocalDateKey(targetDate);
+    setIsSavingNote(true);
+
+    try {
+      const updatedLog = await saveDailyNote(currentUser.uid, dateKey, noteText);
+
+      // If the saved note belongs to the currently displayed date, update state
+      if (dateKey === selectedDate) {
+        setDailyLog((prev) => ({
+          ...prev,
+          note: noteText,
+        }));
+      }
+
+      // Update in-memory rawLogsMap & cached bundle without mutating streak/analytics
+      setRawLogsMap((prev) => {
+        const existing = prev[dateKey] || createDefaultDailyLog(dateKey, habits.length);
+        const nextMap = {
+          ...prev,
+          [dateKey]: {
+            ...existing,
+            note: noteText,
+          },
+        };
+
+        setCachedHistoryBundle(currentUser.uid, {
+          history7Days: history,
+          historyMap,
+          rawLogsMap: nextMap,
+          streaks,
+          analytics,
+        });
+
+        return nextMap;
+      });
+    } catch (err) {
+      console.error('Error saving daily note:', err);
+    } finally {
+      setIsSavingNote(false);
+    }
+  };
+
+  const handleClearDailyNote = async (targetDate: string) => {
+    if (!currentUser?.uid) return;
+    const dateKey = getLocalDateKey(targetDate);
+    setIsSavingNote(true);
+
+    try {
+      await clearDailyNote(currentUser.uid, dateKey);
+
+      if (dateKey === selectedDate) {
+        setDailyLog((prev) => ({
+          ...prev,
+          note: '',
+        }));
+      }
+
+      setRawLogsMap((prev) => {
+        const existing = prev[dateKey];
+        if (!existing) return prev;
+        const nextMap = {
+          ...prev,
+          [dateKey]: {
+            ...existing,
+            note: '',
+          },
+        };
+
+        setCachedHistoryBundle(currentUser.uid, {
+          history7Days: history,
+          historyMap,
+          rawLogsMap: nextMap,
+          streaks,
+          analytics,
+        });
+
+        return nextMap;
+      });
+    } catch (err) {
+      console.error('Error clearing daily note:', err);
+    } finally {
+      setIsSavingNote(false);
+    }
+  };
+
   // Save changes from HabitModal
   const handleSaveHabitFromProfile = async (
     data: { name: string; target: string; icon: string; reminderEnabled?: boolean; reminderTime?: string },
@@ -762,7 +922,6 @@ export default function App() {
       <Header
         user={currentUser}
         currentDate={selectedDate}
-        onSignOut={handleSignOut}
         onOpenProfile={() => {
           setProfileModalTab('analytics');
           setIsProfileModalOpen(true);
@@ -829,6 +988,16 @@ export default function App() {
           />
         </section>
 
+        {/* Daily Note Section */}
+        <DailyNote
+          selectedDate={selectedDate}
+          isToday={isToday}
+          note={dailyLog.note || ''}
+          onSaveNote={handleSaveDailyNote}
+          onClearNote={handleClearDailyNote}
+          isSaving={isSavingNote}
+        />
+
         {/* 7-Day History Section */}
         <HistoryList
           history={history}
@@ -850,6 +1019,7 @@ export default function App() {
         onUpdateHabitReminder={handleUpdateHabitReminder}
         onTestNotification={handleTestNotification}
         analytics={analytics}
+        milestones={milestones}
         rawLogsMap={rawLogsMap}
         todayDate={todayDate}
         onSignOut={handleSignOut}

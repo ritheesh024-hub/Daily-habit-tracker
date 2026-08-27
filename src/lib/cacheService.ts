@@ -128,6 +128,25 @@ export function setCachedHistoryBundle(
   }
 }
 
+export function getCachedMilestones(userId: string): Record<string, string> | null {
+  if (!userId) return null;
+  try {
+    const raw = localStorage.getItem(`${PREFIX}milestones_${userId}`);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function setCachedMilestones(userId: string, records: Record<string, string>): void {
+  if (!userId) return;
+  try {
+    localStorage.setItem(`${PREFIX}milestones_${userId}`, JSON.stringify(records));
+  } catch (e) {
+    console.warn(`Cache write error (milestones for ${userId}):`, e);
+  }
+}
+
 /**
  * Completely purges all stored cache for a specific user.
  */
@@ -137,6 +156,7 @@ export function clearUserCache(userId: string): void {
     localStorage.removeItem(`${PREFIX}user_${userId}`);
     localStorage.removeItem(`${PREFIX}habits_${userId}`);
     localStorage.removeItem(`${PREFIX}history_${userId}`);
+    localStorage.removeItem(`${PREFIX}milestones_${userId}`);
 
     // Clean up all date logs for this user
     const toRemove: string[] = [];
