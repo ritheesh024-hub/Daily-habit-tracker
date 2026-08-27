@@ -191,6 +191,7 @@ export function clearUserCache(userId: string): void {
     localStorage.removeItem(`${PREFIX}history_${userId}`);
     localStorage.removeItem(`${PREFIX}milestones_${userId}`);
     localStorage.removeItem(`${PREFIX}reminders_${userId}`);
+    localStorage.removeItem(`${PREFIX}theme_${userId}`);
 
     // Clean up all date logs for this user
     const toRemove: string[] = [];

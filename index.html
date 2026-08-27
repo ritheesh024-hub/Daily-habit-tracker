@@ -13,6 +13,20 @@
     <meta property="og:description" content="A simple 1-page daily habit tracker with Google authentication and history." />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
+    <script>
+      (function () {
+        try {
+          var activeUid = localStorage.getItem('dh_cache_active_uid');
+          var saved = (activeUid && localStorage.getItem('dh_cache_theme_' + activeUid)) || localStorage.getItem('dh_theme_pref') || 'system';
+          var isDark = saved === 'dark' || (saved === 'system' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          if (isDark) {
+            document.documentElement.classList.add('dark');
+          } else {
+            document.documentElement.classList.remove('dark');
+          }
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

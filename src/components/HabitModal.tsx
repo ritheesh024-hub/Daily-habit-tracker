@@ -87,19 +87,19 @@ export const HabitModal: React.FC<HabitModalProps> = ({
   return (
     <div
       id="habit-modal-backdrop"
-      className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4 backdrop-blur-[1px] animate-fadeIn"
+      className="fixed inset-0 z-50 bg-black/50 dark:bg-black/70 flex items-center justify-center p-4 backdrop-blur-[1px] animate-fadeIn"
       onClick={(e) => {
         if (e.target === e.currentTarget && !isSaving) onClose();
       }}
     >
       <div
         id="habit-modal-card"
-        className="w-full max-w-md bg-white border border-zinc-200 rounded-xl shadow-lg overflow-hidden flex flex-col"
+        className="w-full max-w-md bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-xl overflow-hidden flex flex-col transition-colors"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-200">
-          <h2 id="modal-title" className="text-base font-semibold text-zinc-900">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-200 dark:border-zinc-800">
+          <h2 id="modal-title" className="text-base font-semibold text-zinc-900 dark:text-zinc-100">
             {isEditing ? 'Edit Habit' : 'Add Habit'}
           </h2>
           <button
@@ -107,7 +107,7 @@ export const HabitModal: React.FC<HabitModalProps> = ({
             type="button"
             onClick={onClose}
             disabled={isSaving}
-            className="text-zinc-400 hover:text-zinc-700 p-1 rounded transition-colors"
+            className="text-zinc-400 dark:text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-200 p-1 rounded transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -116,11 +116,11 @@ export const HabitModal: React.FC<HabitModalProps> = ({
         {/* Delete Confirmation View */}
         {showDeleteConfirm && isEditing && initialHabit ? (
           <div id="delete-confirmation-view" className="p-5 space-y-4">
-            <div className="flex items-start gap-3 p-3 bg-red-50 border border-red-200 rounded-lg text-red-800">
-              <AlertCircle className="w-5 h-5 shrink-0 text-red-600 mt-0.5" />
+            <div className="flex items-start gap-3 p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800/80 rounded-lg text-red-800 dark:text-red-200">
+              <AlertCircle className="w-5 h-5 shrink-0 text-red-600 dark:text-red-400 mt-0.5" />
               <div className="text-xs space-y-1">
-                <p className="font-semibold text-red-900">Delete habit "{initialHabit.name}"?</p>
-                <p className="text-red-700">
+                <p className="font-semibold text-red-900 dark:text-red-100">Delete habit "{initialHabit.name}"?</p>
+                <p className="text-red-700 dark:text-red-300">
                   This will remove it from your active daily list. Past completion records in history will be preserved.
                 </p>
               </div>
@@ -132,7 +132,7 @@ export const HabitModal: React.FC<HabitModalProps> = ({
                 type="button"
                 onClick={() => setShowDeleteConfirm(false)}
                 disabled={isSaving}
-                className="px-3 py-2 text-xs font-medium text-zinc-700 bg-zinc-100 hover:bg-zinc-200 rounded-md border border-zinc-200 transition-colors"
+                className="px-3 py-2 text-xs font-medium text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-md border border-zinc-200 dark:border-zinc-700 transition-colors cursor-pointer"
               >
                 Keep Habit
               </button>
@@ -141,7 +141,7 @@ export const HabitModal: React.FC<HabitModalProps> = ({
                 type="button"
                 onClick={() => onDelete && onDelete(initialHabit.id)}
                 disabled={isSaving}
-                className="px-3 py-2 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors"
+                className="px-3 py-2 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors cursor-pointer"
               >
                 {isSaving ? 'Deleting...' : 'Yes, Delete Habit'}
               </button>
@@ -153,7 +153,7 @@ export const HabitModal: React.FC<HabitModalProps> = ({
             {/* Quick Presets (Only on Add) */}
             {!isEditing && (
               <div className="space-y-1.5">
-                <label className="text-[11px] font-medium text-zinc-500 uppercase tracking-wider">
+                <label className="text-[11px] font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
                   Quick Suggestions
                 </label>
                 <div className="flex flex-wrap gap-1.5">
@@ -162,11 +162,11 @@ export const HabitModal: React.FC<HabitModalProps> = ({
                       key={p.name}
                       type="button"
                       onClick={() => handleApplyPreset(p)}
-                      className="inline-flex items-center gap-1.5 px-2 py-1 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded text-xs border border-zinc-200/70 transition-colors cursor-pointer"
+                      className="inline-flex items-center gap-1.5 px-2 py-1 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200 rounded text-xs border border-zinc-200/70 dark:border-zinc-700 transition-colors cursor-pointer"
                     >
-                      <HabitIcon name={p.icon} className="w-3 h-3 text-zinc-500" />
+                      <HabitIcon name={p.icon} className="w-3 h-3 text-zinc-500 dark:text-zinc-400" />
                       <span>{p.name}</span>
-                      <span className="text-zinc-400 font-mono text-[10px]">({p.target})</span>
+                      <span className="text-zinc-400 dark:text-zinc-500 font-mono text-[10px]">({p.target})</span>
                     </button>
                   ))}
                 </div>
@@ -175,7 +175,7 @@ export const HabitModal: React.FC<HabitModalProps> = ({
 
             {/* Habit Name Field */}
             <div className="space-y-1">
-              <label htmlFor="habit-name-input" className="text-xs font-medium text-zinc-700">
+              <label htmlFor="habit-name-input" className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
                 Habit Name <span className="text-red-500">*</span>
               </label>
               <input
@@ -187,15 +187,15 @@ export const HabitModal: React.FC<HabitModalProps> = ({
                   if (error) setError(null);
                 }}
                 placeholder="e.g. Meditation, Walking, Read a chapter"
-                className="w-full px-3 py-2 text-sm text-zinc-900 bg-white border border-zinc-300 rounded-md focus:outline-none focus:ring-1 focus:ring-zinc-900 focus:border-zinc-900 placeholder:text-zinc-400"
+                className="w-full px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-md focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-zinc-100 focus:border-zinc-900 dark:focus:border-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500"
                 autoFocus
               />
             </div>
 
             {/* Target / Value Field */}
             <div className="space-y-1">
-              <label htmlFor="habit-target-input" className="text-xs font-medium text-zinc-700">
-                Target / Goal <span className="text-zinc-400 font-normal">(optional)</span>
+              <label htmlFor="habit-target-input" className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                Target / Goal <span className="text-zinc-400 dark:text-zinc-500 font-normal">(optional)</span>
               </label>
               <input
                 id="habit-target-input"
@@ -203,18 +203,18 @@ export const HabitModal: React.FC<HabitModalProps> = ({
                 value={target}
                 onChange={(e) => setTarget(e.target.value)}
                 placeholder="e.g. 20 mins, 8 glasses, 10:30 PM, 1 hour"
-                className="w-full px-3 py-2 text-sm text-zinc-900 bg-white border border-zinc-300 rounded-md focus:outline-none focus:ring-1 focus:ring-zinc-900 focus:border-zinc-900 placeholder:text-zinc-400"
+                className="w-full px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-md focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-zinc-100 focus:border-zinc-900 dark:focus:border-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500"
               />
             </div>
 
             {/* Optional Icon Selector */}
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-zinc-700">
-                Icon <span className="text-zinc-400 font-normal">(optional)</span>
+              <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                Icon <span className="text-zinc-400 dark:text-zinc-500 font-normal">(optional)</span>
               </label>
               <div
                 id="icon-picker-grid"
-                className="grid grid-cols-6 sm:grid-cols-9 gap-1.5 p-2 bg-zinc-50 border border-zinc-200 rounded-md max-h-32 overflow-y-auto"
+                className="grid grid-cols-6 sm:grid-cols-9 gap-1.5 p-2 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700/80 rounded-md max-h-32 overflow-y-auto"
               >
                 {AVAILABLE_ICONS.map((item) => {
                   const isSelected = selectedIcon === item.name;
@@ -227,8 +227,8 @@ export const HabitModal: React.FC<HabitModalProps> = ({
                       onClick={() => setSelectedIcon(item.name)}
                       className={`p-2 rounded flex items-center justify-center transition-colors cursor-pointer ${
                         isSelected
-                          ? 'bg-zinc-900 text-white shadow-xs'
-                          : 'bg-white text-zinc-600 hover:bg-zinc-200/70 border border-zinc-200/80'
+                          ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 shadow-xs'
+                          : 'bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200/70 dark:hover:bg-zinc-700 border border-zinc-200/80 dark:border-zinc-700'
                       }`}
                     >
                       <Icon className="w-4 h-4" />
@@ -239,11 +239,11 @@ export const HabitModal: React.FC<HabitModalProps> = ({
             </div>
 
             {/* Reminder Setting inside Form */}
-            <div className="p-3 bg-zinc-50 border border-zinc-200 rounded-lg space-y-2">
+            <div className="p-3 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700/80 rounded-lg space-y-2">
               <div className="flex items-center justify-between">
                 <div>
-                  <span className="text-xs font-medium text-zinc-800 block">Daily Reminder</span>
-                  <span className="text-[10px] text-zinc-500">Get notified at scheduled time</span>
+                  <span className="text-xs font-medium text-zinc-800 dark:text-zinc-200 block">Daily Reminder</span>
+                  <span className="text-[10px] text-zinc-500 dark:text-zinc-400">Get notified at scheduled time</span>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input
@@ -253,13 +253,13 @@ export const HabitModal: React.FC<HabitModalProps> = ({
                     onChange={(e) => setReminderEnabled(e.target.checked)}
                     className="sr-only peer"
                   />
-                  <div className="w-9 h-5 bg-zinc-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-zinc-900"></div>
+                  <div className="w-9 h-5 bg-zinc-300 dark:bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 dark:after:border-zinc-600 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-zinc-900 dark:peer-checked:bg-zinc-100 dark:peer-checked:after:bg-zinc-900"></div>
                 </label>
               </div>
 
               {reminderEnabled && (
-                <div className="pt-2 border-t border-zinc-200/70 flex items-center justify-between">
-                  <label htmlFor="modal-reminder-time" className="text-xs text-zinc-600">
+                <div className="pt-2 border-t border-zinc-200/70 dark:border-zinc-700/70 flex items-center justify-between">
+                  <label htmlFor="modal-reminder-time" className="text-xs text-zinc-600 dark:text-zinc-400">
                     Reminder Time:
                   </label>
                   <input
@@ -267,7 +267,7 @@ export const HabitModal: React.FC<HabitModalProps> = ({
                     type="time"
                     value={reminderTime}
                     onChange={(e) => setReminderTime(e.target.value)}
-                    className="px-2.5 py-1 text-xs font-mono bg-white border border-zinc-300 rounded focus:outline-none focus:ring-1 focus:ring-zinc-900"
+                    className="px-2.5 py-1 text-xs font-mono bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 border border-zinc-300 dark:border-zinc-700 rounded focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-zinc-100"
                   />
                 </div>
               )}
@@ -275,20 +275,20 @@ export const HabitModal: React.FC<HabitModalProps> = ({
 
             {/* Error Message */}
             {error && (
-              <p id="modal-error-message" className="text-xs text-red-600 font-medium">
+              <p id="modal-error-message" className="text-xs text-red-600 dark:text-red-400 font-medium">
                 {error}
               </p>
             )}
 
             {/* Footer actions */}
-            <div className="pt-3 border-t border-zinc-200 flex items-center justify-between gap-3">
+            <div className="pt-3 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-3">
               {isEditing && onDelete ? (
                 <button
                   id="delete-habit-btn"
                   type="button"
                   onClick={() => setShowDeleteConfirm(true)}
                   disabled={isSaving}
-                  className="inline-flex items-center gap-1.5 text-xs font-medium text-red-600 hover:text-red-700 hover:bg-red-50 px-2.5 py-1.5 rounded transition-colors"
+                  className="inline-flex items-center gap-1.5 text-xs font-medium text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/30 px-2.5 py-1.5 rounded transition-colors cursor-pointer"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                   <span>Delete habit</span>
@@ -303,7 +303,7 @@ export const HabitModal: React.FC<HabitModalProps> = ({
                   type="button"
                   onClick={onClose}
                   disabled={isSaving}
-                  className="px-3 py-1.5 text-xs font-medium text-zinc-700 bg-zinc-100 hover:bg-zinc-200 rounded-md border border-zinc-200 transition-colors"
+                  className="px-3 py-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-md border border-zinc-200 dark:border-zinc-700 transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -311,7 +311,7 @@ export const HabitModal: React.FC<HabitModalProps> = ({
                   id="modal-save-btn"
                   type="submit"
                   disabled={isSaving}
-                  className="px-3.5 py-1.5 text-xs font-medium text-white bg-zinc-900 hover:bg-zinc-800 rounded-md transition-colors disabled:opacity-50"
+                  className="px-3.5 py-1.5 text-xs font-medium text-white dark:text-zinc-900 bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-white rounded-md transition-colors disabled:opacity-50 cursor-pointer"
                 >
                   {isSaving ? 'Saving...' : 'Save'}
                 </button>

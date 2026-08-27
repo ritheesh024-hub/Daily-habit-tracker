@@ -23,6 +23,7 @@ import {
   HabitConsistency,
   UserReminderSettings,
   DEFAULT_REMINDER_SETTINGS,
+  ThemeMode,
 } from '../types';
 import {
   getLast7Days,
@@ -44,6 +45,11 @@ import {
   getCachedReminderSettings,
   setCachedReminderSettings,
 } from './cacheService';
+import {
+  getCachedTheme,
+  setCachedTheme,
+  applyTheme,
+} from './themeService';
 
 export { getLocalDateKey };
 
@@ -1000,5 +1006,41 @@ export async function saveUserReminderSettings(
   } catch (error) {
     console.warn(`Background save reminder settings error for ${userId}:`, error);
     throw error;
+  }
+}
+
+/**
+ * Loads user theme preference from users/{userId}/settings/preferences.
+ * Cache-first for instant UI loading with background synchronization.
+ */
+export async function fetchUserThemePreference(userId: string): Promise<ThemeMode> {
+  const cached = getCachedTheme(userId);
+  try {
+    const prefDocRef = doc(db, 'users', userId, 'settings', 'preferences');
+    const snap = await getDoc(prefDocRef);
+    if (snap.exists()) {
+      const data = snap.data();
+      if (data.theme === 'light' || data.theme === 'dark' || data.theme === 'system') {
+        setCachedTheme(data.theme, userId);
+        return data.theme;
+      }
+    }
+  } catch (error) {
+    console.warn(`Background theme preference fetch notice for ${userId}:`, error);
+  }
+  return cached;
+}
+
+/**
+ * Saves user theme preference to users/{userId}/settings/preferences.
+ */
+export async function saveUserThemePreference(userId: string, theme: ThemeMode): Promise<void> {
+  setCachedTheme(theme, userId);
+  applyTheme(theme);
+  try {
+    const prefDocRef = doc(db, 'users', userId, 'settings', 'preferences');
+    await setDoc(prefDocRef, { theme, updatedAt: new Date().toISOString() }, { merge: true });
+  } catch (error) {
+    console.warn(`Background save theme preference error for ${userId}:`, error);
   }
 }

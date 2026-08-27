@@ -1,4 +1,38 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
-  <rect width="512" height="512" rx="128" fill="#18181b"/>
-  <path d="M160 266L224 330L352 192" stroke="#ffffff" stroke-width="48" stroke-linecap="round" stroke-linejoin="round"/>
+  <defs>
+    <filter id="tick-blur" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="12" />
+    </filter>
+    <radialGradient id="soft-illumination" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.16" />
+      <stop offset="60%" stop-color="#ffffff" stop-opacity="0.04" />
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+
+  <!-- Clean Circle Background -->
+  <circle cx="256" cy="256" r="256" fill="#18181b" />
+
+  <!-- Soft Central Illumination Light -->
+  <circle cx="256" cy="256" r="220" fill="url(#soft-illumination)" />
+
+  <!-- Subtle Soft Glow around Tick Mark -->
+  <path
+    d="M80 270L202 392L432 145"
+    stroke="#ffffff"
+    stroke-width="78"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    opacity="0.30"
+    filter="url(#tick-blur)"
+  />
+
+  <!-- Prominent, Sharp & Bolder Zoomed Tick Mark -->
+  <path
+    d="M80 270L202 392L432 145"
+    stroke="#ffffff"
+    stroke-width="58"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
 </svg>

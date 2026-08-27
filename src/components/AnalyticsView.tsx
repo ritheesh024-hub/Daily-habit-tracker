@@ -97,76 +97,76 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
     analytics.totalLoggedDays <= 1;
 
   return (
-    <div id="advanced-analytics-view" className="space-y-5">
+    <div id="advanced-analytics-view" className="space-y-4">
       {/* 1. TOP ANALYTICS OVERVIEW */}
       <section id="analytics-overview-section" className="space-y-2">
-        <h3 className="text-xs font-semibold text-zinc-800 uppercase tracking-wider">
+        <h3 className="text-xs font-semibold text-zinc-800 dark:text-zinc-200 uppercase tracking-wider">
           Analytics Overview
         </h3>
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
           {/* Current Streak */}
-          <div className="p-3 bg-zinc-50 border border-zinc-200 rounded-lg">
-            <span className="text-[10px] font-medium text-zinc-500 uppercase tracking-wider block">
+          <div className="p-2.5 sm:p-3 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700/80 rounded-lg">
+            <span className="text-[10px] font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider block">
               Current Streak
             </span>
             <div className="mt-1 flex items-baseline gap-1">
-              <Flame className="w-3.5 h-3.5 text-zinc-800 shrink-0" />
-              <span className="text-base font-bold text-zinc-900 font-mono">
+              <Flame className="w-3.5 h-3.5 text-zinc-800 dark:text-zinc-200 shrink-0" />
+              <span className="text-base font-bold text-zinc-900 dark:text-zinc-100 font-mono">
                 {analytics.currentStreak}
               </span>
-              <span className="text-[11px] text-zinc-500 font-mono">
+              <span className="text-[11px] text-zinc-500 dark:text-zinc-400 font-mono">
                 {analytics.currentStreak === 1 ? 'day' : 'days'}
               </span>
             </div>
           </div>
 
           {/* Best Streak */}
-          <div className="p-3 bg-zinc-50 border border-zinc-200 rounded-lg">
-            <span className="text-[10px] font-medium text-zinc-500 uppercase tracking-wider block">
+          <div className="p-2.5 sm:p-3 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700/80 rounded-lg">
+            <span className="text-[10px] font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider block">
               Best Streak
             </span>
             <div className="mt-1 flex items-baseline gap-1">
-              <Award className="w-3.5 h-3.5 text-zinc-800 shrink-0" />
-              <span className="text-base font-bold text-zinc-900 font-mono">
+              <Award className="w-3.5 h-3.5 text-zinc-800 dark:text-zinc-200 shrink-0" />
+              <span className="text-base font-bold text-zinc-900 dark:text-zinc-100 font-mono">
                 {analytics.bestStreak}
               </span>
-              <span className="text-[11px] text-zinc-500 font-mono">
+              <span className="text-[11px] text-zinc-500 dark:text-zinc-400 font-mono">
                 {analytics.bestStreak === 1 ? 'day' : 'days'}
               </span>
             </div>
           </div>
 
           {/* Today */}
-          <div className="p-3 bg-zinc-50 border border-zinc-200 rounded-lg">
-            <span className="text-[10px] font-medium text-zinc-500 uppercase tracking-wider block">
+          <div className="p-2.5 sm:p-3 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700/80 rounded-lg">
+            <span className="text-[10px] font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider block">
               Today
             </span>
             <div className="mt-1 flex items-baseline gap-1">
-              <span className="text-base font-bold text-zinc-900 font-mono">
+              <span className="text-base font-bold text-zinc-900 dark:text-zinc-100 font-mono">
                 {analytics.todayPercentage}%
               </span>
             </div>
           </div>
 
           {/* Last 7 Days */}
-          <div className="p-3 bg-zinc-50 border border-zinc-200 rounded-lg">
-            <span className="text-[10px] font-medium text-zinc-500 uppercase tracking-wider block">
+          <div className="p-2.5 sm:p-3 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700/80 rounded-lg">
+            <span className="text-[10px] font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider block">
               Last 7 Days
             </span>
             <div className="mt-1 flex items-baseline gap-1">
-              <span className="text-base font-bold text-zinc-900 font-mono">
+              <span className="text-base font-bold text-zinc-900 dark:text-zinc-100 font-mono">
                 {analytics.last7DaysPercentage}%
               </span>
             </div>
           </div>
 
           {/* Last 30 Days */}
-          <div className="p-3 bg-zinc-50 border border-zinc-200 rounded-lg col-span-2 sm:col-span-1">
-            <span className="text-[10px] font-medium text-zinc-500 uppercase tracking-wider block">
+          <div className="p-2.5 sm:p-3 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700/80 rounded-lg col-span-2 sm:col-span-1">
+            <span className="text-[10px] font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider block">
               Last 30 Days
             </span>
             <div className="mt-1 flex items-baseline gap-1">
-              <span className="text-base font-bold text-zinc-900 font-mono">
+              <span className="text-base font-bold text-zinc-900 dark:text-zinc-100 font-mono">
                 {analytics.last30DaysPercentage}%
               </span>
             </div>
@@ -178,37 +178,37 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
       {isEmptyUser && (
         <div
           id="analytics-empty-state"
-          className="p-4 bg-zinc-50 border border-dashed border-zinc-200 rounded-lg text-center space-y-1"
+          className="p-4 bg-zinc-50 dark:bg-zinc-800/60 border border-dashed border-zinc-200 dark:border-zinc-700 rounded-lg text-center space-y-1"
         >
-          <p className="text-xs font-semibold text-zinc-800">
+          <p className="text-xs font-semibold text-zinc-800 dark:text-zinc-200">
             Keep tracking your habits.
           </p>
-          <p className="text-[11px] text-zinc-500">
+          <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
             Your analytics will appear here as you build your history.
           </p>
         </div>
       )}
 
       {/* 2. 7-DAY ANALYTICS & WEEKLY COMPARISON */}
-      <section id="analytics-7day-section" className="p-3.5 bg-zinc-50 border border-zinc-200 rounded-lg space-y-3">
+      <section id="analytics-7day-section" className="p-3.5 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700/80 rounded-lg space-y-3">
         <div className="flex items-center justify-between">
           <div>
-            <h4 className="text-xs font-semibold text-zinc-900 uppercase tracking-wider">
+            <h4 className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider">
               7-Day Analytics
             </h4>
-            <span className="text-[11px] text-zinc-500">Daily completion percentages</span>
+            <span className="text-[11px] text-zinc-500 dark:text-zinc-400">Daily completion percentages</span>
           </div>
 
           {/* Weekly Comparison Badge */}
-          <div className="flex items-center gap-1.5 bg-white border border-zinc-200/80 px-2.5 py-1 rounded-md text-xs">
-            <span className="text-[11px] text-zinc-500">vs prev week:</span>
+          <div className="flex items-center gap-1.5 bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-700/80 px-2.5 py-1 rounded-md text-xs">
+            <span className="text-[11px] text-zinc-500 dark:text-zinc-400">vs prev week:</span>
             <span
               className={`font-mono font-semibold flex items-center gap-0.5 ${
                 analytics.weeklyComparison.improvement > 0
-                  ? 'text-emerald-700'
+                  ? 'text-emerald-700 dark:text-emerald-400'
                   : analytics.weeklyComparison.improvement < 0
-                  ? 'text-rose-600'
-                  : 'text-zinc-600'
+                  ? 'text-rose-600 dark:text-rose-400'
+                  : 'text-zinc-600 dark:text-zinc-400'
               }`}
             >
               {analytics.weeklyComparison.improvement > 0 ? (
@@ -229,13 +229,13 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
             return (
               <div
                 key={day.date}
-                className={`p-2 rounded border text-center flex flex-col justify-between min-h-[72px] transition-colors ${
+                className={`p-2 rounded border text-center flex flex-col justify-between min-h-[68px] sm:min-h-[72px] transition-colors ${
                   isDayToday
-                    ? 'bg-zinc-900 text-white border-zinc-900 shadow-2xs'
-                    : 'bg-white text-zinc-800 border-zinc-200/80'
+                    ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 border-zinc-900 dark:border-zinc-100 shadow-2xs'
+                    : 'bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 border-zinc-200/80 dark:border-zinc-700/80'
                 }`}
               >
-                <span className={`text-[10px] font-semibold ${isDayToday ? 'text-zinc-300' : 'text-zinc-500'}`}>
+                <span className={`text-[10px] font-semibold ${isDayToday ? 'text-zinc-300 dark:text-zinc-600' : 'text-zinc-500 dark:text-zinc-400'}`}>
                   {day.weekday}
                 </span>
 
@@ -245,9 +245,9 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
                   </span>
                 </div>
 
-                <div className="w-full bg-zinc-200/60 h-1 rounded-full overflow-hidden">
+                <div className="w-full bg-zinc-200/60 dark:bg-zinc-700/60 h-1 rounded-full overflow-hidden">
                   <div
-                    className={`h-full rounded-full ${isDayToday ? 'bg-white' : 'bg-zinc-900'}`}
+                    className={`h-full rounded-full ${isDayToday ? 'bg-white dark:bg-zinc-900' : 'bg-zinc-900 dark:bg-zinc-100'}`}
                     style={{ width: `${day.percentage}%` }}
                   />
                 </div>
@@ -257,16 +257,16 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
         </div>
 
         {/* Weekly Comparison summary text */}
-        <div className="pt-2 border-t border-zinc-200/80 flex items-center justify-between text-[11px] text-zinc-600">
+        <div className="pt-2 border-t border-zinc-200/80 dark:border-zinc-700/80 flex items-center justify-between text-[11px] text-zinc-600 dark:text-zinc-400">
           <div>
-            <span className="font-medium text-zinc-700">This week:</span>{' '}
+            <span className="font-medium text-zinc-700 dark:text-zinc-300">This week:</span>{' '}
             <span className="font-mono font-semibold">{analytics.weeklyComparison.thisWeekPercentage}%</span>
-            <span className="mx-2 text-zinc-300">|</span>
-            <span className="font-medium text-zinc-700">Last week:</span>{' '}
+            <span className="mx-2 text-zinc-300 dark:text-zinc-600">|</span>
+            <span className="font-medium text-zinc-700 dark:text-zinc-300">Last week:</span>{' '}
             <span className="font-mono font-semibold">{analytics.weeklyComparison.lastWeekPercentage}%</span>
           </div>
           <div>
-            <span className="font-medium text-zinc-700">Improvement:</span>{' '}
+            <span className="font-medium text-zinc-700 dark:text-zinc-300">Improvement:</span>{' '}
             <span className="font-mono font-semibold">
               {analytics.weeklyComparison.improvement > 0 ? `+${analytics.weeklyComparison.improvement}%` : `${analytics.weeklyComparison.improvement}%`}
             </span>
@@ -275,35 +275,35 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
       </section>
 
       {/* 3. 30-DAY ANALYTICS SUMMARY */}
-      <section id="analytics-30day-section" className="p-3.5 bg-zinc-50 border border-zinc-200 rounded-lg space-y-2.5">
-        <h4 className="text-xs font-semibold text-zinc-900 uppercase tracking-wider">
+      <section id="analytics-30day-section" className="p-3.5 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700/80 rounded-lg space-y-2.5">
+        <h4 className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider">
           30-Day Summary
         </h4>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
-          <div className="p-2.5 bg-white border border-zinc-200/80 rounded">
-            <span className="text-[10px] text-zinc-500 font-medium block">Average Completion</span>
-            <span className="text-base font-bold text-zinc-900 font-mono mt-0.5 block">
+          <div className="p-2.5 bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-700/80 rounded">
+            <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-medium block">Average Completion</span>
+            <span className="text-base font-bold text-zinc-900 dark:text-zinc-100 font-mono mt-0.5 block">
               {analytics.thirtyDaySummary.averagePercentage}%
             </span>
           </div>
 
-          <div className="p-2.5 bg-white border border-zinc-200/80 rounded">
-            <span className="text-[10px] text-zinc-500 font-medium block">Completed Days</span>
-            <span className="text-base font-bold text-emerald-700 font-mono mt-0.5 block">
+          <div className="p-2.5 bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-700/80 rounded">
+            <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-medium block">Completed Days</span>
+            <span className="text-base font-bold text-emerald-700 dark:text-emerald-400 font-mono mt-0.5 block">
               {analytics.thirtyDaySummary.completedDays}
             </span>
           </div>
 
-          <div className="p-2.5 bg-white border border-zinc-200/80 rounded">
-            <span className="text-[10px] text-zinc-500 font-medium block">Partial Days</span>
-            <span className="text-base font-bold text-amber-700 font-mono mt-0.5 block">
+          <div className="p-2.5 bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-700/80 rounded">
+            <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-medium block">Partial Days</span>
+            <span className="text-base font-bold text-amber-700 dark:text-amber-400 font-mono mt-0.5 block">
               {analytics.thirtyDaySummary.partialDays}
             </span>
           </div>
 
-          <div className="p-2.5 bg-white border border-zinc-200/80 rounded">
-            <span className="text-[10px] text-zinc-500 font-medium block">Total Completions</span>
-            <span className="text-base font-bold text-zinc-900 font-mono mt-0.5 block">
+          <div className="p-2.5 bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-700/80 rounded">
+            <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-medium block">Total Completions</span>
+            <span className="text-base font-bold text-zinc-900 dark:text-zinc-100 font-mono mt-0.5 block">
               {analytics.thirtyDaySummary.totalCompletedHabits}
             </span>
           </div>
@@ -311,18 +311,18 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
       </section>
 
       {/* 4. MONTHLY CALENDAR (READ-ONLY WITH DAY INSPECTION) */}
-      <section id="analytics-calendar-section" className="p-3.5 bg-zinc-50 border border-zinc-200 rounded-lg space-y-3">
+      <section id="analytics-calendar-section" className="p-3.5 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700/80 rounded-lg space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5">
-            <CalendarIcon className="w-3.5 h-3.5 text-zinc-700" />
-            <h4 className="text-xs font-semibold text-zinc-900 uppercase tracking-wider">
+            <CalendarIcon className="w-3.5 h-3.5 text-zinc-700 dark:text-zinc-300" />
+            <h4 className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider">
               Monthly Calendar
             </h4>
           </div>
 
           {/* Month Navigation */}
           <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-zinc-900 font-mono">
+            <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100 font-mono">
               {formatMonthYear(currentYearMonth.year, currentYearMonth.monthIndex)}
             </span>
             <div className="flex items-center gap-1">
@@ -330,7 +330,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
                 type="button"
                 id="analytics-calendar-prev-btn"
                 onClick={handlePrevMonth}
-                className="p-1 rounded bg-white hover:bg-zinc-200/70 border border-zinc-200 text-zinc-600 transition-colors cursor-pointer"
+                className="p-1 rounded bg-white dark:bg-zinc-800 hover:bg-zinc-200/70 dark:hover:bg-zinc-700 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 transition-colors cursor-pointer"
                 title="Previous Month"
               >
                 <ChevronLeft className="w-3.5 h-3.5" />
@@ -339,7 +339,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
                 type="button"
                 id="analytics-calendar-next-btn"
                 onClick={handleNextMonth}
-                className="p-1 rounded bg-white hover:bg-zinc-200/70 border border-zinc-200 text-zinc-600 transition-colors cursor-pointer"
+                className="p-1 rounded bg-white dark:bg-zinc-800 hover:bg-zinc-200/70 dark:hover:bg-zinc-700 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 transition-colors cursor-pointer"
                 title="Next Month"
               >
                 <ChevronRight className="w-3.5 h-3.5" />
@@ -349,9 +349,9 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
         </div>
 
         {/* Calendar Grid */}
-        <div className="bg-white border border-zinc-200/80 rounded-lg p-2.5">
+        <div className="bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-700/80 rounded-lg p-2.5">
           {/* Weekday Labels */}
-          <div className="grid grid-cols-7 gap-1 text-center mb-1 text-[10px] font-semibold text-zinc-400">
+          <div className="grid grid-cols-7 gap-1 text-center mb-1 text-[10px] font-semibold text-zinc-400 dark:text-zinc-500">
             <span>S</span>
             <span>M</span>
             <span>T</span>
@@ -377,26 +377,26 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
               const isPartial = compCount > 0 && compCount < totCount;
               const isSelected = inspectedDate === cell.date;
 
-              let statusClasses = 'text-zinc-600 hover:bg-zinc-100';
+              let statusClasses = 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800';
 
               if (!cell.isCurrentMonth) {
-                statusClasses = 'text-zinc-300 opacity-40';
+                statusClasses = 'text-zinc-300 dark:text-zinc-700 opacity-40';
               } else if (cell.isFuture) {
-                statusClasses = 'text-zinc-300 cursor-not-allowed';
+                statusClasses = 'text-zinc-300 dark:text-zinc-700 cursor-not-allowed';
               } else if (isFull) {
-                statusClasses = 'bg-emerald-100/80 text-emerald-900 border border-emerald-300 font-semibold';
+                statusClasses = 'bg-emerald-100/80 dark:bg-emerald-950/60 text-emerald-900 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 font-semibold';
               } else if (isPartial) {
-                statusClasses = 'bg-amber-50 text-amber-900 border border-amber-200 font-medium';
+                statusClasses = 'bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-300 border border-amber-200 dark:border-amber-700 font-medium';
               } else {
-                statusClasses = 'bg-zinc-50 text-zinc-600 border border-zinc-200/60';
+                statusClasses = 'bg-zinc-50 dark:bg-zinc-800/60 text-zinc-600 dark:text-zinc-400 border border-zinc-200/60 dark:border-zinc-700/60';
               }
 
               if (cell.isToday) {
-                statusClasses += ' ring-2 ring-zinc-900 ring-offset-1';
+                statusClasses += ' ring-2 ring-zinc-900 dark:ring-zinc-100 ring-offset-1 dark:ring-offset-zinc-900';
               }
 
               if (isSelected) {
-                statusClasses += ' outline-2 outline-zinc-900 font-bold';
+                statusClasses += ' outline-2 outline-zinc-900 dark:outline-zinc-100 font-bold';
               }
 
               return (
@@ -412,7 +412,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
                   {cell.isCurrentMonth && !cell.isFuture && compCount > 0 && (
                     <span
                       className={`w-1 h-1 rounded-full ${
-                        isFull ? 'bg-emerald-600' : 'bg-amber-600'
+                        isFull ? 'bg-emerald-600 dark:bg-emerald-400' : 'bg-amber-600 dark:bg-amber-400'
                       }`}
                     />
                   )}
@@ -422,21 +422,21 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
           </div>
 
           {/* Legend */}
-          <div className="mt-3 pt-2 border-t border-zinc-100 flex flex-wrap items-center justify-between text-[10px] text-zinc-500 gap-2">
+          <div className="mt-3 pt-2 border-t border-zinc-100 dark:border-zinc-800 flex flex-wrap items-center justify-between text-[10px] text-zinc-500 dark:text-zinc-400 gap-2">
             <div className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded bg-emerald-100 border border-emerald-300 inline-block" />
+              <span className="w-2.5 h-2.5 rounded bg-emerald-100 dark:bg-emerald-900/60 border border-emerald-300 dark:border-emerald-700 inline-block" />
               <span>Completed</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded bg-amber-50 border border-amber-200 inline-block" />
+              <span className="w-2.5 h-2.5 rounded bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-700 inline-block" />
               <span>Partial</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded bg-zinc-50 border border-zinc-200 inline-block" />
+              <span className="w-2.5 h-2.5 rounded bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 inline-block" />
               <span>No Activity</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded ring-1 ring-zinc-900 inline-block" />
+              <span className="w-2.5 h-2.5 rounded ring-1 ring-zinc-900 dark:ring-zinc-100 inline-block" />
               <span>Today</span>
             </div>
           </div>
@@ -445,22 +445,22 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
         {/* Selected Date Read-Only Inspector Panel */}
         <div
           id="calendar-day-inspect-card"
-          className="p-3 bg-white border border-zinc-200 rounded-lg space-y-2.5"
+          className="p-3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg space-y-2.5"
         >
-          <div className="flex items-center justify-between border-b border-zinc-100 pb-2">
+          <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-2">
             <div>
-              <span className="text-[10px] font-medium text-zinc-400 uppercase tracking-wider block">
+              <span className="text-[10px] font-medium text-zinc-400 dark:text-zinc-500 uppercase tracking-wider block">
                 Selected Day (View Only)
               </span>
-              <span className="text-xs font-bold text-zinc-900">
+              <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100">
                 {formatHeaderDate(inspectedDate)}
               </span>
             </div>
             <div className="text-right">
-              <span className="text-xs font-bold text-zinc-900 font-mono">
+              <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100 font-mono">
                 {inspectedCompletedCount} / {inspectedTotalCount}
               </span>
-              <span className="text-[11px] text-zinc-500 font-mono block">
+              <span className="text-[11px] text-zinc-500 dark:text-zinc-400 font-mono block">
                 {inspectedPercentage}% completed
               </span>
             </div>
@@ -470,22 +470,22 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
             {/* Completed */}
             <div className="space-y-1">
-              <span className="text-[10px] font-semibold text-emerald-800 flex items-center gap-1">
-                <Check className="w-3 h-3 text-emerald-600" /> Completed ({completedHabitsList.length})
+              <span className="text-[10px] font-semibold text-emerald-800 dark:text-emerald-400 flex items-center gap-1">
+                <Check className="w-3 h-3 text-emerald-600 dark:text-emerald-400" /> Completed ({completedHabitsList.length})
               </span>
               <div className="space-y-1 max-h-28 overflow-y-auto pr-1">
                 {completedHabitsList.length > 0 ? (
                   completedHabitsList.map((h) => (
                     <div
                       key={h.id}
-                      className="p-1.5 bg-emerald-50/60 border border-emerald-100 rounded flex items-center gap-1.5 text-zinc-800 truncate"
+                      className="p-1.5 bg-emerald-50/60 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-800/50 rounded flex items-center gap-1.5 text-zinc-800 dark:text-zinc-200 truncate"
                     >
-                      <HabitIcon name={h.icon} className="w-3 h-3 text-emerald-700 shrink-0" />
+                      <HabitIcon name={h.icon} className="w-3 h-3 text-emerald-700 dark:text-emerald-400 shrink-0" />
                       <span className="truncate">{h.name}</span>
                     </div>
                   ))
                 ) : (
-                  <span className="text-[11px] text-zinc-400 italic block py-1">
+                  <span className="text-[11px] text-zinc-400 dark:text-zinc-500 italic block py-1">
                     No habits completed on this date.
                   </span>
                 )}
@@ -494,22 +494,22 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
 
             {/* Incomplete */}
             <div className="space-y-1">
-              <span className="text-[10px] font-semibold text-zinc-600 flex items-center gap-1">
-                <Circle className="w-3 h-3 text-zinc-400" /> Incomplete ({incompleteHabitsList.length})
+              <span className="text-[10px] font-semibold text-zinc-600 dark:text-zinc-400 flex items-center gap-1">
+                <Circle className="w-3 h-3 text-zinc-400 dark:text-zinc-500" /> Incomplete ({incompleteHabitsList.length})
               </span>
               <div className="space-y-1 max-h-28 overflow-y-auto pr-1">
                 {incompleteHabitsList.length > 0 ? (
                   incompleteHabitsList.map((h) => (
                     <div
                       key={h.id}
-                      className="p-1.5 bg-zinc-50 border border-zinc-200/60 rounded flex items-center gap-1.5 text-zinc-500 truncate"
+                      className="p-1.5 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200/60 dark:border-zinc-700/60 rounded flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400 truncate"
                     >
-                      <HabitIcon name={h.icon} className="w-3 h-3 text-zinc-400 shrink-0" />
+                      <HabitIcon name={h.icon} className="w-3 h-3 text-zinc-400 dark:text-zinc-500 shrink-0" />
                       <span className="truncate">{h.name}</span>
                     </div>
                   ))
                 ) : (
-                  <span className="text-[11px] text-emerald-700 font-medium italic block py-1">
+                  <span className="text-[11px] text-emerald-700 dark:text-emerald-400 font-medium italic block py-1">
                     All habits completed! 🎉
                   </span>
                 )}
@@ -521,43 +521,43 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
 
       {/* 5. MOST & LEAST CONSISTENT */}
       <section id="analytics-consistency-section" className="space-y-2">
-        <h4 className="text-xs font-semibold text-zinc-900 uppercase tracking-wider">
+        <h4 className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider">
           Consistency Highlights
         </h4>
         {analytics.hasEnoughData && analytics.mostConsistentHabit && analytics.leastCompletedHabit ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             {/* Most Consistent */}
-            <div className="p-3 bg-zinc-50 border border-zinc-200 rounded-lg">
-              <div className="flex items-center gap-1.5 text-zinc-600 text-xs font-medium mb-1">
-                <Award className="w-3.5 h-3.5 text-zinc-800 shrink-0" />
+            <div className="p-3 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700/80 rounded-lg">
+              <div className="flex items-center gap-1.5 text-zinc-600 dark:text-zinc-400 text-xs font-medium mb-1">
+                <Award className="w-3.5 h-3.5 text-zinc-800 dark:text-zinc-200 shrink-0" />
                 <span>Most Consistent</span>
               </div>
-              <p className="text-sm font-semibold text-zinc-900 truncate">
+              <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 truncate">
                 {analytics.mostConsistentHabit.name} —{' '}
                 <span className="font-mono font-bold">{analytics.mostConsistentHabit.percentage}%</span>
               </p>
-              <p className="text-[11px] text-zinc-500 mt-0.5">
+              <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
                 Completed on {analytics.mostConsistentHabit.completedDays} of {analytics.mostConsistentHabit.totalLoggedDays} tracked days
               </p>
             </div>
 
             {/* Least Consistent */}
-            <div className="p-3 bg-zinc-50 border border-zinc-200 rounded-lg">
-              <div className="flex items-center gap-1.5 text-zinc-600 text-xs font-medium mb-1">
-                <TrendingDown className="w-3.5 h-3.5 text-zinc-800 shrink-0" />
+            <div className="p-3 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700/80 rounded-lg">
+              <div className="flex items-center gap-1.5 text-zinc-600 dark:text-zinc-400 text-xs font-medium mb-1">
+                <TrendingDown className="w-3.5 h-3.5 text-zinc-800 dark:text-zinc-200 shrink-0" />
                 <span>Least Consistent</span>
               </div>
-              <p className="text-sm font-semibold text-zinc-900 truncate">
+              <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 truncate">
                 {analytics.leastCompletedHabit.name} —{' '}
                 <span className="font-mono font-bold">{analytics.leastCompletedHabit.percentage}%</span>
               </p>
-              <p className="text-[11px] text-zinc-500 mt-0.5">
+              <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
                 Completed on {analytics.leastCompletedHabit.completedDays} of {analytics.leastCompletedHabit.totalLoggedDays} tracked days
               </p>
             </div>
           </div>
         ) : (
-          <div className="p-3 bg-zinc-50 border border-zinc-200 rounded-lg text-xs text-zinc-500">
+          <div className="p-3 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700/80 rounded-lg text-xs text-zinc-500 dark:text-zinc-400">
             Keep tracking to see your habit consistency.
           </div>
         )}
@@ -566,28 +566,28 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
       {/* 6. HABIT PERFORMANCE BREAKDOWN */}
       <section id="analytics-habit-performance-section" className="space-y-2">
         <div className="flex items-center justify-between">
-          <h4 className="text-xs font-semibold text-zinc-900 uppercase tracking-wider">
+          <h4 className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider">
             Habit Performance
           </h4>
-          <span className="text-[11px] text-zinc-500 font-mono">Completion Rate</span>
+          <span className="text-[11px] text-zinc-500 dark:text-zinc-400 font-mono">Completion Rate</span>
         </div>
 
         <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
           {analytics.habitBreakdown.map((item) => (
             <div
               key={item.habitId}
-              className="p-2.5 bg-zinc-50 border border-zinc-200/80 rounded-lg flex items-center justify-between gap-3 text-xs"
+              className="p-2.5 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200/80 dark:border-zinc-700/80 rounded-lg flex items-center justify-between gap-3 text-xs"
             >
               <div className="flex items-center gap-2 min-w-0 flex-1">
-                <div className="w-6 h-6 rounded bg-white border border-zinc-200 flex items-center justify-center text-zinc-700 shrink-0">
+                <div className="w-6 h-6 rounded bg-white dark:bg-zinc-700 border border-zinc-200 dark:border-zinc-600 flex items-center justify-center text-zinc-700 dark:text-zinc-200 shrink-0">
                   <HabitIcon name={item.icon} className="w-3 h-3" />
                 </div>
                 <div className="min-w-0">
-                  <span className="font-semibold text-zinc-900 truncate block">
+                  <span className="font-semibold text-zinc-900 dark:text-zinc-100 truncate block">
                     {item.name}
                   </span>
                   {item.target && (
-                    <span className="text-[10px] text-zinc-500 font-mono truncate block">
+                    <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono truncate block">
                       {item.target}
                     </span>
                   )}
@@ -595,13 +595,13 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
               </div>
 
               <div className="flex items-center gap-2.5 shrink-0">
-                <div className="w-24 sm:w-32 bg-zinc-200 h-1.5 rounded-full overflow-hidden">
+                <div className="w-24 sm:w-32 bg-zinc-200 dark:bg-zinc-700 h-1.5 rounded-full overflow-hidden">
                   <div
-                    className="bg-zinc-900 h-full rounded-full transition-all duration-300"
+                    className="bg-zinc-900 dark:bg-zinc-100 h-full rounded-full transition-all duration-300"
                     style={{ width: `${item.percentage}%` }}
                   />
                 </div>
-                <span className="text-xs font-mono font-bold text-zinc-900 w-10 text-right">
+                <span className="text-xs font-mono font-bold text-zinc-900 dark:text-zinc-100 w-10 text-right">
                   {item.percentage}%
                 </span>
               </div>
@@ -609,7 +609,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
           ))}
 
           {analytics.habitBreakdown.length === 0 && (
-            <div className="text-center py-6 text-zinc-400 text-xs">
+            <div className="text-center py-6 text-zinc-400 dark:text-zinc-500 text-xs">
               No habits configured yet.
             </div>
           )}

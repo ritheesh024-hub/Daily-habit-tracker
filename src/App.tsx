@@ -24,8 +24,15 @@ import {
   UserReminderSettings,
   ActiveSmartReminderNotice,
   DEFAULT_REMINDER_SETTINGS,
+  ThemeMode,
 } from './types';
 import { getTodayDateString, formatHeaderDate } from './lib/dateUtils';
+import {
+  getCachedTheme,
+  setCachedTheme,
+  applyTheme,
+  listenToSystemThemeChange,
+} from './lib/themeService';
 import {
   createDefaultDailyLog,
   countCompletedInMap,
@@ -169,6 +176,26 @@ export default function App() {
   const [reminderSettings, setReminderSettings] = useState<UserReminderSettings>(() =>
     getCachedReminderSettings(currentUser?.uid)
   );
+
+  // Appearance Theme state ('system' | 'light' | 'dark')
+  const [theme, setTheme] = useState<ThemeMode>(() => getCachedTheme(currentUser?.uid));
+
+  // Initialize and apply theme on mount and whenever theme or currentUser changes
+  useEffect(() => {
+    applyTheme(theme);
+    if (theme === 'system') {
+      const unsubscribe = listenToSystemThemeChange(() => {
+        applyTheme('system');
+      });
+      return () => unsubscribe();
+    }
+  }, [theme]);
+
+  const handleThemeChange = (newTheme: ThemeMode) => {
+    setTheme(newTheme);
+    setCachedTheme(newTheme, currentUser?.uid);
+    applyTheme(newTheme);
+  };
 
   // Active Toast reminders in state
   const [activeReminders, setActiveReminders] = useState<ActiveReminderNotice[]>([]);
@@ -1055,7 +1082,7 @@ export default function App() {
   const totalCount = habits.length;
 
   return (
-    <div className="min-h-screen bg-zinc-50 text-zinc-900 flex flex-col font-sans antialiased selection:bg-zinc-200">
+    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 flex flex-col font-sans antialiased selection:bg-zinc-200 dark:selection:bg-zinc-800 transition-colors">
       {/* Header with profile trigger */}
       <Header
         user={currentUser}
@@ -1072,29 +1099,29 @@ export default function App() {
         <div
           id="offline-banner"
           role="status"
-          className="bg-amber-50 border-b border-amber-200 text-amber-800 px-4 py-1.5 text-xs text-center font-medium"
+          className="bg-amber-50 dark:bg-amber-950/40 border-b border-amber-200 dark:border-amber-800/80 text-amber-800 dark:text-amber-300 px-4 py-1.5 text-xs text-center font-medium"
         >
           Offline Mode — your habit progress is preserved and will sync when you reconnect.
         </div>
       )}
 
       {/* Main Single Page Content */}
-      <main id="main-content" className="flex-1 max-w-2xl w-full mx-auto p-4 sm:p-6 space-y-6">
+      <main id="main-content" className="flex-1 max-w-2xl w-full mx-auto p-3.5 sm:p-5 space-y-3.5 sm:space-y-4">
         {/* Date Selector / Notice when viewing historical past days */}
         {!isToday && (
           <div
             id="past-date-banner"
-            className="flex items-center justify-between p-3 rounded-lg bg-zinc-200/80 border border-zinc-300/80 text-xs text-zinc-800"
+            className="flex items-center justify-between p-3 rounded-lg bg-zinc-200/80 dark:bg-zinc-800/80 border border-zinc-300/80 dark:border-zinc-700/80 text-xs text-zinc-800 dark:text-zinc-200"
           >
             <div className="flex items-center gap-2">
-              <span className="font-semibold text-zinc-900">Viewing past date:</span>
+              <span className="font-semibold text-zinc-900 dark:text-zinc-100">Viewing past date:</span>
               <span className="font-mono">{formatHeaderDate(selectedDate)}</span>
             </div>
             <button
               id="return-to-today-btn"
               type="button"
               onClick={() => setSelectedDate(todayDate)}
-              className="inline-flex items-center gap-1 font-medium text-zinc-900 hover:text-black underline cursor-pointer"
+              className="inline-flex items-center gap-1 font-medium text-zinc-900 dark:text-zinc-100 hover:text-black dark:hover:text-white underline cursor-pointer"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
               Back to Today
@@ -1112,9 +1139,9 @@ export default function App() {
         />
 
         {/* Habit List Section */}
-        <section id="habit-checklist-section" className="space-y-3">
+        <section id="habit-checklist-section" className="space-y-2">
           <div className="flex items-center justify-between">
-            <h2 id="checklist-heading" className="text-sm font-semibold text-zinc-900 uppercase tracking-wider">
+            <h2 id="checklist-heading" className="text-xs sm:text-sm font-semibold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider">
               {isToday ? "Today's Checklist" : `Checklist for ${formatHeaderDate(selectedDate)}`}
             </h2>
           </div>
@@ -1165,6 +1192,8 @@ export default function App() {
         todayDate={todayDate}
         onSignOut={handleSignOut}
         initialTab={profileModalTab}
+        theme={theme}
+        onThemeChange={handleThemeChange}
       />
 
       {/* Active In-App Reminder Notifications */}
@@ -1177,8 +1206,8 @@ export default function App() {
       />
 
       {/* Subtle Footer */}
-      <footer id="app-footer" className="py-4 border-t border-zinc-200/80 text-center text-xs text-zinc-400 font-mono">
-        Daily Habits • Personal Routine Tracker
+      <footer id="app-footer" className="py-3 border-t border-zinc-200/80 dark:border-zinc-800/80 text-center text-xs text-zinc-400 dark:text-zinc-500 font-mono">
+        Track • Improve • Achieve
       </footer>
     </div>
   );

@@ -123,6 +123,8 @@ export interface UnlockedMilestoneRecord {
   unlockedAt: string;
 }
 
+export type ThemeMode = 'system' | 'light' | 'dark';
+
 export interface UserReminderSettings {
   remindersEnabled: boolean;
   reminderTime: string; // HH:mm format e.g. "20:00"
