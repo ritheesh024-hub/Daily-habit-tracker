@@ -25,8 +25,13 @@ import {
   ActiveSmartReminderNotice,
   DEFAULT_REMINDER_SETTINGS,
   ThemeMode,
+  FoodLog,
 } from './types';
 import { getTodayDateString, formatHeaderDate } from './lib/dateUtils';
+import {
+  getCachedFoodLogs,
+  subscribeToFoodLogs,
+} from './lib/foodService';
 import {
   getCachedTheme,
   setCachedTheme,
@@ -87,6 +92,8 @@ import { ProgressBar } from './components/ProgressBar';
 import { StreakStatsCard } from './components/StreakStatsCard';
 import { HabitList } from './components/HabitList';
 import { DailyNote } from './components/DailyNote';
+import { FoodSectionWidget } from './components/FoodSectionWidget';
+import { ScanFoodModal } from './components/ScanFoodModal';
 import { HistoryList } from './components/HistoryList';
 import { ProfileModal, TabType } from './components/ProfileModal';
 import { LoginView } from './components/LoginView';
@@ -167,6 +174,12 @@ export default function App() {
     const cached = currentUser?.uid ? getCachedMilestones(currentUser.uid) : null;
     return cached || {};
   });
+
+  // Food Scan & Nutrition Logs State
+  const [foodLogs, setFoodLogs] = useState<FoodLog[]>(() =>
+    getCachedFoodLogs(currentUser?.uid)
+  );
+  const [isScanFoodModalOpen, setIsScanFoodModalOpen] = useState<boolean>(false);
 
   // Profile Modal state
   const [isProfileModalOpen, setIsProfileModalOpen] = useState<boolean>(false);
@@ -313,6 +326,10 @@ export default function App() {
           fetchUserReminderSettings(user.uid).then((settings) => {
             setReminderSettings(settings);
           });
+
+          // Load user-specific cached food logs
+          const cachedFood = getCachedFoodLogs(user.uid);
+          setFoodLogs(cachedFood);
         } else {
           setCurrentUser(null);
           setCachedUserProfile(null);
@@ -325,6 +342,7 @@ export default function App() {
           setStreaks({ currentStreak: 0, bestStreak: 0 });
           setAnalytics(DEFAULT_ANALYTICS);
           setPersistedMilestonesMap({});
+          setFoodLogs([]);
           setReminderSettings(DEFAULT_REMINDER_SETTINGS);
           setActiveReminders([]);
           setActiveSmartReminders([]);
@@ -504,6 +522,23 @@ export default function App() {
       }
     });
   }, [selectedDate, currentUser?.uid, habits]);
+
+  // Real-time listener for Food Logs
+  useEffect(() => {
+    if (!currentUser?.uid) return;
+    const unsubscribe = subscribeToFoodLogs(currentUser.uid, (logs) => {
+      setFoodLogs(logs);
+    });
+    return () => unsubscribe();
+  }, [currentUser?.uid]);
+
+  const handleFoodLogSaved = (savedLog: FoodLog) => {
+    setFoodLogs((prev) => [savedLog, ...prev.filter((l) => l.id !== savedLog.id)]);
+  };
+
+  const handleFoodLogDeleted = (deletedId: string) => {
+    setFoodLogs((prev) => prev.filter((l) => l.id !== deletedId));
+  };
 
   // Habit & Smart Reminder Scheduler Loop
   useEffect(() => {
@@ -1163,6 +1198,14 @@ export default function App() {
           isSaving={isSavingNote}
         />
 
+        {/* Scan Food with AI Section */}
+        <FoodSectionWidget
+          selectedDate={selectedDate}
+          isToday={isToday}
+          foodLogs={foodLogs}
+          onOpenScanFood={() => setIsScanFoodModalOpen(true)}
+        />
+
         {/* 7-Day History Section */}
         <HistoryList
           history={history}
@@ -1171,6 +1214,17 @@ export default function App() {
           onSelectDate={handleSelectDate}
         />
       </main>
+
+      {/* Food Nutrition Scanner Modal */}
+      <ScanFoodModal
+        isOpen={isScanFoodModalOpen}
+        onClose={() => setIsScanFoodModalOpen(false)}
+        user={currentUser}
+        selectedDate={selectedDate}
+        foodLogs={foodLogs}
+        onFoodLogSaved={handleFoodLogSaved}
+        onFoodLogDeleted={handleFoodLogDeleted}
+      />
 
       {/* Profile, Manage Habits, Analytics & Reminders Modal */}
       <ProfileModal

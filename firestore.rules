@@ -46,6 +46,11 @@ service cloud.firestore {
       match /milestones/{milestoneId} {
         allow read, write: if isOwner(userId);
       }
+
+      // Food logs subcollection (AI nutrition scans & meal records)
+      match /foodLogs/{foodLogId} {
+        allow read, write: if isOwner(userId);
+      }
     }
   }
 }

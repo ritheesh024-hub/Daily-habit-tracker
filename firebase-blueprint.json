@@ -57,6 +57,25 @@
         "updatedAt": { "type": "string", "maxLength": 60 }
       },
       "required": ["habitId"]
+    },
+    "FoodLog": {
+      "title": "FoodLog",
+      "description": "AI-scanned or user-edited estimated food nutrition records per meal",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_-]+$" },
+        "userId": { "type": "string", "maxLength": 128 },
+        "date": { "type": "string", "maxLength": 10, "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+        "mealType": { "type": "string", "maxLength": 50 },
+        "createdAt": { "type": "string", "maxLength": 60 },
+        "updatedAt": { "type": "string", "maxLength": 60 },
+        "foods": { "type": "array" },
+        "total": { "type": "object" },
+        "source": { "type": "string", "maxLength": 50 },
+        "confidence": { "type": "string", "maxLength": 20 },
+        "suggestions": { "type": "array" }
+      },
+      "required": ["id", "userId", "date", "foods", "total"]
     }
   },
   "firestore": {
@@ -75,6 +94,10 @@
     "/users/{userId}/reminderSettings/{habitId}": {
       "schema": "ReminderSetting",
       "description": "User habit reminder schedules"
+    },
+    "/users/{userId}/foodLogs/{foodLogId}": {
+      "schema": "FoodLog",
+      "description": "User food nutrition scan logs"
     }
   }
 }

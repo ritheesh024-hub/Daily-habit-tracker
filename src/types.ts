@@ -143,3 +143,48 @@ export interface ActiveSmartReminderNotice {
   incompleteHabits: HabitItem[];
   timestamp: number;
 }
+
+export interface FoodItem {
+  name: string;
+  estimatedPortion: string;
+  calories: number;
+  proteinGrams: number;
+  carbsGrams: number;
+  fatGrams: number;
+  fiberGrams: number;
+  sugarGrams?: number;
+}
+
+export interface FoodNutritionTotal {
+  calories: number;
+  proteinGrams: number;
+  carbsGrams: number;
+  fatGrams: number;
+  fiberGrams: number;
+  sugarGrams?: number;
+}
+
+export interface FoodScanResult {
+  isFood: boolean;
+  confidence: 'low' | 'medium' | 'high';
+  unidentifiedReason: string | null;
+  foods: FoodItem[];
+  total: FoodNutritionTotal;
+  suggestions: string[];
+  modelUsed?: string;
+}
+
+export interface FoodLog {
+  id: string;
+  userId: string;
+  date: string; // YYYY-MM-DD format
+  mealType?: string;
+  foods: FoodItem[];
+  total: FoodNutritionTotal;
+  source: 'ai' | 'manual';
+  confidence: 'low' | 'medium' | 'high';
+  suggestions?: string[];
+  createdAt: string;
+  updatedAt?: string;
+}
+

@@ -1,6 +1,6 @@
 {
   "name": "Daily Habits",
-  "description": "A clean personal habit tracking app with Google authentication, daily notes, reminders, analytics, and milestones.",
-  "requestFramePermissions": [],
+  "description": "A clean personal habit tracking app with Google authentication, food AI scanner, daily notes, reminders, analytics, and milestones.",
+  "requestFramePermissions": ["camera"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
