@@ -22,6 +22,11 @@ import {
   Sun,
   Moon,
   Monitor,
+  AlertTriangle,
+  Scale,
+  ShieldAlert,
+  Download,
+  RotateCcw,
 } from 'lucide-react';
 import { HabitItem, UserProfile, AnalyticsStats, DailyLogData, Milestone, UserReminderSettings, ThemeMode } from '../types';
 import { HabitIcon } from './HabitIcon';
@@ -40,7 +45,14 @@ interface ProfileModalProps {
   isOpen: boolean;
   onClose: () => void;
   user: UserProfile | null;
-  onUpdateProfile: (updates: { displayName: string; dateOfBirth?: string }) => Promise<void>;
+  onUpdateProfile: (updates: {
+    displayName: string;
+    dateOfBirth?: string;
+    height?: number;
+    heightUnit?: 'cm' | 'in';
+    weight?: number;
+    weightUnit?: 'kg' | 'lbs';
+  }) => Promise<void>;
   habits: HabitItem[];
   onSaveHabit: (
     data: { name: string; target: string; icon: string; reminderEnabled?: boolean; reminderTime?: string },
@@ -57,6 +69,9 @@ interface ProfileModalProps {
   rawLogsMap?: Record<string, DailyLogData>;
   todayDate?: string;
   onSignOut: () => void;
+  onExportData?: () => void;
+  onClearData?: () => Promise<void>;
+  onDeleteAccount?: () => Promise<void>;
   initialTab?: TabType;
   theme?: ThemeMode;
   onThemeChange?: (newTheme: ThemeMode) => void;
@@ -82,6 +97,9 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   rawLogsMap = {},
   todayDate = getLocalDateKey(),
   onSignOut,
+  onExportData,
+  onClearData,
+  onDeleteAccount,
   initialTab = 'analytics',
   theme = 'system',
   onThemeChange,
@@ -91,9 +109,21 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   // Edit Profile State
   const [displayNameInput, setDisplayNameInput] = useState('');
   const [dobInput, setDobInput] = useState('');
+  const [heightInput, setHeightInput] = useState('');
+  const [heightUnit, setHeightUnit] = useState<'cm' | 'in'>('cm');
+  const [weightInput, setWeightInput] = useState('');
+  const [weightUnit, setWeightUnit] = useState<'kg' | 'lbs'>('kg');
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [profileSavedSuccess, setProfileSavedSuccess] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [exportSuccess, setExportSuccess] = useState(false);
+
+  // Clear Data & Delete Account State
+  const [showClearDataConfirm, setShowClearDataConfirm] = useState(false);
+  const [isClearingData, setIsClearingData] = useState(false);
+  const [deleteAccountStep, setDeleteAccountStep] = useState<0 | 1 | 2>(0);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [accountActionError, setAccountActionError] = useState<string | null>(null);
 
   // Manage Habits Modal State
   const [isHabitFormOpen, setIsHabitFormOpen] = useState(false);
@@ -125,8 +155,25 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
       setDobInput('');
     }
 
+    if (user?.height !== undefined && user?.height !== null) {
+      setHeightInput(String(user.height));
+    } else {
+      setHeightInput('');
+    }
+    setHeightUnit(user?.heightUnit || 'cm');
+
+    if (user?.weight !== undefined && user?.weight !== null) {
+      setWeightInput(String(user.weight));
+    } else {
+      setWeightInput('');
+    }
+    setWeightUnit(user?.weightUnit || 'kg');
+
     setFormError(null);
     setProfileSavedSuccess(false);
+    setShowClearDataConfirm(false);
+    setDeleteAccountStep(0);
+    setAccountActionError(null);
     setPermissionStatus(getNotificationPermissionStatus());
   }, [user, isOpen]);
 
@@ -154,11 +201,18 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
       return;
     }
 
+    const numHeight = heightInput.trim() ? parseFloat(heightInput.trim()) : undefined;
+    const numWeight = weightInput.trim() ? parseFloat(weightInput.trim()) : undefined;
+
     setIsSavingProfile(true);
     try {
       await onUpdateProfile({
         displayName: trimmedName,
         dateOfBirth: dobInput || undefined,
+        height: numHeight && numHeight > 0 ? numHeight : undefined,
+        heightUnit,
+        weight: numWeight && numWeight > 0 ? numWeight : undefined,
+        weightUnit,
       });
       setProfileSavedSuccess(true);
       setTimeout(() => setProfileSavedSuccess(false), 3000);
@@ -166,6 +220,82 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
       setFormError('Failed to update profile. Please try again.');
     } finally {
       setIsSavingProfile(false);
+    }
+  };
+
+  const handleExportData = () => {
+    if (onExportData) {
+      onExportData();
+      setExportSuccess(true);
+      setTimeout(() => setExportSuccess(false), 3000);
+      return;
+    }
+    try {
+      const exportPayload = {
+        app: 'Daily Habits',
+        version: '1.5',
+        exportedAt: new Date().toISOString(),
+        user: {
+          uid: user?.uid,
+          email: user?.email,
+          displayName: user?.displayName,
+          dateOfBirth: user?.dateOfBirth,
+          height: user?.height,
+          heightUnit: user?.heightUnit,
+          weight: user?.weight,
+          weightUnit: user?.weightUnit,
+          createdAt: user?.createdAt,
+          lastLoginAt: user?.lastLoginAt,
+        },
+        habits,
+        dailyLogs: rawLogsMap,
+        milestones,
+        analytics,
+        reminderSettings,
+      };
+
+      const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(exportPayload, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute('href', dataStr);
+      const dateStr = todayDate || getLocalDateKey();
+      downloadAnchor.setAttribute('download', `daily-habits-backup-${dateStr}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+      setExportSuccess(true);
+      setTimeout(() => setExportSuccess(false), 3000);
+    } catch (err) {
+      console.error('Failed to export data:', err);
+    }
+  };
+
+  const handleExecuteClearData = async () => {
+    if (!onClearData) return;
+    setIsClearingData(true);
+    setAccountActionError(null);
+    try {
+      await onClearData();
+      setShowClearDataConfirm(false);
+      onClose();
+    } catch (err: any) {
+      setAccountActionError(err?.message || 'Failed to clear data. Please try again.');
+    } finally {
+      setIsClearingData(false);
+    }
+  };
+
+  const handleExecuteDeleteAccount = async () => {
+    if (!onDeleteAccount) return;
+    setIsDeletingAccount(true);
+    setAccountActionError(null);
+    try {
+      await onDeleteAccount();
+      setDeleteAccountStep(0);
+      onClose();
+    } catch (err: any) {
+      setAccountActionError(err?.message || 'Failed to delete account. You may need to sign in again to verify identity.');
+    } finally {
+      setIsDeletingAccount(false);
     }
   };
 
@@ -856,7 +986,96 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                     </div>
                   </div>
 
-                  {/* 5. Gmail (Read-Only) */}
+                  {/* 5. Height & Weight */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label htmlFor="edit-height-input" className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                        Height
+                      </label>
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          id="edit-height-input"
+                          type="number"
+                          step="0.1"
+                          min="0"
+                          max="300"
+                          value={heightInput}
+                          onChange={(e) => setHeightInput(e.target.value)}
+                          placeholder={heightUnit === 'cm' ? 'e.g. 175' : 'e.g. 68'}
+                          className="flex-1 px-3 py-2 text-xs font-mono border border-zinc-300 dark:border-zinc-700 rounded-lg focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-zinc-100 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
+                        />
+                        <div className="flex rounded-lg border border-zinc-300 dark:border-zinc-700 overflow-hidden bg-zinc-100 dark:bg-zinc-800 p-0.5">
+                          <button
+                            type="button"
+                            onClick={() => setHeightUnit('cm')}
+                            className={`px-2 py-1 text-[11px] font-semibold rounded transition-colors cursor-pointer ${
+                              heightUnit === 'cm'
+                                ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-2xs'
+                                : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
+                            }`}
+                          >
+                            cm
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setHeightUnit('in')}
+                            className={`px-2 py-1 text-[11px] font-semibold rounded transition-colors cursor-pointer ${
+                              heightUnit === 'in'
+                                ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-2xs'
+                                : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
+                            }`}
+                          >
+                            in
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label htmlFor="edit-weight-input" className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                        Weight
+                      </label>
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          id="edit-weight-input"
+                          type="number"
+                          step="0.1"
+                          min="0"
+                          max="500"
+                          value={weightInput}
+                          onChange={(e) => setWeightInput(e.target.value)}
+                          placeholder={weightUnit === 'kg' ? 'e.g. 70' : 'e.g. 154'}
+                          className="flex-1 px-3 py-2 text-xs font-mono border border-zinc-300 dark:border-zinc-700 rounded-lg focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-zinc-100 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
+                        />
+                        <div className="flex rounded-lg border border-zinc-300 dark:border-zinc-700 overflow-hidden bg-zinc-100 dark:bg-zinc-800 p-0.5">
+                          <button
+                            type="button"
+                            onClick={() => setWeightUnit('kg')}
+                            className={`px-2 py-1 text-[11px] font-semibold rounded transition-colors cursor-pointer ${
+                              weightUnit === 'kg'
+                                ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-2xs'
+                                : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
+                            }`}
+                          >
+                            kg
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setWeightUnit('lbs')}
+                            className={`px-2 py-1 text-[11px] font-semibold rounded transition-colors cursor-pointer ${
+                              weightUnit === 'lbs'
+                                ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-2xs'
+                                : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
+                            }`}
+                          >
+                            lbs
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 6. Gmail (Read-Only) */}
                   <div>
                     <label htmlFor="edit-email-display" className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
                       Gmail
@@ -915,6 +1134,70 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                   </div>
                 </form>
 
+                {/* Account Action Error */}
+                {accountActionError && (
+                  <div className="p-2.5 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-lg text-xs text-red-700 dark:text-red-300 flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-red-600 dark:text-red-400 shrink-0" />
+                    <span>{accountActionError}</span>
+                  </div>
+                )}
+
+                {/* Compressed Data & Account Management Section */}
+                <div className="pt-3.5 border-t border-zinc-200 dark:border-zinc-800 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+                      Data & Account
+                    </span>
+                    {exportSuccess && (
+                      <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium inline-flex items-center gap-1 animate-fadeIn">
+                        <Check className="w-3 h-3" /> Backup exported
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    {/* Export Data */}
+                    <button
+                      type="button"
+                      id="profile-export-data-btn"
+                      onClick={handleExportData}
+                      className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-zinc-700 dark:text-zinc-300 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700/80 rounded-lg border border-zinc-200 dark:border-zinc-700 transition-colors cursor-pointer"
+                      title="Download a JSON backup of your habits, daily logs, notes, and progress"
+                    >
+                      <Download className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />
+                      <span>Export Data</span>
+                    </button>
+
+                    {/* Clear Data */}
+                    {onClearData && (
+                      <button
+                        type="button"
+                        id="profile-clear-data-btn"
+                        onClick={() => setShowClearDataConfirm(true)}
+                        className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-amber-700 dark:text-amber-400 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 dark:hover:bg-amber-900/50 rounded-lg border border-amber-200/80 dark:border-amber-800/80 transition-colors cursor-pointer"
+                        title="Clear habit logs, notes, analytics, and reset onboarding"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                        <span>Clear Data</span>
+                      </button>
+                    )}
+
+                    {/* Delete Account */}
+                    {onDeleteAccount && (
+                      <button
+                        type="button"
+                        id="profile-delete-account-btn"
+                        onClick={() => setDeleteAccountStep(1)}
+                        className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-red-600 dark:text-red-400 hover:text-white dark:hover:text-white bg-red-50 hover:bg-red-600 dark:bg-red-950/30 dark:hover:bg-red-700 rounded-lg border border-red-200/80 dark:border-red-900/50 transition-colors cursor-pointer"
+                        title="Permanently delete account and all cloud data"
+                      >
+                        <ShieldAlert className="w-3.5 h-3.5 text-red-600 dark:text-red-400" />
+                        <span>Delete Account</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+
                 {/* Logout Action */}
                 <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
                   <div>
@@ -971,6 +1254,162 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
         }}
         initialHabit={habitToEdit}
       />
+
+      {/* Clear Data Confirmation Modal */}
+      {showClearDataConfirm && (
+        <div
+          id="clear-data-modal-backdrop"
+          className="fixed inset-0 z-60 bg-black/60 dark:bg-black/80 flex items-center justify-center p-4 backdrop-blur-xs animate-fadeIn"
+        >
+          <div
+            id="clear-data-card"
+            className="w-full max-w-md bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-xl p-5 sm:p-6 transition-colors"
+          >
+            <div className="flex items-start gap-3.5 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
+                  Clear all data?
+                </h3>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 leading-relaxed">
+                  Your habit history, daily notes, analytics, and milestones will be permanently removed. Your Google account will remain active.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                id="cancel-clear-data-btn"
+                disabled={isClearingData}
+                onClick={() => setShowClearDataConfirm(false)}
+                className="px-4 py-2 text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                id="confirm-clear-data-btn"
+                disabled={isClearingData}
+                onClick={handleExecuteClearData}
+                className="px-4 py-2 text-xs font-semibold text-white bg-amber-600 hover:bg-amber-700 dark:bg-amber-700 dark:hover:bg-amber-600 rounded-xl transition-colors cursor-pointer disabled:opacity-50 inline-flex items-center gap-1.5 shadow-2xs"
+              >
+                {isClearingData ? (
+                  <>
+                    <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Clearing...</span>
+                  </>
+                ) : (
+                  <span>Clear Data</span>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Account Confirmation Modal Step 1 */}
+      {deleteAccountStep === 1 && (
+        <div
+          id="delete-account-step1-backdrop"
+          className="fixed inset-0 z-60 bg-black/60 dark:bg-black/80 flex items-center justify-center p-4 backdrop-blur-xs animate-fadeIn"
+        >
+          <div
+            id="delete-account-step1-card"
+            className="w-full max-w-md bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-xl p-5 sm:p-6 transition-colors"
+          >
+            <div className="flex items-start gap-3.5 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-400 flex items-center justify-center shrink-0">
+                <ShieldAlert className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
+                  Delete your account?
+                </h3>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 leading-relaxed">
+                  Your Daily Habits account and all associated habit tracking, streaks, notes, and cloud records will be permanently deleted. This action cannot be undone.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                id="cancel-delete-step1-btn"
+                onClick={() => setDeleteAccountStep(0)}
+                className="px-4 py-2 text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                id="continue-delete-step1-btn"
+                onClick={() => setDeleteAccountStep(2)}
+                className="px-4 py-2 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-600 rounded-xl transition-colors cursor-pointer shadow-2xs"
+              >
+                Continue
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Account Confirmation Modal Step 2 */}
+      {deleteAccountStep === 2 && (
+        <div
+          id="delete-account-step2-backdrop"
+          className="fixed inset-0 z-60 bg-black/60 dark:bg-black/80 flex items-center justify-center p-4 backdrop-blur-xs animate-fadeIn"
+        >
+          <div
+            id="delete-account-step2-card"
+            className="w-full max-w-md bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-xl p-5 sm:p-6 transition-colors"
+          >
+            <div className="flex items-start gap-3.5 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-400 flex items-center justify-center shrink-0">
+                <ShieldAlert className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-red-600 dark:text-red-400">
+                  Are you sure you want to permanently delete your account?
+                </h3>
+                <p className="text-xs text-zinc-600 dark:text-zinc-300 mt-2 leading-relaxed">
+                  All your data will be permanently lost and cannot be recovered.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                id="cancel-delete-step2-btn"
+                disabled={isDeletingAccount}
+                onClick={() => setDeleteAccountStep(0)}
+                className="px-4 py-2 text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                id="final-delete-account-btn"
+                disabled={isDeletingAccount}
+                onClick={handleExecuteDeleteAccount}
+                className="px-4 py-2 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-600 rounded-xl transition-colors cursor-pointer disabled:opacity-50 inline-flex items-center gap-1.5 shadow-2xs"
+              >
+                {isDeletingAccount ? (
+                  <>
+                    <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Deleting Account...</span>
+                  </>
+                ) : (
+                  <span>Delete Account</span>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };

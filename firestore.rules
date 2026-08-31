@@ -18,9 +18,8 @@ service cloud.firestore {
 
     // User profile matching - strictly scoped by auth UID
     match /users/{userId} {
-      allow get, create, update: if isOwner(userId);
+      allow get, create, update, delete: if isOwner(userId);
       allow list: if false; // Users cannot list other users
-      allow delete: if false; // Prevent accidental account deletion from client
 
       // Habit settings subcollection
       match /habitSettings/{habitId} {
@@ -49,6 +48,11 @@ service cloud.firestore {
 
       // Food logs subcollection (AI nutrition scans & meal records)
       match /foodLogs/{foodLogId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      // Weight history subcollection (voluntary weekly personal tracking)
+      match /weightHistory/{entryId} {
         allow read, write: if isOwner(userId);
       }
     }

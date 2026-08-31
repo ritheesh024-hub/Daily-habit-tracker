@@ -7,14 +7,35 @@
       "properties": {
         "uid": { "type": "string", "maxLength": 128 },
         "displayName": { "type": "string", "maxLength": 100 },
+        "name": { "type": "string", "maxLength": 100 },
         "email": { "type": "string", "maxLength": 200 },
         "photoURL": { "type": "string", "maxLength": 1000 },
+        "dateOfBirth": { "type": "string", "maxLength": 10 },
+        "height": { "type": "number" },
+        "heightUnit": { "type": "string", "maxLength": 10 },
+        "weight": { "type": "number" },
+        "weightUnit": { "type": "string", "maxLength": 10 },
+        "onboardingCompleted": { "type": "boolean" },
         "createdAt": { "type": "string", "maxLength": 60 },
         "updatedAt": { "type": "string", "maxLength": 60 },
         "lastLoginAt": { "type": "string", "maxLength": 60 },
         "settings": { "type": "object" }
       },
       "required": ["uid"]
+    },
+    "WeightHistoryEntry": {
+      "title": "WeightHistoryEntry",
+      "description": "Voluntary personal weight check-in entries logged by the user",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "weight": { "type": "number" },
+        "unit": { "type": "string", "maxLength": 10 },
+        "date": { "type": "string", "maxLength": 10, "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+        "createdAt": { "type": "string", "maxLength": 60 }
+      },
+      "required": ["id", "userId", "weight", "date", "createdAt"]
     },
     "HabitSetting": {
       "title": "HabitSetting",
@@ -98,6 +119,10 @@
     "/users/{userId}/foodLogs/{foodLogId}": {
       "schema": "FoodLog",
       "description": "User food nutrition scan logs"
+    },
+    "/users/{userId}/weightHistory/{entryId}": {
+      "schema": "WeightHistoryEntry",
+      "description": "User voluntary weight tracking history entries"
     }
   }
 }

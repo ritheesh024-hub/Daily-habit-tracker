@@ -13,6 +13,7 @@ import {
   DEFAULT_HABITS,
   UserReminderSettings,
   DEFAULT_REMINDER_SETTINGS,
+  WeightHistoryEntry,
 } from '../types';
 import { getLocalDateKey } from './dateUtils';
 
@@ -180,6 +181,29 @@ export function setCachedReminderSettings(userId: string, settings: UserReminder
   }
 }
 
+export function getCachedWeightHistory(userId?: string): WeightHistoryEntry[] {
+  if (!userId) return [];
+  try {
+    const raw = localStorage.getItem(`${PREFIX}weight_${userId}`);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (e) {
+    console.warn(`Cache read error (weight history for ${userId}):`, e);
+  }
+  return [];
+}
+
+export function setCachedWeightHistory(userId: string, entries: WeightHistoryEntry[]): void {
+  if (!userId) return;
+  try {
+    localStorage.setItem(`${PREFIX}weight_${userId}`, JSON.stringify(entries));
+  } catch (e) {
+    console.warn(`Cache write error (weight history for ${userId}):`, e);
+  }
+}
+
 /**
  * Completely purges all stored cache for a specific user.
  */
@@ -192,12 +216,14 @@ export function clearUserCache(userId: string): void {
     localStorage.removeItem(`${PREFIX}milestones_${userId}`);
     localStorage.removeItem(`${PREFIX}reminders_${userId}`);
     localStorage.removeItem(`${PREFIX}theme_${userId}`);
+    localStorage.removeItem(`${PREFIX}weight_${userId}`);
+    localStorage.removeItem(`dh_food_logs_${userId}`);
 
-    // Clean up all date logs for this user
+    // Clean up all date logs and any keys matching this user
     const toRemove: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
-      if (key && key.startsWith(`${PREFIX}log_${userId}_`)) {
+      if (key && (key.startsWith(`${PREFIX}log_${userId}_`) || key.includes(userId))) {
         toRemove.push(key);
       }
     }

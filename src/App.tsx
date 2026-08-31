@@ -25,13 +25,8 @@ import {
   ActiveSmartReminderNotice,
   DEFAULT_REMINDER_SETTINGS,
   ThemeMode,
-  FoodLog,
 } from './types';
 import { getTodayDateString, formatHeaderDate } from './lib/dateUtils';
-import {
-  getCachedFoodLogs,
-  subscribeToFoodLogs,
-} from './lib/foodService';
 import {
   getCachedTheme,
   setCachedTheme,
@@ -59,6 +54,12 @@ import {
   getLocalDateKey,
   fetchUserReminderSettings,
   saveUserReminderSettings,
+  saveOnboardingProfileAndHabits,
+  saveWeightEntry,
+  checkWeeklyWeightReminderNeeded,
+  dismissWeeklyWeightReminder,
+  clearUserData,
+  deleteUserAccount,
 } from './lib/habitService';
 import {
   getCachedUserProfile,
@@ -73,6 +74,7 @@ import {
   setCachedMilestones,
   getCachedReminderSettings,
   setCachedReminderSettings,
+  getCachedWeightHistory,
   clearUserCache,
   clearActiveSession,
 } from './lib/cacheService';
@@ -92,11 +94,12 @@ import { ProgressBar } from './components/ProgressBar';
 import { StreakStatsCard } from './components/StreakStatsCard';
 import { HabitList } from './components/HabitList';
 import { DailyNote } from './components/DailyNote';
-import { FoodSectionWidget } from './components/FoodSectionWidget';
-import { ScanFoodModal } from './components/ScanFoodModal';
 import { HistoryList } from './components/HistoryList';
 import { ProfileModal, TabType } from './components/ProfileModal';
 import { LoginView } from './components/LoginView';
+import { LandingPage } from './components/LandingPage';
+import { OnboardingModal } from './components/OnboardingModal';
+import { WeeklyWeightModal } from './components/WeeklyWeightModal';
 import { ReminderToast, ActiveReminderNotice } from './components/ReminderToast';
 
 const DEFAULT_ANALYTICS: AnalyticsStats = {
@@ -174,12 +177,6 @@ export default function App() {
     const cached = currentUser?.uid ? getCachedMilestones(currentUser.uid) : null;
     return cached || {};
   });
-
-  // Food Scan & Nutrition Logs State
-  const [foodLogs, setFoodLogs] = useState<FoodLog[]>(() =>
-    getCachedFoodLogs(currentUser?.uid)
-  );
-  const [isScanFoodModalOpen, setIsScanFoodModalOpen] = useState<boolean>(false);
 
   // Profile Modal state
   const [isProfileModalOpen, setIsProfileModalOpen] = useState<boolean>(false);
@@ -326,10 +323,6 @@ export default function App() {
           fetchUserReminderSettings(user.uid).then((settings) => {
             setReminderSettings(settings);
           });
-
-          // Load user-specific cached food logs
-          const cachedFood = getCachedFoodLogs(user.uid);
-          setFoodLogs(cachedFood);
         } else {
           setCurrentUser(null);
           setCachedUserProfile(null);
@@ -342,7 +335,6 @@ export default function App() {
           setStreaks({ currentStreak: 0, bestStreak: 0 });
           setAnalytics(DEFAULT_ANALYTICS);
           setPersistedMilestonesMap({});
-          setFoodLogs([]);
           setReminderSettings(DEFAULT_REMINDER_SETTINGS);
           setActiveReminders([]);
           setActiveSmartReminders([]);
@@ -523,23 +515,6 @@ export default function App() {
     });
   }, [selectedDate, currentUser?.uid, habits]);
 
-  // Real-time listener for Food Logs
-  useEffect(() => {
-    if (!currentUser?.uid) return;
-    const unsubscribe = subscribeToFoodLogs(currentUser.uid, (logs) => {
-      setFoodLogs(logs);
-    });
-    return () => unsubscribe();
-  }, [currentUser?.uid]);
-
-  const handleFoodLogSaved = (savedLog: FoodLog) => {
-    setFoodLogs((prev) => [savedLog, ...prev.filter((l) => l.id !== savedLog.id)]);
-  };
-
-  const handleFoodLogDeleted = (deletedId: string) => {
-    setFoodLogs((prev) => prev.filter((l) => l.id !== deletedId));
-  };
-
   // Habit & Smart Reminder Scheduler Loop
   useEffect(() => {
     if (habits.length === 0) return;
@@ -679,11 +654,175 @@ export default function App() {
     }
   };
 
-  // Update Profile (Name, Date of Birth)
-  const handleUpdateProfile = async (updates: { displayName: string; dateOfBirth?: string }) => {
+  // Weekly Weight Modal state
+  const [showWeeklyWeightModal, setShowWeeklyWeightModal] = useState<boolean>(false);
+
+  // Check if weekly weight reminder is needed
+  useEffect(() => {
+    if (currentUser?.uid && currentUser.onboardingCompleted) {
+      if (checkWeeklyWeightReminderNeeded(currentUser)) {
+        setShowWeeklyWeightModal(true);
+      }
+    }
+  }, [currentUser]);
+
+  // Update Profile (Name, Date of Birth, Height, Weight)
+  const handleUpdateProfile = async (updates: {
+    displayName: string;
+    dateOfBirth?: string;
+    height?: number;
+    heightUnit?: 'cm' | 'in';
+    weight?: number;
+    weightUnit?: 'kg' | 'lbs';
+  }) => {
     if (!currentUser?.uid) return;
     const updated = await updateUserProfile(currentUser.uid, updates);
     setCurrentUser(updated);
+    setCachedUserProfile(updated);
+  };
+
+  // Complete Onboarding Flow
+  const handleOnboardingComplete = async (
+    profileData: {
+      displayName: string;
+      dateOfBirth?: string;
+      height?: number;
+      heightUnit?: 'cm' | 'in';
+      weight?: number;
+      weightUnit?: 'kg' | 'lbs';
+    },
+    chosenHabits: HabitItem[]
+  ) => {
+    if (!currentUser?.uid) return;
+    const updated = await saveOnboardingProfileAndHabits(currentUser.uid, profileData, chosenHabits);
+    setCurrentUser(updated);
+    setCachedUserProfile(updated);
+    setHabits(chosenHabits);
+    setCachedHabits(currentUser.uid, chosenHabits);
+
+    const activeIds = chosenHabits.map((h) => h.id);
+    const newCompletedCount = countCompletedInMap(dailyLog.completedHabits, activeIds);
+    const updatedLog: DailyLogData = {
+      ...dailyLog,
+      completedCount: newCompletedCount,
+      totalActiveCount: chosenHabits.length,
+    };
+    setDailyLog(updatedLog);
+    setCachedDailyLog(currentUser.uid, todayDate, updatedLog);
+    await saveDailyLog(currentUser.uid, todayDate, updatedLog);
+  };
+
+  // Save Weekly Weight Check-in
+  const handleSaveWeeklyWeight = async (weight: number, unit: 'kg' | 'lbs') => {
+    if (!currentUser?.uid) return;
+    await saveWeightEntry(currentUser.uid, weight, unit);
+    const updatedUser: UserProfile = {
+      ...currentUser,
+      weight,
+      weightUnit: unit,
+      lastWeightCheckInDate: getTodayDateString(),
+    };
+    setCurrentUser(updatedUser);
+    setCachedUserProfile(updatedUser);
+    setShowWeeklyWeightModal(false);
+  };
+
+  const handleDismissWeeklyWeight = () => {
+    if (currentUser?.uid) {
+      dismissWeeklyWeightReminder(currentUser.uid);
+    }
+    setShowWeeklyWeightModal(false);
+  };
+
+  // Clear all user habit data & reset onboarding
+  const handleClearUserData = async () => {
+    if (!currentUser?.uid) return;
+    await clearUserData(currentUser.uid);
+
+    const resetUser: UserProfile = {
+      ...currentUser,
+      onboardingCompleted: false,
+      weight: undefined,
+      height: undefined,
+      dateOfBirth: undefined,
+    };
+    setCurrentUser(resetUser);
+    setCachedUserProfile(resetUser);
+
+    const defaultHabits = getCachedHabits(currentUser.uid);
+    setHabits(defaultHabits);
+    setDailyLog(createDefaultDailyLog(todayDate, defaultHabits.length));
+    setHistory([]);
+    setHistoryMap({});
+    setRawLogsMap({});
+    setStreaks({ currentStreak: 0, bestStreak: 0 });
+    setAnalytics(DEFAULT_ANALYTICS);
+    setPersistedMilestonesMap({});
+    setIsProfileModalOpen(false);
+  };
+
+  // Permanently delete user account & all cloud records
+  const handleDeleteUserAccount = async () => {
+    if (!auth.currentUser) return;
+    const uid = auth.currentUser.uid;
+    await deleteUserAccount(auth.currentUser);
+    clearUserCache(uid);
+    clearActiveSession();
+    setCurrentUser(null);
+    setCachedUserProfile(null);
+    setIsProfileModalOpen(false);
+    setHabits(getCachedHabits());
+    setDailyLog(createDefaultDailyLog(getTodayDateString(), 8));
+    setHistory([]);
+    setHistoryMap({});
+    setRawLogsMap({});
+    setStreaks({ currentStreak: 0, bestStreak: 0 });
+    setAnalytics(DEFAULT_ANALYTICS);
+    setPersistedMilestonesMap({});
+  };
+
+  // Export complete user data backup as JSON
+  const handleExportUserData = () => {
+    try {
+      const weightHistory = currentUser?.uid ? getCachedWeightHistory(currentUser.uid) : [];
+      const exportPayload = {
+        app: 'Daily Habits',
+        version: '1.5',
+        exportedAt: new Date().toISOString(),
+        user: {
+          uid: currentUser?.uid,
+          email: currentUser?.email,
+          displayName: currentUser?.displayName,
+          dateOfBirth: currentUser?.dateOfBirth,
+          height: currentUser?.height,
+          heightUnit: currentUser?.heightUnit,
+          weight: currentUser?.weight,
+          weightUnit: currentUser?.weightUnit,
+          createdAt: currentUser?.createdAt,
+          lastLoginAt: currentUser?.lastLoginAt,
+          onboardingCompleted: currentUser?.onboardingCompleted,
+        },
+        habits,
+        dailyLogs: rawLogsMap,
+        weightHistory,
+        milestones,
+        streaks,
+        analytics,
+        reminderSettings,
+      };
+
+      const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `daily-habits-backup-${todayDate}.json`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Failed to export user data:', err);
+    }
   };
 
   // Toggle habit checkbox for a specific date: completely isolated by user + targetDate + habitId
@@ -1101,14 +1240,36 @@ export default function App() {
     setSelectedDate(date);
   };
 
-  // If not authenticated, show clean Google login view
+  // If not authenticated, show clean Google landing / login view
   if (!currentUser) {
     return (
-      <LoginView
-        onSignInWithGoogle={handleGoogleSignIn}
+      <LandingPage
+        onGetStarted={handleGoogleSignIn}
         isLoading={isAuthLoading}
         error={authError}
       />
+    );
+  }
+
+  // If first-time user hasn't completed onboarding, render onboarding wizard
+  if (currentUser.onboardingCompleted === false) {
+    return (
+      <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 flex flex-col font-sans antialiased">
+        <Header
+          user={currentUser}
+          currentDate={todayDate}
+          onOpenProfile={() => {}}
+          isSyncing={false}
+        />
+        <main className="flex-1 flex items-center justify-center p-4">
+          <OnboardingModal
+            isOpen={true}
+            user={currentUser}
+            onComplete={handleOnboardingComplete}
+            onSignOut={handleSignOut}
+          />
+        </main>
+      </div>
     );
   }
 
@@ -1198,14 +1359,6 @@ export default function App() {
           isSaving={isSavingNote}
         />
 
-        {/* Scan Food with AI Section */}
-        <FoodSectionWidget
-          selectedDate={selectedDate}
-          isToday={isToday}
-          foodLogs={foodLogs}
-          onOpenScanFood={() => setIsScanFoodModalOpen(true)}
-        />
-
         {/* 7-Day History Section */}
         <HistoryList
           history={history}
@@ -1214,17 +1367,6 @@ export default function App() {
           onSelectDate={handleSelectDate}
         />
       </main>
-
-      {/* Food Nutrition Scanner Modal */}
-      <ScanFoodModal
-        isOpen={isScanFoodModalOpen}
-        onClose={() => setIsScanFoodModalOpen(false)}
-        user={currentUser}
-        selectedDate={selectedDate}
-        foodLogs={foodLogs}
-        onFoodLogSaved={handleFoodLogSaved}
-        onFoodLogDeleted={handleFoodLogDeleted}
-      />
 
       {/* Profile, Manage Habits, Analytics & Reminders Modal */}
       <ProfileModal
@@ -1245,9 +1387,21 @@ export default function App() {
         rawLogsMap={rawLogsMap}
         todayDate={todayDate}
         onSignOut={handleSignOut}
+        onExportData={handleExportUserData}
+        onClearData={handleClearUserData}
+        onDeleteAccount={handleDeleteUserAccount}
         initialTab={profileModalTab}
         theme={theme}
         onThemeChange={handleThemeChange}
+      />
+
+      {/* Weekly Weight Check-in Voluntary Modal */}
+      <WeeklyWeightModal
+        isOpen={showWeeklyWeightModal}
+        onClose={handleDismissWeeklyWeight}
+        onSave={handleSaveWeeklyWeight}
+        currentWeight={currentUser?.weight}
+        currentUnit={currentUser?.weightUnit}
       />
 
       {/* Active In-App Reminder Notifications */}

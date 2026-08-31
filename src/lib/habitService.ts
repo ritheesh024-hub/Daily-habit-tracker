@@ -10,8 +10,8 @@ import {
   getDocs,
   writeBatch,
 } from 'firebase/firestore';
-import { User, updateProfile } from 'firebase/auth';
-import { db, auth } from './firebase';
+import { User, updateProfile, deleteUser, reauthenticateWithPopup } from 'firebase/auth';
+import { db, auth, googleProvider } from './firebase';
 import {
   DEFAULT_HABITS,
   HabitItem,
@@ -24,6 +24,7 @@ import {
   UserReminderSettings,
   DEFAULT_REMINDER_SETTINGS,
   ThemeMode,
+  WeightHistoryEntry,
 } from '../types';
 import {
   getLast7Days,
@@ -44,6 +45,9 @@ import {
   setCachedUserProfile,
   getCachedReminderSettings,
   setCachedReminderSettings,
+  getCachedWeightHistory,
+  setCachedWeightHistory,
+  clearUserCache,
 } from './cacheService';
 import {
   getCachedTheme,
@@ -97,9 +101,16 @@ export function syncUserProfile(
   const profile: UserProfile = {
     uid: user.uid,
     displayName: cached?.displayName || user.displayName || 'User',
+    name: cached?.name || cached?.displayName || user.displayName || 'User',
     email: user.email || null,
     photoURL: user.photoURL || null,
     dateOfBirth: cached?.dateOfBirth,
+    height: cached?.height,
+    heightUnit: cached?.heightUnit || 'cm',
+    weight: cached?.weight,
+    weightUnit: cached?.weightUnit || 'kg',
+    onboardingCompleted: cached?.onboardingCompleted,
+    lastWeightCheckInDate: cached?.lastWeightCheckInDate,
     createdAt: cached?.createdAt,
     updatedAt: cached?.updatedAt,
     lastLoginAt: now,
@@ -109,7 +120,6 @@ export function syncUserProfile(
   setCachedUserProfile(profile);
 
   // Background sync with Firestore users/{uid}
-  // If user doc exists, preserve custom displayName & dateOfBirth and fetch them
   const userRef = doc(db, 'users', user.uid);
   getDoc(userRef)
     .then((snap) => {
@@ -118,9 +128,21 @@ export function syncUserProfile(
         const updatedProfile: UserProfile = {
           uid: user.uid,
           displayName: data.displayName || cached?.displayName || user.displayName || 'User',
+          name: data.name || data.displayName || cached?.name || user.displayName || 'User',
           email: user.email || data.email || null,
           photoURL: user.photoURL || data.photoURL || null,
           dateOfBirth: data.dateOfBirth || cached?.dateOfBirth,
+          height: data.height ?? cached?.height,
+          heightUnit: data.heightUnit || cached?.heightUnit || 'cm',
+          weight: data.weight ?? cached?.weight,
+          weightUnit: data.weightUnit || cached?.weightUnit || 'kg',
+          onboardingCompleted:
+            typeof data.onboardingCompleted === 'boolean'
+              ? data.onboardingCompleted
+              : typeof cached?.onboardingCompleted === 'boolean'
+              ? cached.onboardingCompleted
+              : data.createdAt ? true : false,
+          lastWeightCheckInDate: data.lastWeightCheckInDate || cached?.lastWeightCheckInDate,
           createdAt: data.createdAt || cached?.createdAt || now,
           updatedAt: data.updatedAt || cached?.updatedAt,
           lastLoginAt: now,
@@ -130,7 +152,7 @@ export function syncUserProfile(
           onProfileLoaded(updatedProfile);
         }
 
-        // Update login metadata without overwriting user-edited displayName or dateOfBirth
+        // Update login metadata without overwriting custom properties
         setDoc(
           userRef,
           {
@@ -142,14 +164,31 @@ export function syncUserProfile(
           { merge: true }
         ).catch((e) => console.warn('Login metadata update notice:', e));
       } else {
-        // Initial user profile document creation
+        // Initial new user profile document
+        const initialProfile: UserProfile = {
+          uid: user.uid,
+          displayName: user.displayName || 'User',
+          name: user.displayName || 'User',
+          email: user.email || null,
+          photoURL: user.photoURL || null,
+          onboardingCompleted: false,
+          createdAt: now,
+          updatedAt: now,
+          lastLoginAt: now,
+        };
+        setCachedUserProfile(initialProfile);
+        if (onProfileLoaded) {
+          onProfileLoaded(initialProfile);
+        }
         setDoc(
           userRef,
           {
             uid: user.uid,
-            displayName: profile.displayName || 'User',
+            displayName: initialProfile.displayName,
+            name: initialProfile.name,
             email: user.email || null,
             photoURL: user.photoURL || null,
+            onboardingCompleted: false,
             createdAt: now,
             updatedAt: now,
             lastLoginAt: now,
@@ -171,20 +210,36 @@ export function syncUserProfile(
 
 export async function updateUserProfile(
   userId: string,
-  updates: { displayName: string; dateOfBirth?: string }
+  updates: {
+    displayName?: string;
+    name?: string;
+    dateOfBirth?: string;
+    height?: number;
+    heightUnit?: 'cm' | 'in';
+    weight?: number;
+    weightUnit?: 'kg' | 'lbs';
+    onboardingCompleted?: boolean;
+  }
 ): Promise<UserProfile> {
   const cached = getCachedUserProfile(userId);
   const now = new Date().toISOString();
 
-  const cleanName = updates.displayName.trim();
-  const cleanDob = updates.dateOfBirth ? updates.dateOfBirth.trim() : undefined;
+  const cleanName = updates.displayName ? updates.displayName.trim() : updates.name ? updates.name.trim() : (cached?.displayName || 'User');
+  const cleanDob = updates.dateOfBirth !== undefined ? (updates.dateOfBirth.trim() || undefined) : cached?.dateOfBirth;
 
   const updatedProfile: UserProfile = {
     uid: userId,
     displayName: cleanName,
-    email: cached?.email || null,
-    photoURL: cached?.photoURL || null,
+    name: cleanName,
+    email: cached?.email || auth.currentUser?.email || null,
+    photoURL: cached?.photoURL || auth.currentUser?.photoURL || null,
     dateOfBirth: cleanDob,
+    height: updates.height !== undefined ? updates.height : cached?.height,
+    heightUnit: updates.heightUnit || cached?.heightUnit || 'cm',
+    weight: updates.weight !== undefined ? updates.weight : cached?.weight,
+    weightUnit: updates.weightUnit || cached?.weightUnit || 'kg',
+    onboardingCompleted: updates.onboardingCompleted !== undefined ? updates.onboardingCompleted : (cached?.onboardingCompleted ?? true),
+    lastWeightCheckInDate: cached?.lastWeightCheckInDate,
     updatedAt: now,
     lastLoginAt: cached?.lastLoginAt || now,
     createdAt: cached?.createdAt || now,
@@ -194,7 +249,7 @@ export async function updateUserProfile(
   setCachedUserProfile(updatedProfile);
 
   // 2. Update Firebase Auth displayName where supported
-  if (auth.currentUser && auth.currentUser.uid === userId) {
+  if (auth.currentUser && auth.currentUser.uid === userId && updates.displayName) {
     try {
       await updateProfile(auth.currentUser, {
         displayName: cleanName,
@@ -206,22 +261,356 @@ export async function updateUserProfile(
 
   // 3. Persist to Firestore user document with merge: true
   const userRef = doc(db, 'users', userId);
-  await setDoc(
-    userRef,
-    {
-      uid: userId,
-      displayName: cleanName,
-      dateOfBirth: cleanDob || null,
-      updatedAt: now,
-    },
-    { merge: true }
-  );
+  const firestoreUpdates: Record<string, any> = {
+    uid: userId,
+    displayName: cleanName,
+    name: cleanName,
+    dateOfBirth: cleanDob || null,
+    updatedAt: now,
+  };
+  if (updates.height !== undefined) firestoreUpdates.height = updates.height;
+  if (updates.heightUnit !== undefined) firestoreUpdates.heightUnit = updates.heightUnit;
+  if (updates.weight !== undefined) firestoreUpdates.weight = updates.weight;
+  if (updates.weightUnit !== undefined) firestoreUpdates.weightUnit = updates.weightUnit;
+  if (updates.onboardingCompleted !== undefined) firestoreUpdates.onboardingCompleted = updates.onboardingCompleted;
+
+  await setDoc(userRef, firestoreUpdates, { merge: true });
 
   return updatedProfile;
 }
 
 export async function updateUserDisplayName(userId: string, displayName: string): Promise<void> {
   await updateUserProfile(userId, { displayName });
+}
+
+/**
+ * Saves completed onboarding data (profile attributes & custom chosen habits).
+ */
+export async function saveOnboardingProfileAndHabits(
+  userId: string,
+  profileData: {
+    displayName: string;
+    dateOfBirth?: string;
+    height?: number;
+    heightUnit?: 'cm' | 'in';
+    weight?: number;
+    weightUnit?: 'kg' | 'lbs';
+  },
+  selectedHabits: HabitItem[]
+): Promise<UserProfile> {
+  const now = new Date().toISOString();
+  const todayKey = getLocalDateKey();
+  const cached = getCachedUserProfile(userId);
+
+  const cleanName = profileData.displayName.trim() || 'User';
+  const cleanDob = profileData.dateOfBirth?.trim() || undefined;
+
+  const updatedProfile: UserProfile = {
+    uid: userId,
+    displayName: cleanName,
+    name: cleanName,
+    email: cached?.email || auth.currentUser?.email || null,
+    photoURL: cached?.photoURL || auth.currentUser?.photoURL || null,
+    dateOfBirth: cleanDob,
+    height: profileData.height,
+    heightUnit: profileData.heightUnit || 'cm',
+    weight: profileData.weight,
+    weightUnit: profileData.weightUnit || 'kg',
+    onboardingCompleted: true,
+    lastWeightCheckInDate: profileData.weight ? todayKey : undefined,
+    createdAt: cached?.createdAt || now,
+    updatedAt: now,
+    lastLoginAt: cached?.lastLoginAt || now,
+  };
+
+  // 1. Update Firebase Auth displayName
+  if (auth.currentUser && auth.currentUser.uid === userId) {
+    try {
+      await updateProfile(auth.currentUser, { displayName: cleanName });
+    } catch (e) {
+      console.warn('Firebase Auth updateProfile notice:', e);
+    }
+  }
+
+  // 2. Persist profile document to Firestore
+  const userRef = doc(db, 'users', userId);
+  await setDoc(
+    userRef,
+    {
+      uid: userId,
+      displayName: cleanName,
+      name: cleanName,
+      dateOfBirth: cleanDob || null,
+      height: profileData.height ?? null,
+      heightUnit: profileData.heightUnit || 'cm',
+      weight: profileData.weight ?? null,
+      weightUnit: profileData.weightUnit || 'kg',
+      onboardingCompleted: true,
+      lastWeightCheckInDate: profileData.weight ? todayKey : null,
+      updatedAt: now,
+    },
+    { merge: true }
+  );
+
+  // 3. Save selected habits to Firestore
+  const habitBatch = writeBatch(db);
+  const habitsToSave: HabitItem[] = selectedHabits.map((h, index) => ({
+    ...h,
+    order: index,
+    updatedAt: now,
+  }));
+  for (const h of habitsToSave) {
+    const hRef = doc(db, 'users', userId, 'habitSettings', h.id);
+    habitBatch.set(hRef, h);
+  }
+  await habitBatch.commit();
+  setCachedHabits(userId, habitsToSave);
+
+  // 4. If weight was provided, record initial entry in weightHistory
+  if (profileData.weight && profileData.weight > 0) {
+    const entryId = `weight_${Date.now()}`;
+    const weightEntry: WeightHistoryEntry = {
+      id: entryId,
+      userId,
+      weight: profileData.weight,
+      unit: profileData.weightUnit || 'kg',
+      date: todayKey,
+      createdAt: now,
+    };
+    try {
+      const weightRef = doc(db, 'users', userId, 'weightHistory', entryId);
+      await setDoc(weightRef, weightEntry);
+      setCachedWeightHistory(userId, [weightEntry]);
+    } catch (err) {
+      console.warn('Initial weight entry save notice:', err);
+    }
+  }
+
+  // 5. Update local cache
+  setCachedUserProfile(updatedProfile);
+  setCachedHabits(userId, habitsToSave);
+
+  return updatedProfile;
+}
+
+/**
+ * Fetches user weight history.
+ */
+export async function fetchWeightHistory(userId: string): Promise<WeightHistoryEntry[]> {
+  const cached = getCachedWeightHistory(userId);
+  try {
+    const weightCol = collection(db, 'users', userId, 'weightHistory');
+    const q = query(weightCol, orderBy('date', 'desc'), limit(50));
+    const snap = await getDocs(q);
+    if (!snap.empty) {
+      const entries: WeightHistoryEntry[] = [];
+      snap.forEach((d) => {
+        entries.push(d.data() as WeightHistoryEntry);
+      });
+      setCachedWeightHistory(userId, entries);
+      return entries;
+    }
+  } catch (err) {
+    console.warn('Weight history fetch notice:', err);
+  }
+  return cached;
+}
+
+/**
+ * Saves a new voluntary weight entry and updates user profile weight.
+ */
+export async function saveWeightEntry(
+  userId: string,
+  weight: number,
+  unit: 'kg' | 'lbs',
+  dateInput?: string
+): Promise<WeightHistoryEntry> {
+  const now = new Date().toISOString();
+  const date = dateInput ? getLocalDateKey(dateInput) : getLocalDateKey();
+  const id = `weight_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+
+  const entry: WeightHistoryEntry = {
+    id,
+    userId,
+    weight,
+    unit,
+    date,
+    createdAt: now,
+  };
+
+  // Update local cache immediately
+  const existing = getCachedWeightHistory(userId);
+  const updated = [entry, ...existing.filter((e) => e.date !== date)];
+  setCachedWeightHistory(userId, updated);
+
+  const cachedUser = getCachedUserProfile(userId);
+  if (cachedUser) {
+    setCachedUserProfile({
+      ...cachedUser,
+      weight,
+      weightUnit: unit,
+      lastWeightCheckInDate: date,
+    });
+  }
+
+  // Persist to Firestore
+  try {
+    const entryRef = doc(db, 'users', userId, 'weightHistory', id);
+    await setDoc(entryRef, entry);
+
+    const userRef = doc(db, 'users', userId);
+    await setDoc(
+      userRef,
+      {
+        weight,
+        weightUnit: unit,
+        lastWeightCheckInDate: date,
+        updatedAt: now,
+      },
+      { merge: true }
+    );
+  } catch (err) {
+    console.warn('Error saving weight entry to Firestore:', err);
+  }
+
+  return entry;
+}
+
+/**
+ * Checks if a weekly weight check-in prompt should be shown.
+ * Prompts at most once every 7 days, and only if user has finished onboarding.
+ */
+export function checkWeeklyWeightReminderNeeded(user: UserProfile | null): boolean {
+  if (!user || !user.onboardingCompleted) return false;
+
+  const userId = user.uid;
+  const dismissedUntil = localStorage.getItem(`dh_weight_prompt_dismissed_until_${userId}`);
+  const todayKey = getLocalDateKey();
+
+  if (dismissedUntil && dismissedUntil > todayKey) {
+    return false;
+  }
+
+  const lastCheckIn = user.lastWeightCheckInDate || (user.createdAt ? getLocalDateKey(user.createdAt) : null);
+  if (!lastCheckIn) return true;
+
+  // Calculate days difference between today and last check-in
+  const [cy, cm, cd] = todayKey.split('-').map(Number);
+  const [ly, lm, ld] = lastCheckIn.split('-').map(Number);
+  const nowDate = new Date(cy, cm - 1, cd).getTime();
+  const prevDate = new Date(ly, lm - 1, ld).getTime();
+  const diffDays = Math.floor((nowDate - prevDate) / (1000 * 60 * 60 * 24));
+
+  return diffDays >= 7;
+}
+
+/**
+ * Dismisses weekly weight check-in prompt for the next 7 days.
+ */
+export function dismissWeeklyWeightReminder(userId: string): void {
+  const [y, m, d] = getLocalDateKey().split('-').map(Number);
+  const nextWeek = new Date(y, m - 1, d + 7);
+  const nextWeekKey = getLocalDateKey(nextWeek);
+  localStorage.setItem(`dh_weight_prompt_dismissed_until_${userId}`, nextWeekKey);
+}
+
+/**
+ * Clears all user habit history, daily notes, analytics, milestones, food logs, and weight history.
+ * Preserves the Firebase Auth account.
+ */
+export async function clearUserData(userId: string): Promise<void> {
+  // 1. Delete documents from subcollections
+  const subcollections = ['dailyLogs', 'milestones', 'foodLogs', 'weightHistory'];
+  for (const sub of subcollections) {
+    try {
+      const colRef = collection(db, 'users', userId, sub);
+      const snap = await getDocs(colRef);
+      if (!snap.empty) {
+        const batch = writeBatch(db);
+        snap.forEach((d) => {
+          batch.delete(d.ref);
+        });
+        await batch.commit();
+      }
+    } catch (e) {
+      console.warn(`Error clearing subcollection ${sub}:`, e);
+    }
+  }
+
+  // 2. Reset user document weight & onboarding state in Firestore
+  const userRef = doc(db, 'users', userId);
+  const now = new Date().toISOString();
+  await setDoc(
+    userRef,
+    {
+      weight: null,
+      lastWeightCheckInDate: null,
+      onboardingCompleted: false,
+      updatedAt: now,
+    },
+    { merge: true }
+  );
+
+  // 3. Purge local storage cache for this user
+  clearUserCache(userId);
+}
+
+/**
+ * Permanently deletes the user's account and all associated Firestore data.
+ * If re-authentication is required by Firebase Auth, triggers Google popup re-auth.
+ */
+export async function deleteUserAccount(currentUser: User): Promise<void> {
+  const userId = currentUser.uid;
+
+  // 1. Delete all user subcollections
+  const subcollections = [
+    'dailyLogs',
+    'habitSettings',
+    'reminderSettings',
+    'settings',
+    'milestones',
+    'foodLogs',
+    'weightHistory',
+  ];
+
+  for (const sub of subcollections) {
+    try {
+      const colRef = collection(db, 'users', userId, sub);
+      const snap = await getDocs(colRef);
+      if (!snap.empty) {
+        const batch = writeBatch(db);
+        snap.forEach((d) => {
+          batch.delete(d.ref);
+        });
+        await batch.commit();
+      }
+    } catch (e) {
+      console.warn(`Error deleting subcollection ${sub}:`, e);
+    }
+  }
+
+  // 2. Delete user root document
+  try {
+    const userRef = doc(db, 'users', userId);
+    await deleteDoc(userRef);
+  } catch (e) {
+    console.warn('Error deleting user root doc:', e);
+  }
+
+  // 3. Purge all user cache
+  clearUserCache(userId);
+
+  // 4. Delete Firebase Auth user
+  try {
+    await deleteUser(currentUser);
+  } catch (err: any) {
+    if (err?.code === 'auth/requires-recent-login') {
+      await reauthenticateWithPopup(currentUser, googleProvider);
+      await deleteUser(currentUser);
+    } else {
+      throw err;
+    }
+  }
 }
 
 /**

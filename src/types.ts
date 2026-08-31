@@ -33,12 +33,28 @@ export interface DailyLogData {
 export interface UserProfile {
   uid: string;
   displayName: string | null;
+  name?: string;
   email: string | null;
   photoURL: string | null;
   dateOfBirth?: string; // YYYY-MM-DD format
+  height?: number;
+  heightUnit?: 'cm' | 'in';
+  weight?: number;
+  weightUnit?: 'kg' | 'lbs';
+  onboardingCompleted?: boolean;
+  lastWeightCheckInDate?: string; // YYYY-MM-DD
   createdAt?: string;
   updatedAt?: string;
   lastLoginAt?: string;
+}
+
+export interface WeightHistoryEntry {
+  id: string;
+  userId: string;
+  weight: number;
+  unit: 'kg' | 'lbs';
+  date: string; // YYYY-MM-DD
+  createdAt: string;
 }
 
 export interface DayHistorySummary {
@@ -142,49 +158,5 @@ export interface ActiveSmartReminderNotice {
   body: string;
   incompleteHabits: HabitItem[];
   timestamp: number;
-}
-
-export interface FoodItem {
-  name: string;
-  estimatedPortion: string;
-  calories: number;
-  proteinGrams: number;
-  carbsGrams: number;
-  fatGrams: number;
-  fiberGrams: number;
-  sugarGrams?: number;
-}
-
-export interface FoodNutritionTotal {
-  calories: number;
-  proteinGrams: number;
-  carbsGrams: number;
-  fatGrams: number;
-  fiberGrams: number;
-  sugarGrams?: number;
-}
-
-export interface FoodScanResult {
-  isFood: boolean;
-  confidence: 'low' | 'medium' | 'high';
-  unidentifiedReason: string | null;
-  foods: FoodItem[];
-  total: FoodNutritionTotal;
-  suggestions: string[];
-  modelUsed?: string;
-}
-
-export interface FoodLog {
-  id: string;
-  userId: string;
-  date: string; // YYYY-MM-DD format
-  mealType?: string;
-  foods: FoodItem[];
-  total: FoodNutritionTotal;
-  source: 'ai' | 'manual';
-  confidence: 'low' | 'medium' | 'high';
-  suggestions?: string[];
-  createdAt: string;
-  updatedAt?: string;
 }
 

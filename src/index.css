@@ -5,8 +5,51 @@
 @layer base {
   html {
     color-scheme: light;
+    scroll-behavior: smooth;
   }
   html.dark {
     color-scheme: dark;
+  }
+}
+
+@keyframes subtleFloat {
+  0%, 100% {
+    transform: translateY(0px) rotateX(4deg) rotateY(-2deg);
+  }
+  50% {
+    transform: translateY(-8px) rotateX(2deg) rotateY(-1deg);
+  }
+}
+
+@keyframes softGlow {
+  0%, 100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.65;
+  }
+}
+
+.perspective-1000 {
+  perspective: 1000px;
+}
+
+.animate-subtle-float {
+  animation: subtleFloat 7s ease-in-out infinite;
+  transform-style: preserve-3d;
+}
+
+.animate-soft-glow {
+  animation: softGlow 4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .animate-subtle-float,
+  .animate-soft-glow {
+    animation: none !important;
+    transform: none !important;
   }
 }
