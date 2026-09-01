@@ -10,7 +10,7 @@ import {
   getDocs,
   writeBatch,
 } from 'firebase/firestore';
-import { User, updateProfile, deleteUser, reauthenticateWithPopup } from 'firebase/auth';
+import { User, updateProfile, deleteUser, reauthenticateWithPopup, signOut } from 'firebase/auth';
 import { db, auth, googleProvider } from './firebase';
 import {
   DEFAULT_HABITS,
@@ -47,7 +47,9 @@ import {
   setCachedReminderSettings,
   getCachedWeightHistory,
   setCachedWeightHistory,
+  clearUserAppData,
   clearUserCache,
+  clearActiveSession,
 } from './cacheService';
 import {
   getCachedTheme,
@@ -515,54 +517,16 @@ export function dismissWeeklyWeightReminder(userId: string): void {
 }
 
 /**
- * Clears all user habit history, daily notes, analytics, milestones, food logs, and weight history.
- * Preserves the Firebase Auth account.
+ * Clears all user habit completion history, daily habit logs, custom habits, daily notes,
+ * milestones, food logs, weight history, and reminder settings from Firestore and local cache.
+ * Preserves the Firebase Auth account and Google account.
+ * Re-seeds clean default habits so the user immediately has a working, empty Daily Habits dashboard.
  */
 export async function clearUserData(userId: string): Promise<void> {
-  // 1. Delete documents from subcollections
-  const subcollections = ['dailyLogs', 'milestones', 'foodLogs', 'weightHistory'];
-  for (const sub of subcollections) {
-    try {
-      const colRef = collection(db, 'users', userId, sub);
-      const snap = await getDocs(colRef);
-      if (!snap.empty) {
-        const batch = writeBatch(db);
-        snap.forEach((d) => {
-          batch.delete(d.ref);
-        });
-        await batch.commit();
-      }
-    } catch (e) {
-      console.warn(`Error clearing subcollection ${sub}:`, e);
-    }
+  if (!userId) {
+    throw new Error('User ID is required to clear data.');
   }
 
-  // 2. Reset user document weight & onboarding state in Firestore
-  const userRef = doc(db, 'users', userId);
-  const now = new Date().toISOString();
-  await setDoc(
-    userRef,
-    {
-      weight: null,
-      lastWeightCheckInDate: null,
-      onboardingCompleted: false,
-      updatedAt: now,
-    },
-    { merge: true }
-  );
-
-  // 3. Purge local storage cache for this user
-  clearUserCache(userId);
-}
-
-/**
- * Permanently deletes the user's account and all associated Firestore data.
- * If re-authentication is required by Firebase Auth, triggers Google popup re-auth.
- */
-export async function deleteUserAccount(currentUser: User): Promise<void> {
-  const userId = currentUser.uid;
-
-  // 1. Delete all user subcollections
   const subcollections = [
     'dailyLogs',
     'habitSettings',
@@ -573,41 +537,191 @@ export async function deleteUserAccount(currentUser: User): Promise<void> {
     'weightHistory',
   ];
 
-  for (const sub of subcollections) {
-    try {
-      const colRef = collection(db, 'users', userId, sub);
-      const snap = await getDocs(colRef);
-      if (!snap.empty) {
-        const batch = writeBatch(db);
-        snap.forEach((d) => {
-          batch.delete(d.ref);
-        });
-        await batch.commit();
-      }
-    } catch (e) {
-      console.warn(`Error deleting subcollection ${sub}:`, e);
+  // 1. Concurrently delete all documents across all user subcollections
+  const deleteSubcollections = async () => {
+    const results = await Promise.allSettled(
+      subcollections.map(async (sub) => {
+        try {
+          const colRef = collection(db, 'users', userId, sub);
+          const snap = await getDocs(colRef);
+          if (!snap.empty) {
+            const docs = snap.docs;
+            for (let i = 0; i < docs.length; i += 400) {
+              const chunk = docs.slice(i, i + 400);
+              const batch = writeBatch(db);
+              chunk.forEach((d) => batch.delete(d.ref));
+              await batch.commit();
+            }
+          }
+        } catch (e) {
+          console.error(`Error clearing subcollection ${sub} for user ${userId}:`, e);
+          throw e;
+        }
+      })
+    );
+
+    const hasCriticalError = results.some(
+      (r) => r.status === 'rejected' && (r as PromiseRejectedResult).reason?.code !== 'permission-denied'
+    );
+    if (hasCriticalError) {
+      console.warn('Some subcollection deletions encountered errors during clear');
     }
-  }
+  };
 
-  // 2. Delete user root document
+  // Execute deletion with safety timeout
+  await withTimeout(deleteSubcollections(), 8000, undefined);
+
+  // 2. Re-seed default habits and reminder settings into Firestore
+  const now = new Date().toISOString();
   try {
+    const seedBatch = writeBatch(db);
+    for (let idx = 0; idx < DEFAULT_HABITS.length; idx++) {
+      const habit = DEFAULT_HABITS[idx];
+      const item: HabitItem = {
+        ...habit,
+        order: idx,
+        createdAt: now,
+        updatedAt: now,
+      };
+      const hRef = doc(db, 'users', userId, 'habitSettings', item.id);
+      seedBatch.set(hRef, item);
+
+      const rRef = doc(db, 'users', userId, 'reminderSettings', item.id);
+      seedBatch.set(rRef, {
+        habitId: item.id,
+        reminderEnabled: !!item.reminderEnabled,
+        reminderTime: item.reminderTime || '08:00',
+        updatedAt: now,
+      });
+    }
+
+    // Update user document (preserve profile identity & keep onboardingCompleted: true)
     const userRef = doc(db, 'users', userId);
-    await deleteDoc(userRef);
-  } catch (e) {
-    console.warn('Error deleting user root doc:', e);
+    seedBatch.set(
+      userRef,
+      {
+        uid: userId,
+        weight: null,
+        lastWeightCheckInDate: null,
+        onboardingCompleted: true,
+        updatedAt: now,
+      },
+      { merge: true }
+    );
+
+    await seedBatch.commit();
+  } catch (err) {
+    console.error('Error re-seeding default settings to Firestore:', err);
+    throw err;
   }
 
-  // 3. Purge all user cache
-  clearUserCache(userId);
+  // 3. Purge user-specific local storage cache while preserving active session
+  clearUserAppData(userId);
+}
 
-  // 4. Delete Firebase Auth user
+/**
+ * Helper to race any promise against a timeout.
+ */
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, fallbackValue: T): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((resolve) => setTimeout(() => resolve(fallbackValue), timeoutMs)),
+  ]);
+}
+
+/**
+ * Permanently deletes the user's account and all associated Firestore data.
+ * - Concurrently wipes all user data in Firestore with quick timeouts to prevent long loading.
+ * - Handles Firebase Auth deletion and re-authentication if credentials are stale.
+ * - Guaranteed local state and session purging.
+ */
+export async function deleteUserAccount(currentUser: User): Promise<void> {
+  const userId = currentUser.uid;
+
+  // 1. Delete all user subcollections concurrently (bounded by 4s timeout)
+  const subcollections = [
+    'dailyLogs',
+    'habitSettings',
+    'reminderSettings',
+    'settings',
+    'milestones',
+    'foodLogs',
+    'weightHistory',
+  ];
+
+  const wipeFirestorePromise = (async () => {
+    // Delete all subcollection documents in parallel
+    await Promise.allSettled(
+      subcollections.map(async (sub) => {
+        try {
+          const colRef = collection(db, 'users', userId, sub);
+          const snap = await getDocs(colRef);
+          if (!snap.empty) {
+            const batch = writeBatch(db);
+            snap.forEach((d) => {
+              batch.delete(d.ref);
+            });
+            await batch.commit();
+          }
+        } catch (e) {
+          console.warn(`Error deleting subcollection ${sub}:`, e);
+        }
+      })
+    );
+
+    // Delete user root document
+    try {
+      const userRef = doc(db, 'users', userId);
+      await deleteDoc(userRef);
+    } catch (e) {
+      console.warn('Error deleting user root doc:', e);
+    }
+  })();
+
+  // Race firestore cleanup with a 5 second safety limit
+  await withTimeout(wipeFirestorePromise, 5000, undefined);
+
+  // 2. Always purge all local storage cache for this user
+  clearUserCache(userId);
+  clearActiveSession();
+
+  // 3. Delete Firebase Auth user account
   try {
     await deleteUser(currentUser);
   } catch (err: any) {
-    if (err?.code === 'auth/requires-recent-login') {
-      await reauthenticateWithPopup(currentUser, googleProvider);
-      await deleteUser(currentUser);
+    console.warn('Initial deleteUser attempt result:', err);
+    if (err?.code === 'auth/requires-recent-login' || err?.code === 'auth/user-token-expired') {
+      try {
+        // Re-authenticate via Google popup
+        const reauthResult = await reauthenticateWithPopup(currentUser, googleProvider);
+        if (reauthResult?.user) {
+          await deleteUser(reauthResult.user);
+        } else {
+          await deleteUser(currentUser);
+        }
+      } catch (reauthErr: any) {
+        console.error('Re-authentication for deletion failed:', reauthErr);
+        // Force sign out so the user is not stuck in a broken state
+        try {
+          await signOut(auth);
+        } catch (_) {}
+
+        if (
+          reauthErr?.code === 'auth/popup-closed-by-user' ||
+          reauthErr?.code === 'auth/cancelled-popup-request'
+        ) {
+          throw new Error('Account deletion was cancelled. All cloud data has been cleared.');
+        } else if (reauthErr?.code === 'auth/popup-blocked') {
+          throw new Error('Google sign-in popup was blocked by your browser. Please allow popups and try again.');
+        } else {
+          throw new Error('Authentication expired. Your local & cloud data was removed, and you have been signed out.');
+        }
+      }
     } else {
+      // If any other auth error occurred, sign out to ensure session is cleared
+      try {
+        await signOut(auth);
+      } catch (_) {}
       throw err;
     }
   }

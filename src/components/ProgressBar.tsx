@@ -10,19 +10,24 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ completed, total }) =>
   const isAllCompleted = completed === total && total > 0;
 
   return (
-    <section id="today-progress-section" className="py-1">
-      <div className="flex items-baseline justify-between mb-1.5">
-        <span id="progress-text" className="text-sm sm:text-base font-medium text-zinc-900 dark:text-zinc-100">
-          <span className="font-semibold text-zinc-950 dark:text-white">{completed}</span> / {total} completed
-        </span>
-        <span id="progress-percentage" className="text-xs font-mono text-zinc-500 dark:text-zinc-400">
+    <section id="today-progress-section" className="p-3.5 sm:p-4 rounded-xl glass-card space-y-2">
+      <div className="flex items-baseline justify-between">
+        <div className="flex items-center gap-2">
+          <span id="progress-text" className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+            Daily Progress
+          </span>
+          <span className="text-xs font-mono text-zinc-500 dark:text-zinc-400">
+            (<span className="font-bold text-zinc-900 dark:text-zinc-100">{completed}</span> of {total} completed)
+          </span>
+        </div>
+        <span id="progress-percentage" className="text-xs font-mono font-bold text-zinc-900 dark:text-zinc-100 bg-zinc-200/50 dark:bg-zinc-800/60 px-2 py-0.5 rounded-full border border-zinc-300/40 dark:border-white/10">
           {percentage}%
         </span>
       </div>
 
       <div
         id="progress-bar-track"
-        className="w-full h-2.5 bg-zinc-100 dark:bg-zinc-800 rounded-full border border-zinc-200/80 dark:border-zinc-700/80 overflow-hidden"
+        className="w-full h-2.5 bg-zinc-200/60 dark:bg-zinc-800/80 rounded-full border border-zinc-300/40 dark:border-white/5 overflow-hidden p-0.5"
         role="progressbar"
         aria-valuenow={completed}
         aria-valuemin={0}
@@ -30,8 +35,10 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ completed, total }) =>
       >
         <div
           id="progress-bar-fill"
-          className={`h-full transition-all duration-200 ease-out ${
-            isAllCompleted ? 'bg-emerald-600 dark:bg-emerald-500' : 'bg-zinc-800 dark:bg-zinc-200'
+          className={`h-full rounded-full transition-all duration-300 ease-out ${
+            isAllCompleted
+              ? 'bg-emerald-500 shadow-sm shadow-emerald-500/50'
+              : 'bg-zinc-900 dark:bg-zinc-100 shadow-sm'
           }`}
           style={{ width: `${percentage}%` }}
         />

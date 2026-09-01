@@ -14,28 +14,34 @@ export const LoginView: React.FC<LoginViewProps> = ({
   error,
 }) => {
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex items-center justify-center p-4 sm:p-6 transition-colors">
-      <div className="w-full max-w-md bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 sm:p-8 shadow-xs">
+    <div className="min-h-screen bg-zinc-50/70 dark:bg-zinc-950/80 flex items-center justify-center p-4 sm:p-6 transition-colors relative overflow-hidden">
+      {/* Ambient background glows */}
+      <div
+        aria-hidden="true"
+        className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 sm:w-96 h-80 sm:h-96 rounded-full bg-gradient-to-tr from-emerald-500/10 via-cyan-500/10 to-indigo-500/10 blur-3xl pointer-events-none -z-10"
+      />
+
+      <div className="w-full max-w-md glass-card rounded-2xl p-6 sm:p-8 shadow-2xl relative z-10 transition-all">
         {/* Header */}
         <div className="mb-6">
-          <h1 id="login-app-title" className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
+          <h1 id="login-app-title" className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
             Daily Habits
           </h1>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
+          <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1.5">
             A simple personal daily checklist to track and manage your daily routines.
           </p>
         </div>
 
         {/* Preview of habits */}
-        <div className="bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200/80 dark:border-zinc-700/80 rounded-lg p-3.5 mb-6">
-          <div className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-2.5">
+        <div className="bg-white/40 dark:bg-zinc-900/40 border border-zinc-200/60 dark:border-white/5 rounded-xl p-4 mb-6 backdrop-blur-xs">
+          <div className="text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-3">
             Default Daily Routines
           </div>
-          <div className="grid grid-cols-2 gap-y-2 gap-x-2 text-xs text-zinc-700 dark:text-zinc-300 font-mono">
+          <div className="grid grid-cols-2 gap-y-2.5 gap-x-2 text-xs text-zinc-700 dark:text-zinc-300 font-mono">
             {DEFAULT_HABITS.map((h, i) => (
               <div key={h.id} className="flex items-center gap-1.5 truncate">
                 <span className="text-zinc-400 dark:text-zinc-500">{i + 1}.</span>
-                {h.icon && <HabitIcon name={h.icon} className="w-3 h-3 text-zinc-400 dark:text-zinc-500 shrink-0" />}
+                {h.icon && <HabitIcon name={h.icon} className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500 shrink-0" />}
                 <span className="truncate">{h.name}</span>
               </div>
             ))}
@@ -46,14 +52,14 @@ export const LoginView: React.FC<LoginViewProps> = ({
         {error && (
           <div
             id="auth-error-banner"
-            className="mb-4 p-3.5 rounded-lg bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-xs text-red-800 dark:text-red-300 space-y-2"
+            className="mb-4 p-3.5 rounded-xl bg-red-500/10 dark:bg-red-500/15 border border-red-500/30 text-xs text-red-800 dark:text-red-300 space-y-2 backdrop-blur-xs"
           >
             <div className="font-medium flex items-start gap-2">
               <span className="text-red-600 dark:text-red-400 font-bold shrink-0">⚠️</span>
               <span className="leading-relaxed">{error}</span>
             </div>
             {typeof window !== 'undefined' && error.includes('Authorized domains') && (
-              <div className="pt-1 flex items-center justify-between gap-2 bg-white/70 dark:bg-zinc-800/80 p-2 rounded border border-red-200/60 dark:border-red-800/60">
+              <div className="pt-1 flex items-center justify-between gap-2 bg-white/70 dark:bg-zinc-800/80 p-2 rounded-lg border border-red-200/60 dark:border-red-800/60">
                 <code className="text-[11px] font-mono text-zinc-800 dark:text-zinc-200 truncate select-all">
                   {window.location.hostname}
                 </code>
@@ -77,7 +83,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
           type="button"
           disabled={isLoading}
           onClick={onSignInWithGoogle}
-          className="w-full flex items-center justify-center gap-3 py-2.5 px-4 bg-zinc-900 dark:bg-zinc-100 hover:bg-zinc-800 dark:hover:bg-zinc-200 active:bg-zinc-950 dark:active:bg-zinc-300 text-white dark:text-zinc-900 text-sm font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+          className="w-full flex items-center justify-center gap-3 py-3 px-4 bg-zinc-900 dark:bg-zinc-100 hover:bg-black dark:hover:bg-white active:scale-98 text-white dark:text-zinc-900 text-sm font-semibold rounded-xl transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
         >
           {isLoading ? (
             <span className="flex items-center gap-2">

@@ -37,17 +37,17 @@ export const ReminderToast: React.FC<ReminderToastProps> = ({
         <div
           key={id}
           id={`smart-reminder-toast-${id}`}
-          className="pointer-events-auto bg-zinc-900 text-white p-3.5 rounded-xl shadow-2xl border border-zinc-800 flex items-start justify-between gap-3 animate-slideUp"
+          className="pointer-events-auto bg-zinc-950/85 backdrop-blur-md text-white p-4 rounded-2xl shadow-2xl border border-white/15 flex items-start justify-between gap-3 animate-slideUp"
           role="alert"
         >
           <div className="flex items-start gap-3 min-w-0 flex-1">
-            <div className="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-300 flex items-center justify-center text-sm shrink-0 border border-amber-500/30">
+            <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-300 flex items-center justify-center text-sm shrink-0 border border-amber-500/30 shadow-xs">
               <Bell className="w-4 h-4" />
             </div>
 
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5">
-                <span className="text-[11px] font-semibold tracking-wider uppercase text-amber-400">
+                <span className="text-[11px] font-bold tracking-wider uppercase text-amber-400">
                   Smart Reminder
                 </span>
               </div>
@@ -60,14 +60,14 @@ export const ReminderToast: React.FC<ReminderToastProps> = ({
                   {incompleteHabits.slice(0, 4).map((h) => (
                     <span
                       key={h.id}
-                      className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md bg-zinc-800 text-zinc-300 border border-zinc-700 font-mono"
+                      className="inline-flex items-center gap-1 text-[11px] px-2.5 py-0.5 rounded-full bg-white/10 text-zinc-200 border border-white/10 font-mono"
                     >
-                      <HabitIcon name={h.icon} className="w-3 h-3 text-zinc-400" />
+                      <HabitIcon name={h.icon} className="w-3 h-3 text-zinc-300" />
                       {h.name}
                     </span>
                   ))}
                   {incompleteHabits.length > 4 && (
-                    <span className="text-[11px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 font-mono">
+                    <span className="text-[11px] px-2 py-0.5 rounded-full bg-white/10 text-zinc-300 font-mono">
                       +{incompleteHabits.length - 4} more
                     </span>
                   )}
@@ -75,7 +75,7 @@ export const ReminderToast: React.FC<ReminderToastProps> = ({
               )}
 
               {/* Quick action buttons */}
-              <div className="flex items-center gap-2 mt-2.5 pt-2 border-t border-zinc-800">
+              <div className="flex items-center gap-2 mt-2.5 pt-2 border-t border-white/10">
                 {incompleteHabits.length === 1 && (
                   <button
                     type="button"
@@ -84,7 +84,7 @@ export const ReminderToast: React.FC<ReminderToastProps> = ({
                       onCompleteHabit(incompleteHabits[0].id);
                       if (onDismissSmart) onDismissSmart(id);
                     }}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-zinc-100 text-zinc-950 text-xs font-semibold rounded-md transition-colors cursor-pointer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1 bg-white hover:bg-zinc-100 text-zinc-950 text-xs font-semibold rounded-lg transition-all active:scale-95 cursor-pointer shadow-sm"
                   >
                     <Check className="w-3 h-3 stroke-[3]" />
                     <span>Mark {incompleteHabits[0].name} Done</span>
@@ -106,7 +106,7 @@ export const ReminderToast: React.FC<ReminderToastProps> = ({
             type="button"
             id={`dismiss-smart-toast-btn-${id}`}
             onClick={() => onDismissSmart ? onDismissSmart(id) : onDismiss(id)}
-            className="text-zinc-500 hover:text-zinc-300 p-1 rounded transition-colors shrink-0"
+            className="text-zinc-400 hover:text-zinc-200 p-1.5 rounded-lg hover:bg-white/10 transition-colors shrink-0"
             title="Dismiss notification"
           >
             <X className="w-4 h-4" />
@@ -121,13 +121,13 @@ export const ReminderToast: React.FC<ReminderToastProps> = ({
           <div
             key={id}
             id={`reminder-toast-${habit.id}`}
-            className="pointer-events-auto bg-zinc-900 text-white p-3.5 rounded-xl shadow-2xl border border-zinc-800 flex items-start justify-between gap-3 animate-slideUp"
+            className="pointer-events-auto bg-zinc-950/85 backdrop-blur-md text-white p-4 rounded-2xl shadow-2xl border border-white/15 flex items-start justify-between gap-3 animate-slideUp"
             role="alert"
           >
             <div className="flex items-start gap-3 min-w-0 flex-1">
-              <div className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center text-sm shrink-0 border border-zinc-700">
+              <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center text-sm shrink-0 border border-white/10 shadow-xs">
                 {habit.icon ? (
-                  <HabitIcon name={habit.icon} className="w-4 h-4 text-zinc-200" />
+                  <HabitIcon name={habit.icon} className="w-4 h-4 text-zinc-100" />
                 ) : (
                   <span>{emoji}</span>
                 )}
@@ -135,7 +135,7 @@ export const ReminderToast: React.FC<ReminderToastProps> = ({
 
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-[11px] font-semibold tracking-wider uppercase text-zinc-400">
+                  <span className="text-[11px] font-bold tracking-wider uppercase text-zinc-400">
                     Habit Reminder
                   </span>
                 </div>
@@ -149,7 +149,7 @@ export const ReminderToast: React.FC<ReminderToastProps> = ({
                 )}
 
                 {/* Quick actions */}
-                <div className="flex items-center gap-2 mt-2 pt-1 border-t border-zinc-800">
+                <div className="flex items-center gap-2 mt-2.5 pt-2 border-t border-white/10">
                   <button
                     type="button"
                     id={`toast-mark-done-${habit.id}`}
@@ -157,7 +157,7 @@ export const ReminderToast: React.FC<ReminderToastProps> = ({
                       onCompleteHabit(habit.id);
                       onDismiss(id);
                     }}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-zinc-100 text-zinc-950 text-xs font-semibold rounded-md transition-colors cursor-pointer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1 bg-white hover:bg-zinc-100 text-zinc-950 text-xs font-semibold rounded-lg transition-all active:scale-95 cursor-pointer shadow-sm"
                   >
                     <Check className="w-3 h-3 stroke-[3]" />
                     <span>Mark Done</span>
@@ -177,7 +177,7 @@ export const ReminderToast: React.FC<ReminderToastProps> = ({
               type="button"
               id={`dismiss-toast-btn-${habit.id}`}
               onClick={() => onDismiss(id)}
-              className="text-zinc-500 hover:text-zinc-300 p-1 rounded transition-colors shrink-0"
+              className="text-zinc-400 hover:text-zinc-200 p-1.5 rounded-lg hover:bg-white/10 transition-colors shrink-0"
               title="Dismiss notification"
             >
               <X className="w-4 h-4" />

@@ -69,7 +69,7 @@ export const DailyNote: React.FC<DailyNoteProps> = ({
   return (
     <section
       id="daily-note-section"
-      className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3.5 sm:p-4 shadow-2xs space-y-2.5 transition-colors"
+      className="glass-card rounded-xl p-3.5 sm:p-4 space-y-2.5 transition-all duration-200"
       aria-labelledby="daily-note-heading"
     >
       {/* Header */}
@@ -107,7 +107,7 @@ export const DailyNote: React.FC<DailyNoteProps> = ({
           placeholder="How was your day? Write a brief note about your thoughts, achievements, or routine..."
           rows={3}
           maxLength={MAX_CHAR_LIMIT}
-          className="w-full p-2.5 sm:p-3 text-xs text-zinc-800 dark:text-zinc-200 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700/80 rounded-lg focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-zinc-100 focus:bg-white dark:focus:bg-zinc-800 resize-none transition-colors placeholder:text-zinc-400 dark:placeholder:text-zinc-500 leading-relaxed font-sans"
+          className="w-full p-3 text-xs text-zinc-800 dark:text-zinc-200 glass-input rounded-xl focus:outline-none focus:ring-2 focus:ring-zinc-900/10 dark:focus:ring-white/10 resize-none transition-all placeholder:text-zinc-400 dark:placeholder:text-zinc-500 leading-relaxed font-sans"
         />
       </div>
 
@@ -116,7 +116,7 @@ export const DailyNote: React.FC<DailyNoteProps> = ({
         {/* Left: Clear or Confirmation or Status Feedback */}
         <div className="flex items-center gap-2 min-h-6">
           {isConfirmingClear ? (
-            <div className="flex items-center gap-2 text-xs bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800/60 px-2.5 py-1 rounded-md text-red-700 dark:text-red-300">
+            <div className="flex items-center gap-2 text-xs bg-red-500/10 dark:bg-red-500/15 border border-red-500/30 px-2.5 py-1 rounded-lg text-red-700 dark:text-red-300 backdrop-blur-xs">
               <span>Clear note?</span>
               <button
                 id="confirm-clear-note-btn"
@@ -153,7 +153,7 @@ export const DailyNote: React.FC<DailyNoteProps> = ({
           {saveSuccess && !isConfirmingClear && (
             <span
               id="daily-note-saved-badge"
-              className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-200/60 dark:border-emerald-800/60"
+              className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-500/15 dark:bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/30 backdrop-blur-xs"
             >
               <Check className="w-3 h-3" />
               Saved
@@ -167,7 +167,7 @@ export const DailyNote: React.FC<DailyNoteProps> = ({
           type="button"
           onClick={handleSave}
           disabled={isSavingLocal || isSaving || (!hasChanges && !saveSuccess)}
-          className="px-3.5 py-1.5 bg-zinc-900 hover:bg-black dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 text-xs font-medium rounded-lg transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-1.5 shadow-2xs"
+          className="px-3.5 py-1.5 bg-zinc-900 hover:bg-black dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 text-xs font-semibold rounded-lg transition-all active:scale-95 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-1.5 shadow-sm"
         >
           {isSavingLocal || isSaving ? (
             <>

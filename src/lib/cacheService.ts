@@ -205,6 +205,57 @@ export function setCachedWeightHistory(userId: string, entries: WeightHistoryEnt
 }
 
 /**
+ * Clears user habit records, logs, history, milestones, reminders, weight, and notes from cache
+ * while preserving the user's active session and basic profile state.
+ */
+export function clearUserAppData(userId: string): void {
+  if (!userId) return;
+  try {
+    localStorage.removeItem(`${PREFIX}history_${userId}`);
+    localStorage.removeItem(`${PREFIX}milestones_${userId}`);
+    localStorage.removeItem(`${PREFIX}weight_${userId}`);
+    localStorage.removeItem(`dh_food_logs_${userId}`);
+    localStorage.removeItem(`dh_weight_prompt_dismissed_until_${userId}`);
+
+    // Remove all cached date logs and user-specific entries
+    const toRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (
+        key &&
+        (key.startsWith(`${PREFIX}log_${userId}_`) ||
+          key.startsWith(`dh_weight_prompt_dismissed_until_${userId}`) ||
+          key.startsWith(`dh_food_logs_${userId}`))
+      ) {
+        toRemove.push(key);
+      }
+    }
+    toRemove.forEach((k) => localStorage.removeItem(k));
+
+    // Reset habits to default habits
+    const defaultHabits = DEFAULT_HABITS.map((h, idx) => ({ ...h, order: idx }));
+    localStorage.setItem(`${PREFIX}habits_${userId}`, JSON.stringify(defaultHabits));
+
+    // Reset reminders to default settings
+    localStorage.setItem(`${PREFIX}reminders_${userId}`, JSON.stringify(DEFAULT_REMINDER_SETTINGS));
+
+    // Update cached profile to clear weight & preserve onboarding completed
+    const cachedUser = getCachedUserProfile(userId);
+    if (cachedUser) {
+      const cleanedProfile: UserProfile = {
+        ...cachedUser,
+        weight: undefined,
+        lastWeightCheckInDate: undefined,
+        onboardingCompleted: true,
+      };
+      localStorage.setItem(`${PREFIX}user_${userId}`, JSON.stringify(cleanedProfile));
+    }
+  } catch (e) {
+    console.warn(`Cache clear error (app data for ${userId}):`, e);
+  }
+}
+
+/**
  * Completely purges all stored cache for a specific user.
  */
 export function clearUserCache(userId: string): void {

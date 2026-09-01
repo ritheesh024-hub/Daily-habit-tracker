@@ -34,25 +34,25 @@ export const StreakStatsCard: React.FC<StreakStatsCardProps> = ({ stats }) => {
             initial={{ opacity: 0, y: -8, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -6, scale: 0.98 }}
-            transition={{ duration: 0.35, ease: 'easeOut' }}
-            className="flex items-center justify-between px-3.5 py-2 rounded-lg bg-amber-50/90 border border-amber-200/90 text-amber-900 shadow-2xs"
+            transition={{ duration: 0.3, ease: 'easeOut' }}
+            className="flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-amber-500/15 dark:bg-amber-500/10 backdrop-blur-md border border-amber-500/30 text-amber-950 dark:text-amber-200 shadow-sm"
           >
             <div className="flex items-center gap-2">
-              <span className="flex items-center justify-center w-5 h-5 rounded-full bg-amber-200 text-amber-800 shrink-0">
+              <span className="flex items-center justify-center w-5 h-5 rounded-full bg-amber-400/30 text-amber-900 dark:text-amber-200 shrink-0">
                 <Sparkles className="w-3.5 h-3.5 animate-spin-slow" />
               </span>
               <span className="text-xs font-semibold tracking-tight">
                 Milestone Reached! New Best Streak ({stats.bestStreak} {stats.bestStreak === 1 ? 'day' : 'days'})
               </span>
             </div>
-            <span className="text-[11px] font-medium text-amber-700 bg-amber-100/80 px-2 py-0.5 rounded-full border border-amber-200">
+            <span className="text-[11px] font-medium text-amber-800 dark:text-amber-300 bg-amber-400/20 px-2 py-0.5 rounded-full border border-amber-500/30">
               Personal Record 🎉
             </span>
           </motion.div>
         )}
       </AnimatePresence>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
         {/* Current Streak */}
         <motion.div
           id="current-streak-card"
@@ -61,11 +61,11 @@ export const StreakStatsCard: React.FC<StreakStatsCardProps> = ({ stats }) => {
               ? { scale: [1, 1.01, 1] }
               : {}
           }
-          transition={{ duration: 0.4 }}
-          className={`p-3 sm:p-3.5 bg-white dark:bg-zinc-900 border rounded-lg shadow-2xs flex flex-col justify-between transition-colors relative overflow-hidden ${
+          transition={{ duration: 0.35 }}
+          className={`p-3.5 sm:p-4 rounded-xl glass-card flex flex-col justify-between transition-all duration-200 relative overflow-hidden group ${
             isCurrentAllTimeBest && stats.currentStreak > 1
-              ? 'border-amber-200/90 dark:border-amber-700/60 bg-gradient-to-b from-amber-50/30 dark:from-amber-950/20 to-white dark:to-zinc-900'
-              : 'border-zinc-200 dark:border-zinc-800'
+              ? 'border-amber-500/40 dark:border-amber-500/30 bg-amber-500/5 dark:bg-amber-500/5'
+              : ''
           }`}
         >
           <div className="flex items-center justify-between">
@@ -75,7 +75,7 @@ export const StreakStatsCard: React.FC<StreakStatsCardProps> = ({ stats }) => {
             {isCurrentAllTimeBest && stats.currentStreak > 1 && (
               <span
                 id="active-record-pill"
-                className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700 dark:text-amber-300 bg-amber-100/70 dark:bg-amber-950/50 border border-amber-200/80 dark:border-amber-800/70 px-1.5 py-0.5 rounded-full"
+                className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700 dark:text-amber-300 bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 rounded-full backdrop-blur-xs"
                 title="Current streak is matching or setting your all-time best record"
               >
                 <Flame className="w-2.5 h-2.5 text-amber-600 dark:text-amber-400" />
@@ -83,9 +83,9 @@ export const StreakStatsCard: React.FC<StreakStatsCardProps> = ({ stats }) => {
               </span>
             )}
           </div>
-          <div className="mt-1 flex items-baseline gap-1.5">
-            <span className="text-base" role="img" aria-label="fire">🔥</span>
-            <span id="current-streak-value" className="text-lg sm:text-xl font-bold text-zinc-900 dark:text-zinc-100 font-mono">
+          <div className="mt-2 flex items-baseline gap-2">
+            <span className="text-xl sm:text-2xl" role="img" aria-label="fire">🔥</span>
+            <span id="current-streak-value" className="text-xl sm:text-2xl font-bold text-zinc-900 dark:text-zinc-100 font-mono tracking-tight">
               {stats.currentStreak}
             </span>
             <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
@@ -105,11 +105,11 @@ export const StreakStatsCard: React.FC<StreakStatsCardProps> = ({ stats }) => {
                 }
               : {}
           }
-          transition={{ duration: 0.5 }}
-          className={`p-3 sm:p-3.5 bg-white dark:bg-zinc-900 border rounded-lg shadow-2xs flex flex-col justify-between transition-all relative overflow-hidden ${
+          transition={{ duration: 0.4 }}
+          className={`p-3.5 sm:p-4 rounded-xl glass-card flex flex-col justify-between transition-all duration-200 relative overflow-hidden group ${
             showCelebration
-              ? 'border-amber-300 dark:border-amber-600 ring-2 ring-amber-100 dark:ring-amber-900/50 bg-amber-50/20 dark:bg-amber-950/30'
-              : 'border-zinc-200 dark:border-zinc-800'
+              ? 'border-amber-400 dark:border-amber-500/60 ring-2 ring-amber-500/20 bg-amber-500/10'
+              : ''
           }`}
         >
           <div className="flex items-center justify-between">
@@ -119,15 +119,15 @@ export const StreakStatsCard: React.FC<StreakStatsCardProps> = ({ stats }) => {
             {stats.bestStreak > 0 && (
               <span
                 id="best-streak-badge"
-                className="inline-flex items-center gap-1 text-[10px] font-medium text-zinc-600 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 px-1.5 py-0.5 rounded-full"
+                className="inline-flex items-center gap-1 text-[10px] font-medium text-zinc-700 dark:text-zinc-300 bg-zinc-200/60 dark:bg-zinc-800/80 border border-zinc-300/60 dark:border-white/10 px-2 py-0.5 rounded-full backdrop-blur-xs"
               >
-                <Trophy className="w-2.5 h-2.5 text-amber-600 dark:text-amber-400" />
+                <Trophy className="w-2.5 h-2.5 text-amber-500 dark:text-amber-400" />
                 <span>Record</span>
               </span>
             )}
           </div>
-          <div className="mt-1 flex items-baseline gap-1.5">
-            <span id="best-streak-value" className="text-lg sm:text-xl font-bold text-zinc-900 dark:text-zinc-100 font-mono">
+          <div className="mt-2 flex items-baseline gap-2">
+            <span id="best-streak-value" className="text-xl sm:text-2xl font-bold text-zinc-900 dark:text-zinc-100 font-mono tracking-tight">
               {stats.bestStreak}
             </span>
             <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">

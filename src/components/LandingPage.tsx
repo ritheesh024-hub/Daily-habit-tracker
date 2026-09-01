@@ -35,7 +35,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       {/* 1. Header / Navigation */}
       <header
         id="landing-header"
-        className="sticky top-0 z-50 bg-zinc-50/85 dark:bg-zinc-950/85 backdrop-blur-md border-b border-zinc-200/80 dark:border-zinc-800/80 transition-colors"
+        className="sticky top-0 z-50 glass-surface border-b border-zinc-200/70 dark:border-white/10 transition-colors shadow-xs"
       >
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 sm:h-16 flex items-center justify-between gap-4">
           {/* Logo & Brand */}
@@ -112,7 +112,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               type="button"
               onClick={onGetStarted}
               disabled={isLoading}
-              className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs sm:text-sm font-medium text-white dark:text-zinc-900 bg-zinc-900 dark:bg-zinc-100 hover:bg-black dark:hover:bg-white rounded-lg transition-all shadow-2xs cursor-pointer"
+              className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs sm:text-sm font-medium text-white dark:text-zinc-900 bg-zinc-900 dark:bg-zinc-100 hover:bg-black dark:hover:bg-white rounded-xl transition-all shadow-2xs active:scale-95 cursor-pointer"
             >
               <span>Get Started</span>
               <ArrowRight className="w-3.5 h-3.5" />
@@ -220,79 +220,79 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
           {/* 3. Hero Visual & Subtle 3D Floating Dashboard Preview */}
           <div className="mt-10 sm:mt-14 w-full max-w-xl perspective-1000">
-            <div className="animate-subtle-float relative bg-white dark:bg-zinc-900 border border-zinc-200/90 dark:border-zinc-800 rounded-2xl p-4 sm:p-5 shadow-2xl transition-all text-left">
+            <div className="animate-subtle-float relative glass-card rounded-2xl p-4 sm:p-6 shadow-2xl transition-all text-left">
               {/* Top Bar of Floating Preview */}
-              <div className="flex items-center justify-between pb-3 border-b border-zinc-100 dark:border-zinc-800/80 text-xs">
-                <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-full bg-zinc-900 dark:bg-zinc-800 flex items-center justify-center text-white">
-                    <Check className="w-3.5 h-3.5" />
+              <div className="flex items-center justify-between pb-3.5 border-b border-zinc-200/70 dark:border-white/10 text-xs">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-7 h-7 rounded-xl bg-zinc-900 dark:bg-zinc-100 flex items-center justify-center text-white dark:text-zinc-900 shadow-xs">
+                    <Check className="w-4 h-4 stroke-[3]" />
                   </div>
                   <div>
-                    <span className="font-semibold text-zinc-900 dark:text-zinc-100 text-xs">Today's Habits</span>
-                    <span className="text-[10px] text-zinc-400 block">4 of 5 completed</span>
+                    <span className="font-bold text-zinc-900 dark:text-zinc-100 text-xs tracking-tight">Today's Habits</span>
+                    <span className="text-[10px] text-zinc-500 dark:text-zinc-400 block font-mono">4 of 5 completed</span>
                   </div>
                 </div>
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 dark:bg-amber-950/40 border border-amber-200/70 dark:border-amber-900/60 text-amber-700 dark:text-amber-400 text-[11px] font-semibold">
-                  <Flame className="w-3 h-3 text-amber-500 fill-amber-500" />
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-[11px] font-bold shadow-2xs">
+                  <Flame className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
                   <span>5-Day Streak</span>
                 </div>
               </div>
 
               {/* Progress Bar in Preview */}
-              <div className="mt-3.5 bg-zinc-50 dark:bg-zinc-800/60 p-2.5 rounded-xl border border-zinc-100 dark:border-zinc-800">
-                <div className="flex items-center justify-between text-[11px] font-medium text-zinc-600 dark:text-zinc-400 mb-1.5">
+              <div className="mt-3.5 bg-zinc-100/60 dark:bg-zinc-800/40 p-3 rounded-xl border border-zinc-200/60 dark:border-white/5 backdrop-blur-xs">
+                <div className="flex items-center justify-between text-[11px] font-semibold text-zinc-600 dark:text-zinc-400 mb-1.5">
                   <span>Daily Completion</span>
-                  <span className="font-mono font-semibold text-zinc-900 dark:text-zinc-100">80%</span>
+                  <span className="font-mono font-bold text-zinc-900 dark:text-zinc-100">80%</span>
                 </div>
-                <div className="w-full h-2 bg-zinc-200 dark:bg-zinc-700 rounded-full overflow-hidden">
-                  <div className="h-full bg-emerald-500 rounded-full w-[80%] transition-all" />
+                <div className="w-full h-2 bg-zinc-200/80 dark:bg-zinc-700/80 rounded-full overflow-hidden p-0.5 border border-zinc-300/30 dark:border-white/5">
+                  <div className="h-full bg-emerald-500 rounded-full w-[80%] transition-all shadow-xs" />
                 </div>
               </div>
 
               {/* Realistic Habit Items List */}
-              <div className="mt-3 space-y-1.5">
-                <div className="flex items-center justify-between p-2 rounded-lg bg-zinc-50/80 dark:bg-zinc-800/40 border border-zinc-100 dark:border-zinc-800/80">
-                  <div className="flex items-center gap-2 text-xs text-zinc-800 dark:text-zinc-200">
-                    <div className="w-4 h-4 rounded bg-emerald-500 text-white flex items-center justify-center">
-                      <Check className="w-3 h-3" />
+              <div className="mt-3.5 space-y-2">
+                <div className="flex items-center justify-between p-2.5 rounded-xl glass-tile border-zinc-200/60 dark:border-white/5">
+                  <div className="flex items-center gap-2.5 text-xs text-zinc-800 dark:text-zinc-200">
+                    <div className="w-4 h-4 rounded-md bg-emerald-500 text-white flex items-center justify-center shadow-xs">
+                      <Check className="w-3 h-3 stroke-[3]" />
                     </div>
-                    <span className="line-through text-zinc-400 dark:text-zinc-500">Drink 2.5L Water</span>
+                    <span className="line-through text-zinc-400 dark:text-zinc-500 font-medium">Drink 2.5L Water</span>
                   </div>
-                  <span className="text-[10px] text-zinc-400 font-mono">08:30 AM</span>
+                  <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono">08:30 AM</span>
                 </div>
 
-                <div className="flex items-center justify-between p-2 rounded-lg bg-zinc-50/80 dark:bg-zinc-800/40 border border-zinc-100 dark:border-zinc-800/80">
-                  <div className="flex items-center gap-2 text-xs text-zinc-800 dark:text-zinc-200">
-                    <div className="w-4 h-4 rounded bg-emerald-500 text-white flex items-center justify-center">
-                      <Check className="w-3 h-3" />
+                <div className="flex items-center justify-between p-2.5 rounded-xl glass-tile border-zinc-200/60 dark:border-white/5">
+                  <div className="flex items-center gap-2.5 text-xs text-zinc-800 dark:text-zinc-200">
+                    <div className="w-4 h-4 rounded-md bg-emerald-500 text-white flex items-center justify-center shadow-xs">
+                      <Check className="w-3 h-3 stroke-[3]" />
                     </div>
-                    <span className="line-through text-zinc-400 dark:text-zinc-500">Morning Workout</span>
+                    <span className="line-through text-zinc-400 dark:text-zinc-500 font-medium">Morning Workout</span>
                   </div>
-                  <span className="text-[10px] text-zinc-400 font-mono">09:15 AM</span>
+                  <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono">09:15 AM</span>
                 </div>
 
-                <div className="flex items-center justify-between p-2 rounded-lg bg-zinc-50/80 dark:bg-zinc-800/40 border border-zinc-100 dark:border-zinc-800/80">
-                  <div className="flex items-center gap-2 text-xs text-zinc-800 dark:text-zinc-200">
-                    <div className="w-4 h-4 rounded bg-emerald-500 text-white flex items-center justify-center">
-                      <Check className="w-3 h-3" />
+                <div className="flex items-center justify-between p-2.5 rounded-xl glass-tile border-zinc-200/60 dark:border-white/5">
+                  <div className="flex items-center gap-2.5 text-xs text-zinc-800 dark:text-zinc-200">
+                    <div className="w-4 h-4 rounded-md bg-emerald-500 text-white flex items-center justify-center shadow-xs">
+                      <Check className="w-3 h-3 stroke-[3]" />
                     </div>
-                    <span className="line-through text-zinc-400 dark:text-zinc-500">Read 20 Pages</span>
+                    <span className="line-through text-zinc-400 dark:text-zinc-500 font-medium">Read 20 Pages</span>
                   </div>
-                  <span className="text-[10px] text-zinc-400 font-mono">01:45 PM</span>
+                  <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono">01:45 PM</span>
                 </div>
 
-                <div className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-zinc-800/90 border border-zinc-200 dark:border-zinc-700 shadow-2xs">
-                  <div className="flex items-center gap-2 text-xs font-medium text-zinc-900 dark:text-zinc-100">
-                    <div className="w-4 h-4 rounded border border-zinc-300 dark:border-zinc-600 flex items-center justify-center" />
+                <div className="flex items-center justify-between p-2.5 rounded-xl glass-card border-zinc-300/80 dark:border-white/15 shadow-sm">
+                  <div className="flex items-center gap-2.5 text-xs font-semibold text-zinc-900 dark:text-zinc-100">
+                    <div className="w-4 h-4 rounded-md border border-zinc-300 dark:border-zinc-600 bg-white/80 dark:bg-zinc-800/80 flex items-center justify-center" />
                     <span>Evening Mindfulness (10 mins)</span>
                   </div>
-                  <span className="text-[10px] font-medium text-amber-600 dark:text-amber-400">Pending</span>
+                  <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider font-mono">Pending</span>
                 </div>
               </div>
 
               {/* Floating Context Badges */}
-              <div className="absolute -top-3 -right-2 sm:-right-4 px-2.5 py-1 rounded-full bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-[10px] font-semibold shadow-lg flex items-center gap-1">
-                <Sparkles className="w-3 h-3 text-amber-400 dark:text-amber-600" />
+              <div className="absolute -top-3 -right-2 sm:-right-4 px-3 py-1 rounded-full bg-zinc-950/90 dark:bg-zinc-100/95 backdrop-blur-md text-white dark:text-zinc-950 text-[10px] font-bold shadow-xl border border-white/20 dark:border-zinc-900/10 flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-amber-400 dark:text-amber-600" />
                 <span>Instant Cloud Sync</span>
               </div>
             </div>
@@ -301,7 +301,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       </section>
 
       {/* 4. Section: Why Daily Habits */}
-      <section id="why" className="py-12 sm:py-16 px-4 sm:px-6 border-t border-zinc-200 dark:border-zinc-850 bg-white/50 dark:bg-zinc-900/30">
+      <section id="why" className="py-12 sm:py-16 px-4 sm:px-6 border-t border-zinc-200/70 dark:border-white/10 bg-zinc-100/30 dark:bg-zinc-900/20">
         <div className="max-w-5xl mx-auto">
           <div className="text-center max-w-2xl mx-auto mb-10 sm:mb-12">
             <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
@@ -314,11 +314,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
             {/* Card 1: Track */}
-            <div className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-2xs hover:border-zinc-300 dark:hover:border-zinc-700 transition-all">
-              <div className="w-10 h-10 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 flex items-center justify-center mb-4">
+            <div className="p-5 sm:p-6 rounded-2xl glass-card shadow-lg hover:border-zinc-400/50 dark:hover:border-white/20 transition-all">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 flex items-center justify-center mb-4 shadow-xs">
                 <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
               </div>
-              <h3 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">
+              <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
                 Track
               </h3>
               <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 mt-2 leading-relaxed">
@@ -327,28 +327,28 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             </div>
 
             {/* Card 2: Improve */}
-            <div className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-2xs hover:border-zinc-300 dark:hover:border-zinc-700 transition-all">
-              <div className="w-10 h-10 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 flex items-center justify-center mb-4">
+            <div className="p-5 sm:p-6 rounded-2xl glass-card shadow-lg hover:border-zinc-400/50 dark:hover:border-white/20 transition-all">
+              <div className="w-10 h-10 rounded-xl bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30 flex items-center justify-center mb-4 shadow-xs">
                 <TrendingUp className="w-5 h-5 text-blue-600 dark:text-blue-400" />
               </div>
-              <h3 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">
+              <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
                 Improve
               </h3>
               <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 mt-2 leading-relaxed">
-                Understand your routine, log daily reflections, and identify trends in your weekly consistency and nutrition.
+                Understand your routine, log daily reflections, and identify trends in your weekly consistency and metrics.
               </p>
             </div>
 
             {/* Card 3: Achieve */}
-            <div className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-2xs hover:border-zinc-300 dark:hover:border-zinc-700 transition-all">
-              <div className="w-10 h-10 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 flex items-center justify-center mb-4">
+            <div className="p-5 sm:p-6 rounded-2xl glass-card shadow-lg hover:border-zinc-400/50 dark:hover:border-white/20 transition-all">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 flex items-center justify-center mb-4 shadow-xs">
                 <Trophy className="w-5 h-5 text-amber-500" />
               </div>
-              <h3 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">
+              <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
                 Achieve
               </h3>
               <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 mt-2 leading-relaxed">
-                Build real momentum through automatic streak calculations, milestone unlocks, and measurable health milestones.
+                Build real momentum through automatic streak calculations, milestone unlocks, and measurable health records.
               </p>
             </div>
           </div>
@@ -356,10 +356,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       </section>
 
       {/* 5. Section: Feature Showcase */}
-      <section id="features" className="py-12 sm:py-16 px-4 sm:px-6 border-t border-zinc-200 dark:border-zinc-850">
+      <section id="features" className="py-12 sm:py-16 px-4 sm:px-6 border-t border-zinc-200/70 dark:border-white/10">
         <div className="max-w-5xl mx-auto">
           <div className="text-center max-w-xl mx-auto mb-10 sm:mb-12">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 font-mono">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 font-mono">
               Core Capabilities
             </span>
             <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 mt-1">
@@ -369,12 +369,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4">
             {/* 1. Smart Streaks */}
-            <div className="p-4 sm:p-5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 transition-all hover:border-zinc-300 dark:hover:border-zinc-700">
+            <div className="p-5 rounded-2xl glass-card transition-all hover:border-zinc-400/50 dark:hover:border-white/20 shadow-sm">
               <div className="flex items-center gap-2.5 mb-2.5">
-                <div className="w-8 h-8 rounded-lg bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                <div className="w-8 h-8 rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 flex items-center justify-center shrink-0 shadow-2xs">
                   <Flame className="w-4 h-4 fill-amber-500 text-amber-500" />
                 </div>
-                <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Smart Streaks</h3>
+                <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Smart Streaks</h3>
               </div>
               <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
                 Track consistency automatically with current and all-time best streak counts calculated dynamically from your history.
@@ -382,12 +382,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             </div>
 
             {/* 2. Progress Analytics */}
-            <div className="p-4 sm:p-5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 transition-all hover:border-zinc-300 dark:hover:border-zinc-700">
+            <div className="p-5 rounded-2xl glass-card transition-all hover:border-zinc-400/50 dark:hover:border-white/20 shadow-sm">
               <div className="flex items-center gap-2.5 mb-2.5">
-                <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+                <div className="w-8 h-8 rounded-xl bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30 flex items-center justify-center shrink-0 shadow-2xs">
                   <BarChart3 className="w-4 h-4" />
                 </div>
-                <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Progress Analytics</h3>
+                <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Progress Analytics</h3>
               </div>
               <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
                 Understand your daily, weekly, and monthly performance with completion rate breakdowns and activity trends.
@@ -395,12 +395,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             </div>
 
             {/* 3. Smart Reminders */}
-            <div className="p-4 sm:p-5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 transition-all hover:border-zinc-300 dark:hover:border-zinc-700">
+            <div className="p-5 rounded-2xl glass-card transition-all hover:border-zinc-400/50 dark:hover:border-white/20 shadow-sm">
               <div className="flex items-center gap-2.5 mb-2.5">
-                <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+                <div className="w-8 h-8 rounded-xl bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border border-indigo-500/30 flex items-center justify-center shrink-0 shadow-2xs">
                   <Bell className="w-4 h-4" />
                 </div>
-                <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Smart Reminders</h3>
+                <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Smart Reminders</h3>
               </div>
               <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
                 Get intelligent browser notifications about your remaining unfinished habits at your chosen schedule.
@@ -408,12 +408,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             </div>
 
             {/* 4. Daily Notes */}
-            <div className="p-4 sm:p-5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 transition-all hover:border-zinc-300 dark:hover:border-zinc-700">
+            <div className="p-5 rounded-2xl glass-card transition-all hover:border-zinc-400/50 dark:hover:border-white/20 shadow-sm">
               <div className="flex items-center gap-2.5 mb-2.5">
-                <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                <div className="w-8 h-8 rounded-xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 flex items-center justify-center shrink-0 shadow-2xs">
                   <BookOpen className="w-4 h-4" />
                 </div>
-                <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Daily Notes</h3>
+                <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Daily Notes</h3>
               </div>
               <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
                 Capture quick reflections, daily wins, or context alongside each day's checklist for a complete personal journal.
@@ -421,12 +421,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             </div>
 
             {/* 5. Milestones */}
-            <div className="p-4 sm:p-5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 transition-all hover:border-zinc-300 dark:hover:border-zinc-700">
+            <div className="p-5 rounded-2xl glass-card transition-all hover:border-zinc-400/50 dark:hover:border-white/20 shadow-sm">
               <div className="flex items-center gap-2.5 mb-2.5">
-                <div className="w-8 h-8 rounded-lg bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0">
+                <div className="w-8 h-8 rounded-xl bg-purple-500/15 text-purple-600 dark:text-purple-400 border border-purple-500/30 flex items-center justify-center shrink-0 shadow-2xs">
                   <Trophy className="w-4 h-4" />
                 </div>
-                <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Milestones</h3>
+                <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Milestones</h3>
               </div>
               <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
                 Celebrate your consistency as you hit 3-day, 7-day, 30-day, and 100-day streaks with commemorative milestone badges.
@@ -434,12 +434,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             </div>
 
             {/* 6. Data Export & Ownership */}
-            <div className="p-4 sm:p-5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 transition-all hover:border-zinc-300 dark:hover:border-zinc-700">
+            <div className="p-5 rounded-2xl glass-card transition-all hover:border-zinc-400/50 dark:hover:border-white/20 shadow-sm">
               <div className="flex items-center gap-2.5 mb-2.5">
-                <div className="w-8 h-8 rounded-lg bg-orange-50 dark:bg-orange-950/50 text-orange-600 dark:text-orange-400 flex items-center justify-center shrink-0">
+                <div className="w-8 h-8 rounded-xl bg-orange-500/15 text-orange-600 dark:text-orange-400 border border-orange-500/30 flex items-center justify-center shrink-0 shadow-2xs">
                   <Download className="w-4 h-4" />
                 </div>
-                <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Data Export & Backup</h3>
+                <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Data Export & Backup</h3>
               </div>
               <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
                 Export your full habit logs, history, milestones, and notes anytime in clean, open JSON format.
@@ -450,10 +450,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       </section>
 
       {/* 6. Section: How It Works */}
-      <section id="how-it-works" className="py-12 sm:py-16 px-4 sm:px-6 border-t border-zinc-200 dark:border-zinc-850 bg-white/50 dark:bg-zinc-900/30">
+      <section id="how-it-works" className="py-12 sm:py-16 px-4 sm:px-6 border-t border-zinc-200/70 dark:border-white/10 bg-zinc-100/30 dark:bg-zinc-900/20">
         <div className="max-w-4xl mx-auto">
           <div className="text-center max-w-xl mx-auto mb-10 sm:mb-12">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 font-mono">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 font-mono">
               Simple Workflow
             </span>
             <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 mt-1">
@@ -463,11 +463,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative">
             {/* Step 1 */}
-            <div className="flex flex-col items-start p-5 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-2xs">
+            <div className="flex flex-col items-start p-6 rounded-2xl glass-card shadow-lg">
               <span className="text-xs font-mono font-bold text-zinc-400 dark:text-zinc-500 mb-2">
                 01
               </span>
-              <h3 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">
+              <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
                 Create your routine
               </h3>
               <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 mt-1.5 leading-relaxed">
@@ -476,11 +476,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             </div>
 
             {/* Step 2 */}
-            <div className="flex flex-col items-start p-5 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-2xs">
+            <div className="flex flex-col items-start p-6 rounded-2xl glass-card shadow-lg">
               <span className="text-xs font-mono font-bold text-zinc-400 dark:text-zinc-500 mb-2">
                 02
               </span>
-              <h3 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">
+              <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
                 Track every day
               </h3>
               <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 mt-1.5 leading-relaxed">
@@ -489,11 +489,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             </div>
 
             {/* Step 3 */}
-            <div className="flex flex-col items-start p-5 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-2xs">
+            <div className="flex flex-col items-start p-6 rounded-2xl glass-card shadow-lg">
               <span className="text-xs font-mono font-bold text-zinc-400 dark:text-zinc-500 mb-2">
                 03
               </span>
-              <h3 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">
+              <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
                 Improve over time
               </h3>
               <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 mt-1.5 leading-relaxed">
@@ -505,9 +505,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       </section>
 
       {/* 7. Section: Product Preview */}
-      <section id="preview" className="py-12 sm:py-16 px-4 sm:px-6 border-t border-zinc-200 dark:border-zinc-850">
+      <section id="preview" className="py-12 sm:py-16 px-4 sm:px-6 border-t border-zinc-200/70 dark:border-white/10">
         <div className="max-w-4xl mx-auto text-center">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 font-mono">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 font-mono">
             Designed for Daily Clarity
           </span>
           <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 mt-1">
@@ -518,20 +518,20 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           </p>
 
           {/* Product Preview Mockup Container */}
-          <div className="mt-8 sm:mt-10 max-w-2xl mx-auto rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 sm:p-6 shadow-xl text-left">
+          <div className="mt-8 sm:mt-10 max-w-2xl mx-auto rounded-2xl glass-card p-5 sm:p-7 shadow-2xl text-left">
             {/* Header snippet */}
-            <div className="flex items-center justify-between pb-3.5 border-b border-zinc-200 dark:border-zinc-800">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-full bg-zinc-900 dark:bg-zinc-800 flex items-center justify-center text-white text-xs">
+            <div className="flex items-center justify-between pb-3.5 border-b border-zinc-200/70 dark:border-white/10">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-full bg-zinc-900 dark:bg-zinc-100 flex items-center justify-center text-white dark:text-zinc-900 text-xs shadow-xs font-bold">
                   ✓
                 </div>
                 <div>
-                  <h4 className="text-xs font-semibold text-zinc-900 dark:text-zinc-100">Daily Habits</h4>
-                  <p className="text-[10px] text-zinc-400 font-mono">Wednesday, August 31</p>
+                  <h4 className="text-xs font-bold text-zinc-900 dark:text-zinc-100">Daily Habits</h4>
+                  <p className="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono">Wednesday, August 31</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 font-medium">
+                <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 font-semibold font-mono">
                   Cloud Active
                 </span>
               </div>
@@ -539,50 +539,50 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
             {/* Streak & Stats Row */}
             <div className="grid grid-cols-3 gap-2 mt-4 text-center">
-              <div className="p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-100 dark:border-zinc-800">
-                <span className="text-[10px] text-zinc-400 block font-medium">Streak</span>
+              <div className="p-3 rounded-xl glass-tile">
+                <span className="text-[10px] text-zinc-500 dark:text-zinc-400 block font-medium">Streak</span>
                 <span className="text-base font-bold text-zinc-900 dark:text-zinc-100 font-mono">5 days</span>
               </div>
-              <div className="p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-100 dark:border-zinc-800">
-                <span className="text-[10px] text-zinc-400 block font-medium">Completed</span>
+              <div className="p-3 rounded-xl glass-tile">
+                <span className="text-[10px] text-zinc-500 dark:text-zinc-400 block font-medium">Completed</span>
                 <span className="text-base font-bold text-emerald-600 dark:text-emerald-400 font-mono">4 / 5</span>
               </div>
-              <div className="p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-100 dark:border-zinc-800">
-                <span className="text-[10px] text-zinc-400 block font-medium">Best Record</span>
+              <div className="p-3 rounded-xl glass-tile">
+                <span className="text-[10px] text-zinc-500 dark:text-zinc-400 block font-medium">Best Record</span>
                 <span className="text-base font-bold text-zinc-900 dark:text-zinc-100 font-mono">14 days</span>
               </div>
             </div>
 
             {/* Checklist sample */}
             <div className="mt-4 space-y-2">
-              <div className="flex items-center justify-between p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-100 dark:border-zinc-800 text-xs">
+              <div className="flex items-center justify-between p-3 rounded-xl glass-tile text-xs">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-4 h-4 rounded bg-emerald-500 text-white flex items-center justify-center text-[10px]">
+                  <div className="w-4 h-4 rounded-md bg-emerald-500 text-white flex items-center justify-center text-[10px] shadow-2xs font-bold">
                     ✓
                   </div>
-                  <span className="line-through text-zinc-400 dark:text-zinc-500">Morning Hydration (500ml)</span>
+                  <span className="line-through text-zinc-400 dark:text-zinc-500 font-medium">Morning Hydration (500ml)</span>
                 </div>
-                <span className="text-[10px] text-zinc-400 font-mono">Done</span>
+                <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono">Done</span>
               </div>
 
-              <div className="flex items-center justify-between p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-100 dark:border-zinc-800 text-xs">
+              <div className="flex items-center justify-between p-3 rounded-xl glass-tile text-xs">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-4 h-4 rounded bg-emerald-500 text-white flex items-center justify-center text-[10px]">
+                  <div className="w-4 h-4 rounded-md bg-emerald-500 text-white flex items-center justify-center text-[10px] shadow-2xs font-bold">
                     ✓
                   </div>
-                  <span className="line-through text-zinc-400 dark:text-zinc-500">30 Min Strength Training</span>
+                  <span className="line-through text-zinc-400 dark:text-zinc-500 font-medium">30 Min Strength Training</span>
                 </div>
-                <span className="text-[10px] text-zinc-400 font-mono">Done</span>
+                <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono">Done</span>
               </div>
 
-              <div className="flex items-center justify-between p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-100 dark:border-zinc-800 text-xs">
+              <div className="flex items-center justify-between p-3 rounded-xl glass-tile text-xs">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-4 h-4 rounded bg-emerald-500 text-white flex items-center justify-center text-[10px]">
+                  <div className="w-4 h-4 rounded-md bg-emerald-500 text-white flex items-center justify-center text-[10px] shadow-2xs font-bold">
                     ✓
                   </div>
-                  <span className="line-through text-zinc-400 dark:text-zinc-500">Deep Work Session (90 min)</span>
+                  <span className="line-through text-zinc-400 dark:text-zinc-500 font-medium">Deep Work Session (90 min)</span>
                 </div>
-                <span className="text-[10px] text-zinc-400 font-mono">Done</span>
+                <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono">Done</span>
               </div>
             </div>
           </div>
@@ -590,10 +590,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       </section>
 
       {/* 8. Section: Final CTA */}
-      <section className="py-14 sm:py-20 px-4 sm:px-6 border-t border-zinc-200 dark:border-zinc-850 bg-zinc-100/60 dark:bg-zinc-900/40">
+      <section className="py-14 sm:py-20 px-4 sm:px-6 border-t border-zinc-200/70 dark:border-white/10 bg-zinc-100/30 dark:bg-zinc-900/30">
         <div className="max-w-xl mx-auto text-center flex flex-col items-center">
-          <div className="w-12 h-12 rounded-2xl bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 flex items-center justify-center mb-4 shadow-sm">
-            <Check className="w-6 h-6" />
+          <div className="w-12 h-12 rounded-2xl bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 flex items-center justify-center mb-4 shadow-md font-bold">
+            <Check className="w-6 h-6 stroke-[3]" />
           </div>
 
           <h2 className="text-2xl sm:text-4xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
@@ -609,7 +609,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               type="button"
               disabled={isLoading}
               onClick={onGetStarted}
-              className="w-full min-h-[48px] inline-flex items-center justify-center gap-2.5 px-6 py-3 bg-zinc-900 hover:bg-black dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 font-semibold text-sm sm:text-base rounded-xl transition-all shadow-md hover:shadow-lg active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer group"
+              className="w-full min-h-[48px] inline-flex items-center justify-center gap-2.5 px-6 py-3 bg-zinc-900 hover:bg-black dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 font-bold text-sm sm:text-base rounded-xl transition-all shadow-lg active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer group"
             >
               <span>Get Started</span>
               <ArrowRight className="w-4 h-4 text-zinc-400 dark:text-zinc-600 group-hover:translate-x-0.5 transition-transform" />

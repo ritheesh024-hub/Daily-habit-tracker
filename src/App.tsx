@@ -19,6 +19,7 @@ import {
   DailyLogData,
   DayHistorySummary,
   HabitItem,
+  DEFAULT_HABITS,
   StreakStats,
   UserProfile,
   UserReminderSettings,
@@ -734,51 +735,80 @@ export default function App() {
     setShowWeeklyWeightModal(false);
   };
 
-  // Clear all user habit data & reset onboarding
+  // Clear all user habit data & reset dashboard to clean initial state
   const handleClearUserData = async () => {
-    if (!currentUser?.uid) return;
-    await clearUserData(currentUser.uid);
+    const user = auth.currentUser;
+    const uid = user?.uid || currentUser?.uid;
+    if (!uid) {
+      throw new Error('No authenticated user found.');
+    }
 
+    await clearUserData(uid);
+
+    const freshHabits = DEFAULT_HABITS.map((h, idx) => ({ ...h, order: idx }));
     const resetUser: UserProfile = {
-      ...currentUser,
-      onboardingCompleted: false,
+      ...(currentUser || {
+        uid,
+        displayName: user?.displayName || 'User',
+        email: user?.email || null,
+        photoURL: user?.photoURL || null,
+      }),
+      onboardingCompleted: true,
       weight: undefined,
-      height: undefined,
-      dateOfBirth: undefined,
+      lastWeightCheckInDate: undefined,
     };
+
     setCurrentUser(resetUser);
     setCachedUserProfile(resetUser);
 
-    const defaultHabits = getCachedHabits(currentUser.uid);
-    setHabits(defaultHabits);
-    setDailyLog(createDefaultDailyLog(todayDate, defaultHabits.length));
+    setHabits(freshHabits);
+    setDailyLog(createDefaultDailyLog(todayDate, freshHabits.length));
     setHistory([]);
     setHistoryMap({});
     setRawLogsMap({});
     setStreaks({ currentStreak: 0, bestStreak: 0 });
     setAnalytics(DEFAULT_ANALYTICS);
     setPersistedMilestonesMap({});
-    setIsProfileModalOpen(false);
+    setReminderSettings(DEFAULT_REMINDER_SETTINGS);
+    setActiveReminders([]);
+    setActiveSmartReminders([]);
+    notifiedHabitTimesRef.current = {};
+    smartReminderNotifiedDatesRef.current = {};
   };
 
   // Permanently delete user account & all cloud records
   const handleDeleteUserAccount = async () => {
-    if (!auth.currentUser) return;
-    const uid = auth.currentUser.uid;
-    await deleteUserAccount(auth.currentUser);
-    clearUserCache(uid);
-    clearActiveSession();
-    setCurrentUser(null);
-    setCachedUserProfile(null);
-    setIsProfileModalOpen(false);
-    setHabits(getCachedHabits());
-    setDailyLog(createDefaultDailyLog(getTodayDateString(), 8));
-    setHistory([]);
-    setHistoryMap({});
-    setRawLogsMap({});
-    setStreaks({ currentStreak: 0, bestStreak: 0 });
-    setAnalytics(DEFAULT_ANALYTICS);
-    setPersistedMilestonesMap({});
+    const user = auth.currentUser;
+    const uid = user?.uid || currentUser?.uid;
+
+    try {
+      if (user) {
+        await deleteUserAccount(user);
+      } else if (uid) {
+        await clearUserData(uid);
+      }
+    } finally {
+      if (uid) {
+        clearUserCache(uid);
+      }
+      clearActiveSession();
+      setCurrentUser(null);
+      setCachedUserProfile(null);
+      setIsProfileModalOpen(false);
+      setHabits(getCachedHabits());
+      setDailyLog(createDefaultDailyLog(getTodayDateString(), 8));
+      setHistory([]);
+      setHistoryMap({});
+      setRawLogsMap({});
+      setStreaks({ currentStreak: 0, bestStreak: 0 });
+      setAnalytics(DEFAULT_ANALYTICS);
+      setPersistedMilestonesMap({});
+      setReminderSettings(DEFAULT_REMINDER_SETTINGS);
+      setActiveReminders([]);
+      setActiveSmartReminders([]);
+      notifiedHabitTimesRef.current = {};
+      smartReminderNotifiedDatesRef.current = {};
+    }
   };
 
   // Export complete user data backup as JSON
@@ -1278,7 +1308,14 @@ export default function App() {
   const totalCount = habits.length;
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 flex flex-col font-sans antialiased selection:bg-zinc-200 dark:selection:bg-zinc-800 transition-colors">
+    <div className="min-h-screen relative bg-zinc-100/70 dark:bg-[#0d0d11] text-zinc-900 dark:text-zinc-100 flex flex-col font-sans antialiased selection:bg-zinc-200 dark:selection:bg-zinc-800 transition-colors overflow-x-hidden">
+      {/* Ambient background light gradients (extremely subtle, high aesthetic value) */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0" aria-hidden="true">
+        <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-[550px] sm:w-[700px] h-[350px] bg-gradient-to-b from-zinc-200/50 via-zinc-300/20 to-transparent dark:from-zinc-800/25 dark:via-zinc-900/10 dark:to-transparent rounded-full blur-3xl" />
+        <div className="absolute top-[40%] -left-32 w-72 h-72 bg-gradient-to-tr from-zinc-300/30 to-transparent dark:from-zinc-800/15 dark:to-transparent rounded-full blur-3xl opacity-60" />
+        <div className="absolute top-[65%] -right-32 w-80 h-80 bg-gradient-to-tl from-zinc-300/30 to-transparent dark:from-zinc-800/15 dark:to-transparent rounded-full blur-3xl opacity-60" />
+      </div>
+
       {/* Header with profile trigger */}
       <Header
         user={currentUser}
@@ -1295,19 +1332,19 @@ export default function App() {
         <div
           id="offline-banner"
           role="status"
-          className="bg-amber-50 dark:bg-amber-950/40 border-b border-amber-200 dark:border-amber-800/80 text-amber-800 dark:text-amber-300 px-4 py-1.5 text-xs text-center font-medium"
+          className="relative z-10 bg-amber-500/10 dark:bg-amber-500/15 backdrop-blur-md border-b border-amber-500/20 text-amber-900 dark:text-amber-300 px-4 py-2 text-xs text-center font-medium shadow-xs"
         >
           Offline Mode — your habit progress is preserved and will sync when you reconnect.
         </div>
       )}
 
       {/* Main Single Page Content */}
-      <main id="main-content" className="flex-1 max-w-2xl w-full mx-auto p-3.5 sm:p-5 space-y-3.5 sm:space-y-4">
+      <main id="main-content" className="relative z-10 flex-1 max-w-2xl w-full mx-auto p-3 sm:p-5 space-y-3.5 sm:space-y-4">
         {/* Date Selector / Notice when viewing historical past days */}
         {!isToday && (
           <div
             id="past-date-banner"
-            className="flex items-center justify-between p-3 rounded-lg bg-zinc-200/80 dark:bg-zinc-800/80 border border-zinc-300/80 dark:border-zinc-700/80 text-xs text-zinc-800 dark:text-zinc-200"
+            className="flex items-center justify-between p-3 rounded-xl glass-card text-xs text-zinc-800 dark:text-zinc-200 animate-slideUp"
           >
             <div className="flex items-center gap-2">
               <span className="font-semibold text-zinc-900 dark:text-zinc-100">Viewing past date:</span>
@@ -1317,7 +1354,7 @@ export default function App() {
               id="return-to-today-btn"
               type="button"
               onClick={() => setSelectedDate(todayDate)}
-              className="inline-flex items-center gap-1 font-medium text-zinc-900 dark:text-zinc-100 hover:text-black dark:hover:text-white underline cursor-pointer"
+              className="inline-flex items-center gap-1 font-semibold text-zinc-900 dark:text-zinc-100 hover:opacity-80 transition-opacity underline cursor-pointer active:scale-[0.98]"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
               Back to Today

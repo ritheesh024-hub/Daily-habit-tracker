@@ -121,6 +121,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   // Clear Data & Delete Account State
   const [showClearDataConfirm, setShowClearDataConfirm] = useState(false);
   const [isClearingData, setIsClearingData] = useState(false);
+  const [isClearSuccess, setIsClearSuccess] = useState(false);
   const [deleteAccountStep, setDeleteAccountStep] = useState<0 | 1 | 2>(0);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [accountActionError, setAccountActionError] = useState<string | null>(null);
@@ -270,15 +271,20 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   };
 
   const handleExecuteClearData = async () => {
-    if (!onClearData) return;
+    if (!onClearData || isClearingData) return;
     setIsClearingData(true);
     setAccountActionError(null);
     try {
       await onClearData();
-      setShowClearDataConfirm(false);
-      onClose();
+      setIsClearSuccess(true);
+      setTimeout(() => {
+        setIsClearSuccess(false);
+        setShowClearDataConfirm(false);
+        onClose();
+      }, 1100);
     } catch (err: any) {
-      setAccountActionError(err?.message || 'Failed to clear data. Please try again.');
+      console.error('Failed to clear user data technical error:', err);
+      setAccountActionError('Unable to clear your data. Please try again.');
     } finally {
       setIsClearingData(false);
     }
@@ -350,18 +356,18 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     <>
       <div
         id="profile-modal-backdrop"
-        className="fixed inset-0 z-40 bg-black/50 dark:bg-black/70 flex items-center justify-center p-3 sm:p-4 backdrop-blur-[1px] animate-fadeIn"
+        className="fixed inset-0 z-40 bg-black/50 dark:bg-black/75 flex items-center justify-center p-3 sm:p-4 backdrop-blur-md animate-fadeIn"
         onClick={(e) => {
           if (e.target === e.currentTarget) onClose();
         }}
       >
         <div
           id="profile-modal-card"
-          className="w-full max-w-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-xl overflow-hidden flex flex-col max-h-[90vh] transition-colors"
+          className="w-full max-w-xl glass-modal rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] transition-all"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Modal Header with Profile Card */}
-          <div className="p-4 sm:p-5 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/60 dark:bg-zinc-900/60">
+          <div className="p-4 sm:p-5 border-b border-zinc-200/80 dark:border-white/10 bg-white/40 dark:bg-zinc-900/40">
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-3">
                 {user?.photoURL ? (
@@ -370,10 +376,10 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                     src={user.photoURL}
                     alt={user.displayName || 'Profile'}
                     referrerPolicy="no-referrer"
-                    className="w-12 h-12 rounded-full border border-zinc-200 dark:border-zinc-700 object-cover shadow-2xs"
+                    className="w-12 h-12 rounded-full border border-white/60 dark:border-white/15 object-cover shadow-sm ring-2 ring-zinc-200/50 dark:ring-zinc-800/60"
                   />
                 ) : (
-                  <div className="w-12 h-12 rounded-full bg-zinc-800 dark:bg-zinc-700 text-white flex items-center justify-center text-base font-semibold">
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-zinc-800 to-zinc-900 dark:from-zinc-700 dark:to-zinc-800 text-white flex items-center justify-center text-base font-semibold shadow-sm ring-2 ring-zinc-200/50 dark:ring-zinc-800/60">
                     {((user?.displayName || user?.email || 'U')[0] || 'U').toUpperCase()}
                   </div>
                 )}
@@ -391,7 +397,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                 id="close-profile-modal-btn"
                 type="button"
                 onClick={onClose}
-                className="text-zinc-400 dark:text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-200 p-1.5 rounded-lg hover:bg-zinc-200/60 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+                className="text-zinc-400 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-100 p-1.5 rounded-xl hover:bg-zinc-200/50 dark:hover:bg-white/10 transition-colors cursor-pointer"
                 title="Close"
               >
                 <X className="w-5 h-5" />
@@ -399,15 +405,15 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
             </div>
 
             {/* Navigation Tabs */}
-            <div className="flex items-center gap-1.5 mt-4 pt-2 border-t border-zinc-200/80 dark:border-zinc-800 overflow-x-auto no-scrollbar">
+            <div className="flex items-center gap-1.5 mt-4 pt-2 border-t border-zinc-200/60 dark:border-white/10 overflow-x-auto no-scrollbar">
               <button
                 type="button"
                 id="tab-analytics"
                 onClick={() => setActiveTab('analytics')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer shrink-0 ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer shrink-0 ${
                   activeTab === 'analytics'
-                    ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 shadow-2xs'
-                    : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-200/60 dark:hover:bg-zinc-800'
+                    ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 shadow-sm scale-[1.02]'
+                    : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-white/50 dark:hover:bg-white/5'
                 }`}
               >
                 <BarChart2 className="w-3.5 h-3.5" />
@@ -418,20 +424,20 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                 type="button"
                 id="tab-milestones"
                 onClick={() => setActiveTab('milestones')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer shrink-0 ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer shrink-0 ${
                   activeTab === 'milestones'
-                    ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 shadow-2xs'
-                    : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-200/60 dark:hover:bg-zinc-800'
+                    ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 shadow-sm scale-[1.02]'
+                    : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-white/50 dark:hover:bg-white/5'
                 }`}
               >
                 <Award className="w-3.5 h-3.5" />
                 <span>Milestones</span>
                 {milestones.length > 0 && (
                   <span
-                    className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                    className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-medium ${
                       activeTab === 'milestones'
-                        ? 'bg-zinc-700 dark:bg-zinc-300 text-zinc-100 dark:text-zinc-900'
-                        : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300'
+                        ? 'bg-zinc-700 text-zinc-100 dark:bg-zinc-200 dark:text-zinc-900'
+                        : 'bg-zinc-200/80 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300'
                     }`}
                   >
                     {milestones.filter((m) => m.isUnlocked).length}/{milestones.length}
@@ -443,19 +449,19 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                 type="button"
                 id="tab-habits"
                 onClick={() => setActiveTab('habits')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer shrink-0 ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer shrink-0 ${
                   activeTab === 'habits'
-                    ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 shadow-2xs'
-                    : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-200/60 dark:hover:bg-zinc-800'
+                    ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 shadow-sm scale-[1.02]'
+                    : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-white/50 dark:hover:bg-white/5'
                 }`}
               >
                 <ListOrdered className="w-3.5 h-3.5" />
                 <span>Manage Habits</span>
                 <span
-                  className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                  className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-medium ${
                     activeTab === 'habits'
-                      ? 'bg-zinc-700 dark:bg-zinc-300 text-zinc-100 dark:text-zinc-900'
-                      : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300'
+                      ? 'bg-zinc-700 text-zinc-100 dark:bg-zinc-200 dark:text-zinc-900'
+                      : 'bg-zinc-200/80 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300'
                   }`}
                 >
                   {habits.length}
@@ -466,20 +472,20 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                 type="button"
                 id="tab-reminders"
                 onClick={() => setActiveTab('reminders')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer shrink-0 ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer shrink-0 ${
                   activeTab === 'reminders'
-                    ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 shadow-2xs'
-                    : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-200/60 dark:hover:bg-zinc-800'
+                    ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 shadow-sm scale-[1.02]'
+                    : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-white/50 dark:hover:bg-white/5'
                 }`}
               >
                 <Bell className="w-3.5 h-3.5" />
                 <span>Reminders</span>
                 {habits.filter((h) => h.reminderEnabled).length > 0 && (
                   <span
-                    className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                    className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-medium ${
                       activeTab === 'reminders'
-                        ? 'bg-zinc-700 dark:bg-zinc-300 text-zinc-100 dark:text-zinc-900'
-                        : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300'
+                        ? 'bg-zinc-700 text-zinc-100 dark:bg-zinc-200 dark:text-zinc-900'
+                        : 'bg-zinc-200/80 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300'
                     }`}
                   >
                     {habits.filter((h) => h.reminderEnabled).length}
@@ -491,10 +497,10 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                 type="button"
                 id="tab-profile"
                 onClick={() => setActiveTab('profile')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer shrink-0 ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer shrink-0 ${
                   activeTab === 'profile'
-                    ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 shadow-2xs'
-                    : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-200/60 dark:hover:bg-zinc-800'
+                    ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 shadow-sm scale-[1.02]'
+                    : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-white/50 dark:hover:bg-white/5'
                 }`}
               >
                 <User className="w-3.5 h-3.5" />
@@ -1259,53 +1265,79 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
       {showClearDataConfirm && (
         <div
           id="clear-data-modal-backdrop"
-          className="fixed inset-0 z-60 bg-black/60 dark:bg-black/80 flex items-center justify-center p-4 backdrop-blur-xs animate-fadeIn"
+          className="fixed inset-0 z-60 bg-black/60 dark:bg-black/80 flex items-center justify-center p-4 backdrop-blur-md animate-fadeIn"
         >
           <div
             id="clear-data-card"
-            className="w-full max-w-md bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-xl p-5 sm:p-6 transition-colors"
+            className="w-full max-w-md glass-modal rounded-2xl shadow-2xl p-5 sm:p-6 transition-all"
           >
-            <div className="flex items-start gap-3.5 mb-4">
-              <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 flex items-center justify-center shrink-0">
-                <AlertTriangle className="w-5 h-5" />
-              </div>
-              <div>
+            {isClearSuccess ? (
+              <div className="py-5 text-center space-y-2.5 animate-fadeIn">
+                <div className="w-11 h-11 rounded-xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center justify-center mx-auto shadow-xs">
+                  <Check className="w-5 h-5" />
+                </div>
                 <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
-                  Clear all data?
+                  Your data has been cleared.
                 </h3>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 leading-relaxed">
-                  Your habit history, daily notes, analytics, and milestones will be permanently removed. Your Google account will remain active.
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                  Returning to your clean dashboard...
                 </p>
               </div>
-            </div>
+            ) : (
+              <>
+                <div className="flex items-start gap-3.5 mb-4">
+                  <div className="w-10 h-10 rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/20 flex items-center justify-center shrink-0">
+                    <AlertTriangle className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
+                      Clear all data?
+                    </h3>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 leading-relaxed">
+                      Your habit history and app data will be permanently removed. Your account will remain active.
+                    </p>
+                  </div>
+                </div>
 
-            <div className="flex items-center justify-end gap-2.5 pt-2">
-              <button
-                type="button"
-                id="cancel-clear-data-btn"
-                disabled={isClearingData}
-                onClick={() => setShowClearDataConfirm(false)}
-                className="px-4 py-2 text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                id="confirm-clear-data-btn"
-                disabled={isClearingData}
-                onClick={handleExecuteClearData}
-                className="px-4 py-2 text-xs font-semibold text-white bg-amber-600 hover:bg-amber-700 dark:bg-amber-700 dark:hover:bg-amber-600 rounded-xl transition-colors cursor-pointer disabled:opacity-50 inline-flex items-center gap-1.5 shadow-2xs"
-              >
-                {isClearingData ? (
-                  <>
-                    <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    <span>Clearing...</span>
-                  </>
-                ) : (
-                  <span>Clear Data</span>
+                {accountActionError && (
+                  <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-xs text-red-700 dark:text-red-300 flex items-start gap-2.5">
+                    <AlertTriangle className="w-4 h-4 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+                    <p className="font-medium">{accountActionError}</p>
+                  </div>
                 )}
-              </button>
-            </div>
+
+                <div className="flex items-center justify-end gap-2.5 pt-2">
+                  <button
+                    type="button"
+                    id="cancel-clear-data-btn"
+                    disabled={isClearingData}
+                    onClick={() => {
+                      setShowClearDataConfirm(false);
+                      setAccountActionError(null);
+                    }}
+                    className="px-4 py-2 text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-white/60 dark:hover:bg-white/10 rounded-xl transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    id="confirm-clear-data-btn"
+                    disabled={isClearingData}
+                    onClick={handleExecuteClearData}
+                    className="px-4 py-2 text-xs font-semibold text-white bg-amber-600 hover:bg-amber-700 dark:bg-amber-600 dark:hover:bg-amber-500 rounded-xl transition-all cursor-pointer disabled:opacity-50 inline-flex items-center gap-1.5 shadow-sm active:scale-[0.98]"
+                  >
+                    {isClearingData ? (
+                      <>
+                        <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        <span>Clearing your data...</span>
+                      </>
+                    ) : (
+                      <span>Clear Data</span>
+                    )}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -1314,14 +1346,14 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
       {deleteAccountStep === 1 && (
         <div
           id="delete-account-step1-backdrop"
-          className="fixed inset-0 z-60 bg-black/60 dark:bg-black/80 flex items-center justify-center p-4 backdrop-blur-xs animate-fadeIn"
+          className="fixed inset-0 z-60 bg-black/60 dark:bg-black/80 flex items-center justify-center p-4 backdrop-blur-md animate-fadeIn"
         >
           <div
             id="delete-account-step1-card"
-            className="w-full max-w-md bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-xl p-5 sm:p-6 transition-colors"
+            className="w-full max-w-md glass-modal rounded-2xl shadow-2xl p-5 sm:p-6 transition-all"
           >
             <div className="flex items-start gap-3.5 mb-4">
-              <div className="w-10 h-10 rounded-xl bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-400 flex items-center justify-center shrink-0">
+              <div className="w-10 h-10 rounded-xl bg-red-500/15 text-red-600 dark:text-red-400 border border-red-500/20 flex items-center justify-center shrink-0">
                 <ShieldAlert className="w-5 h-5" />
               </div>
               <div>
@@ -1339,7 +1371,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                 type="button"
                 id="cancel-delete-step1-btn"
                 onClick={() => setDeleteAccountStep(0)}
-                className="px-4 py-2 text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-colors cursor-pointer"
+                className="px-4 py-2 text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-white/60 dark:hover:bg-white/10 rounded-xl transition-colors cursor-pointer"
               >
                 Cancel
               </button>
@@ -1347,7 +1379,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                 type="button"
                 id="continue-delete-step1-btn"
                 onClick={() => setDeleteAccountStep(2)}
-                className="px-4 py-2 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-600 rounded-xl transition-colors cursor-pointer shadow-2xs"
+                className="px-4 py-2 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-500 rounded-xl transition-all cursor-pointer shadow-sm active:scale-[0.98]"
               >
                 Continue
               </button>
@@ -1360,14 +1392,14 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
       {deleteAccountStep === 2 && (
         <div
           id="delete-account-step2-backdrop"
-          className="fixed inset-0 z-60 bg-black/60 dark:bg-black/80 flex items-center justify-center p-4 backdrop-blur-xs animate-fadeIn"
+          className="fixed inset-0 z-60 bg-black/60 dark:bg-black/80 flex items-center justify-center p-4 backdrop-blur-md animate-fadeIn"
         >
           <div
             id="delete-account-step2-card"
-            className="w-full max-w-md bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-xl p-5 sm:p-6 transition-colors"
+            className="w-full max-w-md glass-modal rounded-2xl shadow-2xl p-5 sm:p-6 transition-all"
           >
             <div className="flex items-start gap-3.5 mb-4">
-              <div className="w-10 h-10 rounded-xl bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-400 flex items-center justify-center shrink-0">
+              <div className="w-10 h-10 rounded-xl bg-red-500/15 text-red-600 dark:text-red-400 border border-red-500/20 flex items-center justify-center shrink-0">
                 <ShieldAlert className="w-5 h-5" />
               </div>
               <div>
@@ -1380,13 +1412,25 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
               </div>
             </div>
 
+            {accountActionError && (
+              <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-xs text-red-700 dark:text-red-300 flex items-start gap-2.5">
+                <AlertTriangle className="w-4 h-4 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <p className="font-medium">{accountActionError}</p>
+                </div>
+              </div>
+            )}
+
             <div className="flex items-center justify-end gap-2.5 pt-2">
               <button
                 type="button"
                 id="cancel-delete-step2-btn"
                 disabled={isDeletingAccount}
-                onClick={() => setDeleteAccountStep(0)}
-                className="px-4 py-2 text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-colors cursor-pointer"
+                onClick={() => {
+                  setDeleteAccountStep(0);
+                  setAccountActionError(null);
+                }}
+                className="px-4 py-2 text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-white/60 dark:hover:bg-white/10 rounded-xl transition-colors cursor-pointer"
               >
                 Cancel
               </button>
@@ -1395,7 +1439,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                 id="final-delete-account-btn"
                 disabled={isDeletingAccount}
                 onClick={handleExecuteDeleteAccount}
-                className="px-4 py-2 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-600 rounded-xl transition-colors cursor-pointer disabled:opacity-50 inline-flex items-center gap-1.5 shadow-2xs"
+                className="px-4 py-2 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-500 rounded-xl transition-all cursor-pointer disabled:opacity-50 inline-flex items-center gap-1.5 shadow-sm active:scale-[0.98]"
               >
                 {isDeletingAccount ? (
                   <>
@@ -1403,7 +1447,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                     <span>Deleting Account...</span>
                   </>
                 ) : (
-                  <span>Delete Account</span>
+                  <span>{accountActionError ? 'Retry Deletion' : 'Delete Account'}</span>
                 )}
               </button>
             </div>

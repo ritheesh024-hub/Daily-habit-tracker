@@ -16,14 +16,17 @@ export const Header: React.FC<HeaderProps> = ({
   isSyncing = false,
 }) => {
   return (
-    <header id="app-header" className="border-b border-zinc-200 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/90 py-2.5 sm:py-3 px-3.5 sm:px-6 transition-colors">
+    <header
+      id="app-header"
+      className="sticky top-0 z-40 w-full glass-surface border-b border-zinc-200/70 dark:border-white/10 py-2.5 sm:py-3 px-3.5 sm:px-6 transition-all duration-200 shadow-xs"
+    >
       <div className="max-w-2xl mx-auto flex items-center justify-between gap-4">
         {/* Left: Logo, Project Name & Today's Date */}
         <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
           {/* Logo */}
           <div
             id="app-logo"
-            className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-zinc-900 dark:bg-zinc-800 border border-zinc-800/80 dark:border-zinc-700/80 flex items-center justify-center shrink-0 shadow-2xs relative overflow-hidden"
+            className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-zinc-900 dark:bg-zinc-800 border border-zinc-700/80 dark:border-zinc-700 flex items-center justify-center shrink-0 shadow-md relative overflow-hidden transition-transform duration-200 hover:scale-105"
             aria-hidden="true"
           >
             <svg className="w-5 h-5 sm:w-5.5 sm:h-5.5 text-white" viewBox="0 0 512 512" fill="none">
@@ -32,8 +35,8 @@ export const Header: React.FC<HeaderProps> = ({
                   <feGaussianBlur stdDeviation="12" />
                 </filter>
                 <radialGradient id="header-inner-glow" cx="50%" cy="50%" r="50%">
-                  <stop offset="0%" stopColor="#ffffff" stopOpacity="0.18" />
-                  <stop offset="60%" stopColor="#ffffff" stopOpacity="0.04" />
+                  <stop offset="0%" stopColor="#ffffff" stopOpacity="0.22" />
+                  <stop offset="60%" stopColor="#ffffff" stopOpacity="0.05" />
                   <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
                 </radialGradient>
               </defs>
@@ -48,7 +51,7 @@ export const Header: React.FC<HeaderProps> = ({
                 strokeWidth="78"
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                opacity="0.32"
+                opacity="0.35"
                 filter="url(#header-tick-glow)"
               />
 
@@ -72,7 +75,7 @@ export const Header: React.FC<HeaderProps> = ({
               {isSyncing && (
                 <span
                   id="sync-status"
-                  className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"
+                  className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse ring-2 ring-emerald-500/20"
                   title="Saving changes..."
                 />
               )}
@@ -91,7 +94,7 @@ export const Header: React.FC<HeaderProps> = ({
             onClick={onOpenProfile}
             aria-label="Open Profile and Settings"
             title="Open Profile and Settings"
-            className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full hover:opacity-90 focus-visible:ring-2 focus-visible:ring-zinc-900 dark:focus-visible:ring-zinc-100 focus-visible:outline-none transition-opacity cursor-pointer group"
+            className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full hover:opacity-90 active:scale-95 focus-visible:ring-2 focus-visible:ring-zinc-900 dark:focus-visible:ring-zinc-100 focus-visible:outline-none transition-all duration-150 cursor-pointer group"
           >
             {user?.photoURL ? (
               <img
@@ -99,13 +102,13 @@ export const Header: React.FC<HeaderProps> = ({
                 src={user.photoURL}
                 alt={user.displayName ? `${user.displayName}'s Profile photo` : 'User profile avatar'}
                 referrerPolicy="no-referrer"
-                className="w-8 h-8 sm:w-9 sm:h-9 rounded-full border border-zinc-200 dark:border-zinc-700 object-cover shadow-2xs group-hover:border-zinc-300 dark:group-hover:border-zinc-600"
+                className="w-8 h-8 sm:w-9 sm:h-9 rounded-full border border-zinc-300/80 dark:border-white/20 object-cover shadow-sm group-hover:border-zinc-400 dark:group-hover:border-white/40 ring-1 ring-black/5 dark:ring-white/10 transition-all"
               />
             ) : (
               <div
                 id="user-avatar-fallback"
                 aria-hidden="true"
-                className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-zinc-900 dark:bg-zinc-800 text-white flex items-center justify-center text-xs sm:text-sm font-semibold shadow-2xs border border-zinc-800 dark:border-zinc-700"
+                className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-zinc-900 dark:bg-zinc-800 text-white flex items-center justify-center text-xs sm:text-sm font-semibold shadow-sm border border-zinc-700 dark:border-white/20 ring-1 ring-black/5 dark:ring-white/10"
               >
                 {((user?.displayName || user?.email || 'U')[0] || 'U').toUpperCase()}
               </div>

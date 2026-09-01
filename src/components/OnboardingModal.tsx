@@ -176,15 +176,15 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-zinc-900/60 dark:bg-black/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-      <div className="w-full max-w-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col my-auto transition-colors">
+    <div className="fixed inset-0 z-50 bg-black/60 dark:bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+      <div className="w-full max-w-xl glass-modal rounded-2xl shadow-2xl overflow-hidden flex flex-col my-auto transition-all">
         {/* Step Indicator Top Bar */}
-        <div className="px-6 pt-6 pb-4 border-b border-zinc-100 dark:border-zinc-800/80 bg-zinc-50/50 dark:bg-zinc-900/50">
+        <div className="px-6 pt-6 pb-4 border-b border-zinc-200/70 dark:border-white/10 bg-zinc-100/50 dark:bg-zinc-900/40">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 font-mono">
+            <span className="text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 font-mono">
               Step {step} of 4
             </span>
-            <span className="text-xs font-medium text-zinc-400">
+            <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
               {step === 1 && 'Profile Details'}
               {step === 2 && 'Personal Metrics'}
               {step === 3 && 'Choose Routines'}
@@ -193,9 +193,9 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
           </div>
 
           {/* Progress bar */}
-          <div className="h-1.5 w-full bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden flex">
+          <div className="h-2 w-full bg-zinc-200/80 dark:bg-zinc-800/80 rounded-full overflow-hidden flex p-0.5 border border-zinc-300/40 dark:border-white/5">
             <div
-              className="h-full bg-zinc-900 dark:bg-zinc-100 transition-all duration-300 rounded-full"
+              className="h-full bg-zinc-900 dark:bg-zinc-100 transition-all duration-300 rounded-full shadow-sm"
               style={{ width: `${(step / 4) * 100}%` }}
             />
           </div>
@@ -217,7 +217,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
 
               {/* Name input */}
               <div>
-                <label htmlFor="onboarding-name" className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                <label htmlFor="onboarding-name" className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
                   Your Name
                 </label>
                 <input
@@ -231,14 +231,14 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                   placeholder="Enter your name"
                   required
                   maxLength={50}
-                  className="w-full px-3.5 py-2.5 text-sm font-medium border border-zinc-300 dark:border-zinc-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
+                  className="w-full px-3.5 py-2.5 text-sm font-medium glass-input rounded-xl focus:outline-none text-zinc-900 dark:text-zinc-100"
                 />
               </div>
 
               {/* Date of Birth & Age Display */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label htmlFor="onboarding-dob" className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                  <label htmlFor="onboarding-dob" className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
                     Date of Birth
                   </label>
                   <input
@@ -247,18 +247,18 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                     max={todayDate}
                     value={dateOfBirth}
                     onChange={(e) => {
-                      setDateDate: setDateOfBirth(e.target.value);
+                      setDateOfBirth(e.target.value);
                       setProfileError(null);
                     }}
-                    className="w-full px-3.5 py-2.5 text-sm font-mono border border-zinc-300 dark:border-zinc-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
+                    className="w-full px-3.5 py-2.5 text-sm font-mono glass-input rounded-xl focus:outline-none text-zinc-900 dark:text-zinc-100"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                  <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
                     Calculated Age
                   </label>
-                  <div className="w-full px-3.5 py-2.5 text-sm font-mono font-medium text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800/70 border border-zinc-200 dark:border-zinc-700/80 rounded-xl flex items-center">
+                  <div className="w-full px-3.5 py-2.5 text-sm font-mono font-medium text-zinc-700 dark:text-zinc-300 bg-zinc-100/70 dark:bg-zinc-800/50 border border-zinc-200/70 dark:border-white/5 rounded-xl flex items-center min-h-[42px]">
                     <span>{age !== null ? `${age} years old` : dateOfBirth ? 'Invalid date' : 'Optional'}</span>
                   </div>
                 </div>
@@ -266,7 +266,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
 
               {/* Google Gmail (Read-Only) */}
               <div>
-                <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
                   Connected Gmail
                 </label>
                 <div className="relative">
@@ -275,14 +275,14 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                     value={user.email || ''}
                     readOnly
                     disabled
-                    className="w-full px-3.5 py-2.5 text-xs font-mono text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl cursor-not-allowed select-none pr-9"
+                    className="w-full px-3.5 py-2.5 text-xs font-mono text-zinc-500 dark:text-zinc-400 bg-zinc-100/70 dark:bg-zinc-800/50 border border-zinc-200/70 dark:border-white/5 rounded-xl cursor-not-allowed select-none pr-9"
                   />
                   <Lock className="w-3.5 h-3.5 text-zinc-400 absolute right-3 top-1/2 -translate-y-1/2" />
                 </div>
               </div>
 
               {profileError && (
-                <div className="p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-xs text-red-700 dark:text-red-300 rounded-xl">
+                <div className="p-3 bg-red-500/10 dark:bg-red-500/15 border border-red-500/30 text-xs text-red-700 dark:text-red-300 rounded-xl backdrop-blur-xs">
                   {profileError}
                 </div>
               )}
@@ -290,7 +290,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
               <div className="pt-3 flex justify-end">
                 <button
                   type="submit"
-                  className="px-5 py-2.5 bg-zinc-900 hover:bg-black dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 text-sm font-semibold rounded-xl transition-colors cursor-pointer inline-flex items-center gap-2"
+                  className="px-5 py-2.5 bg-zinc-900 hover:bg-black dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 text-sm font-semibold rounded-xl transition-all shadow-sm active:scale-95 cursor-pointer inline-flex items-center gap-2"
                 >
                   <span>Continue</span>
                   <ArrowRight className="w-4 h-4" />
@@ -313,7 +313,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
 
               {/* Height Input & Unit Toggle */}
               <div>
-                <label htmlFor="onboarding-height" className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                <label htmlFor="onboarding-height" className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
                   Height (Optional)
                 </label>
                 <div className="flex items-center gap-2">
@@ -326,13 +326,13 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                     value={heightInput}
                     onChange={(e) => setHeightInput(e.target.value)}
                     placeholder={heightUnit === 'cm' ? 'e.g. 175' : 'e.g. 68'}
-                    className="flex-1 px-3.5 py-2.5 text-sm font-mono border border-zinc-300 dark:border-zinc-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
+                    className="flex-1 px-3.5 py-2.5 text-sm font-mono glass-input rounded-xl focus:outline-none text-zinc-900 dark:text-zinc-100"
                   />
-                  <div className="flex rounded-xl border border-zinc-300 dark:border-zinc-700 overflow-hidden bg-zinc-100 dark:bg-zinc-800 p-0.5">
+                  <div className="flex rounded-xl border border-zinc-300/60 dark:border-white/10 overflow-hidden bg-zinc-100/80 dark:bg-zinc-800/80 p-0.5">
                     <button
                       type="button"
                       onClick={() => setHeightUnit('cm')}
-                      className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
+                      className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
                         heightUnit === 'cm'
                           ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-2xs'
                           : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
@@ -343,7 +343,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                     <button
                       type="button"
                       onClick={() => setHeightUnit('in')}
-                      className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
+                      className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
                         heightUnit === 'in'
                           ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-2xs'
                           : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
@@ -357,8 +357,8 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
 
               {/* Weight Input & Unit Toggle */}
               <div>
-                <label htmlFor="onboarding-weight" className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
-                  Current Weight (Optional)
+                <label htmlFor="onboarding-weight" className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
+                  Weight (Optional)
                 </label>
                 <div className="flex items-center gap-2">
                   <input
@@ -369,14 +369,14 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                     max="500"
                     value={weightInput}
                     onChange={(e) => setWeightInput(e.target.value)}
-                    placeholder={weightUnit === 'kg' ? 'e.g. 70' : 'e.g. 154'}
-                    className="flex-1 px-3.5 py-2.5 text-sm font-mono border border-zinc-300 dark:border-zinc-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
+                    placeholder={weightUnit === 'kg' ? 'e.g. 72.5' : 'e.g. 160'}
+                    className="flex-1 px-3.5 py-2.5 text-sm font-mono glass-input rounded-xl focus:outline-none text-zinc-900 dark:text-zinc-100"
                   />
-                  <div className="flex rounded-xl border border-zinc-300 dark:border-zinc-700 overflow-hidden bg-zinc-100 dark:bg-zinc-800 p-0.5">
+                  <div className="flex rounded-xl border border-zinc-300/60 dark:border-white/10 overflow-hidden bg-zinc-100/80 dark:bg-zinc-800/80 p-0.5">
                     <button
                       type="button"
                       onClick={() => setWeightUnit('kg')}
-                      className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
+                      className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
                         weightUnit === 'kg'
                           ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-2xs'
                           : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
@@ -387,7 +387,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                     <button
                       type="button"
                       onClick={() => setWeightUnit('lbs')}
-                      className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
+                      className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
                         weightUnit === 'lbs'
                           ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-2xs'
                           : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
@@ -400,10 +400,10 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
               </div>
 
               {/* Privacy Notice Banner */}
-              <div className="p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200/80 dark:border-zinc-700/70 flex items-start gap-2.5 text-xs text-zinc-600 dark:text-zinc-300">
+              <div className="p-3.5 rounded-xl bg-zinc-100/70 dark:bg-zinc-800/50 border border-zinc-200/70 dark:border-white/5 flex items-start gap-2.5 text-xs text-zinc-600 dark:text-zinc-300">
                 <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
                 <div className="leading-relaxed">
-                  <strong className="text-zinc-800 dark:text-zinc-200 font-semibold block">Private Personal Records</strong>
+                  <strong className="text-zinc-900 dark:text-zinc-100 font-semibold block">Private Personal Records</strong>
                   These metrics are strictly private to your personal account. Daily Habits does not enforce restrictive calorie targets, ideal weight calculations, or body comparisons.
                 </div>
               </div>
@@ -419,7 +419,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 bg-zinc-900 hover:bg-black dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 text-sm font-semibold rounded-xl transition-colors cursor-pointer inline-flex items-center gap-2"
+                  className="px-5 py-2.5 bg-zinc-900 hover:bg-black dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 text-sm font-semibold rounded-xl transition-all shadow-sm active:scale-95 cursor-pointer inline-flex items-center gap-2"
                 >
                   <span>Continue</span>
                   <ArrowRight className="w-4 h-4" />
@@ -443,7 +443,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                 <button
                   type="button"
                   onClick={handleOpenAddCustomHabit}
-                  className="px-3 py-1.5 text-xs font-semibold bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 rounded-lg inline-flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
+                  className="px-3 py-1.5 text-xs font-semibold bg-zinc-200/70 hover:bg-zinc-300/70 dark:bg-zinc-800/80 dark:hover:bg-zinc-700 text-zinc-900 dark:text-zinc-100 rounded-xl inline-flex items-center gap-1.5 transition-all cursor-pointer shrink-0 border border-zinc-300/40 dark:border-white/5"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Custom Habit</span>
@@ -460,16 +460,16 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                       onClick={() => handleToggleHabitSelection(habit.id)}
                       className={`flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer select-none ${
                         isSelected
-                          ? 'bg-zinc-900/5 dark:bg-zinc-100/5 border-zinc-900/30 dark:border-zinc-100/30'
-                          : 'bg-zinc-50/50 dark:bg-zinc-800/30 border-zinc-200 dark:border-zinc-800 opacity-60'
+                          ? 'glass-tile border-zinc-400/50 dark:border-white/20'
+                          : 'bg-zinc-100/40 dark:bg-zinc-900/30 border-zinc-200/40 dark:border-white/5 opacity-60'
                       }`}
                     >
                       <div className="flex items-center gap-3 min-w-0">
                         <div
-                          className={`w-5 h-5 rounded-md flex items-center justify-center border transition-colors shrink-0 ${
+                          className={`w-5 h-5 rounded-lg flex items-center justify-center border transition-all shrink-0 ${
                             isSelected
                               ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 border-zinc-900 dark:border-zinc-100'
-                              : 'border-zinc-300 dark:border-zinc-700'
+                              : 'border-zinc-300 dark:border-zinc-700 bg-white/80 dark:bg-zinc-800/80'
                           }`}
                         >
                           {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
@@ -479,7 +479,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                           <HabitIcon
                             name={habit.icon}
                             className={`w-4 h-4 shrink-0 ${
-                              isSelected ? 'text-zinc-800 dark:text-zinc-200' : 'text-zinc-400'
+                              isSelected ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-400'
                             }`}
                           />
                         )}
@@ -493,7 +493,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                             {habit.name}
                           </p>
                           {habit.target && (
-                            <p className="text-[11px] text-zinc-400 dark:text-zinc-500 font-mono truncate">
+                            <p className="text-[11px] text-zinc-500 dark:text-zinc-400 font-mono truncate">
                               {habit.target}
                             </p>
                           )}
@@ -505,7 +505,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                         <button
                           type="button"
                           onClick={(e) => handleOpenEditHabit(habit, e)}
-                          className="p-1.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                          className="p-1.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 rounded-lg hover:bg-zinc-200/50 dark:hover:bg-white/10 transition-colors"
                           title="Edit Habit"
                         >
                           <Edit2 className="w-3.5 h-3.5" />
@@ -513,7 +513,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                         <button
                           type="button"
                           onClick={() => handleDeleteHabit(habit.id)}
-                          className="p-1.5 text-zinc-400 hover:text-red-600 dark:hover:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
+                          className="p-1.5 text-zinc-400 hover:text-red-600 dark:hover:text-red-400 rounded-lg hover:bg-red-500/10 dark:hover:bg-red-500/15 transition-colors"
                           title="Remove Habit"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -537,7 +537,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                   type="button"
                   disabled={selectedHabitIds.size === 0}
                   onClick={handleNextFromStep3}
-                  className="px-5 py-2.5 bg-zinc-900 hover:bg-black dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 text-sm font-semibold rounded-xl transition-colors cursor-pointer inline-flex items-center gap-2 disabled:opacity-40"
+                  className="px-5 py-2.5 bg-zinc-900 hover:bg-black dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 text-sm font-semibold rounded-xl transition-all shadow-sm active:scale-95 cursor-pointer inline-flex items-center gap-2 disabled:opacity-40"
                 >
                   <span>Review & Continue</span>
                   <ArrowRight className="w-4 h-4" />
@@ -550,7 +550,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
           {step === 4 && (
             <div className="space-y-5">
               <div>
-                <div className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 mb-3">
+                <div className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 mb-3 shadow-xs">
                   <Sparkles className="w-5 h-5" />
                 </div>
                 <h2 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
@@ -561,23 +561,23 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                 </p>
               </div>
 
-              <div className="bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700/80 rounded-xl p-4 space-y-3">
-                <div className="flex items-center justify-between text-xs pb-2 border-b border-zinc-200/80 dark:border-zinc-700/60">
+              <div className="glass-card rounded-xl p-4 space-y-3">
+                <div className="flex items-center justify-between text-xs pb-2 border-b border-zinc-200/70 dark:border-white/10">
                   <span className="text-zinc-500 dark:text-zinc-400">Account</span>
-                  <span className="font-semibold text-zinc-800 dark:text-zinc-200">{displayName}</span>
+                  <span className="font-semibold text-zinc-900 dark:text-zinc-100">{displayName}</span>
                 </div>
                 {dateOfBirth && (
-                  <div className="flex items-center justify-between text-xs pb-2 border-b border-zinc-200/80 dark:border-zinc-700/60">
+                  <div className="flex items-center justify-between text-xs pb-2 border-b border-zinc-200/70 dark:border-white/10">
                     <span className="text-zinc-500 dark:text-zinc-400">Age</span>
-                    <span className="font-mono text-zinc-800 dark:text-zinc-200">
+                    <span className="font-mono font-medium text-zinc-900 dark:text-zinc-100">
                       {age !== null ? `${age} years old` : dateOfBirth}
                     </span>
                   </div>
                 )}
                 {(heightInput || weightInput) && (
-                  <div className="flex items-center justify-between text-xs pb-2 border-b border-zinc-200/80 dark:border-zinc-700/60">
+                  <div className="flex items-center justify-between text-xs pb-2 border-b border-zinc-200/70 dark:border-white/10">
                     <span className="text-zinc-500 dark:text-zinc-400">Metrics</span>
-                    <span className="font-mono text-zinc-800 dark:text-zinc-200">
+                    <span className="font-mono font-medium text-zinc-900 dark:text-zinc-100">
                       {heightInput ? `${heightInput} ${heightUnit}` : ''}
                       {heightInput && weightInput ? ' • ' : ''}
                       {weightInput ? `${weightInput} ${weightUnit}` : ''}
@@ -586,7 +586,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                 )}
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-zinc-500 dark:text-zinc-400">Daily Routines</span>
-                  <span className="font-semibold text-zinc-800 dark:text-zinc-200">
+                  <span className="font-semibold text-zinc-900 dark:text-zinc-100">
                     {activeHabits.length} selected
                   </span>
                 </div>
@@ -606,7 +606,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                   type="button"
                   disabled={isLoading}
                   onClick={handleFinishOnboarding}
-                  className="px-6 py-3 bg-zinc-900 hover:bg-black dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 text-sm font-semibold rounded-xl transition-all shadow-sm cursor-pointer inline-flex items-center gap-2 disabled:opacity-50"
+                  className="px-6 py-3 bg-zinc-900 hover:bg-black dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 text-sm font-semibold rounded-xl transition-all shadow-sm active:scale-95 cursor-pointer inline-flex items-center gap-2 disabled:opacity-50"
                 >
                   {isLoading ? (
                     <>

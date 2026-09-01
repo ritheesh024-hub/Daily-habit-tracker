@@ -34,13 +34,13 @@ export const HabitRow: React.FC<HabitRowProps> = ({
       aria-label={`${habit.name}${habit.target ? `, Goal: ${habit.target}` : ''}, Status: ${completed ? 'Completed' : 'Incomplete'}`}
       onKeyDown={handleKeyDown}
       onClick={() => !disabled && onToggle(habit.id)}
-      className={`group flex items-center justify-between min-h-[44px] py-2 sm:py-2.5 px-3 sm:px-3.5 rounded-lg border transition-colors cursor-pointer select-none focus-visible:ring-2 focus-visible:ring-zinc-900 dark:focus-visible:ring-zinc-100 focus-visible:outline-none ${
+      className={`group flex items-center justify-between min-h-[48px] py-2.5 sm:py-3 px-3.5 sm:px-4 rounded-xl glass-tile cursor-pointer select-none focus-visible:ring-2 focus-visible:ring-zinc-900 dark:focus-visible:ring-zinc-100 focus-visible:outline-none ${
         completed
-          ? 'bg-zinc-50/80 dark:bg-zinc-900/40 border-zinc-200/80 dark:border-zinc-800/60 text-zinc-500 dark:text-zinc-500'
-          : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-2xs'
-      } ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`}
+          ? 'opacity-70 dark:opacity-60 bg-zinc-100/50 dark:bg-zinc-900/30'
+          : ''
+      } ${disabled ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''}`}
     >
-      <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
+      <div className="flex items-center gap-3 sm:gap-3.5 min-w-0 flex-1">
         {/* Checkbox button */}
         <button
           type="button"
@@ -54,31 +54,31 @@ export const HabitRow: React.FC<HabitRowProps> = ({
             e.stopPropagation();
             if (!disabled) onToggle(habit.id);
           }}
-          className={`w-5 h-5 rounded border flex items-center justify-center transition-colors shrink-0 ${
+          className={`w-5 h-5 sm:w-5.5 sm:h-5.5 rounded-lg border flex items-center justify-center transition-all duration-200 shrink-0 shadow-2xs ${
             completed
-              ? 'bg-zinc-900 dark:bg-zinc-100 border-zinc-900 dark:border-zinc-100 text-white dark:text-zinc-900'
-              : 'border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 group-hover:border-zinc-400 dark:group-hover:border-zinc-500'
+              ? 'bg-zinc-900 dark:bg-zinc-100 border-zinc-900 dark:border-zinc-100 text-white dark:text-zinc-900 scale-100'
+              : 'border-zinc-300 dark:border-zinc-600 bg-white/80 dark:bg-zinc-800/80 group-hover:border-zinc-400 dark:group-hover:border-zinc-400 group-hover:scale-105'
           }`}
         >
-          {completed && <Check className="w-3.5 h-3.5 stroke-[2.5]" />}
+          {completed && <Check className="w-3.5 h-3.5 stroke-[3]" />}
         </button>
 
         {/* Index, Icon & Habit Name */}
-        <div className="flex items-center gap-2 min-w-0">
+        <div className="flex items-center gap-2.5 min-w-0">
           <span className="text-xs font-mono text-zinc-400 dark:text-zinc-500 w-4 shrink-0">{index + 1}.</span>
           {habit.icon && (
             <span
-              className={`shrink-0 ${
-                completed ? 'text-zinc-400 dark:text-zinc-500' : 'text-zinc-500 dark:text-zinc-400 group-hover:text-zinc-800 dark:group-hover:text-zinc-200'
+              className={`shrink-0 transition-colors ${
+                completed ? 'text-zinc-400 dark:text-zinc-500' : 'text-zinc-500 dark:text-zinc-400 group-hover:text-zinc-900 dark:group-hover:text-zinc-100'
               }`}
             >
-              <HabitIcon name={habit.icon} className="w-3.5 h-3.5" />
+              <HabitIcon name={habit.icon} className="w-4 h-4" />
             </span>
           )}
           <span
             id={`habit-name-${habit.id}`}
-            className={`text-xs sm:text-sm font-medium tracking-tight truncate ${
-              completed ? 'line-through text-zinc-400 dark:text-zinc-500' : 'text-zinc-800 dark:text-zinc-200'
+            className={`text-xs sm:text-sm font-medium tracking-tight truncate transition-colors ${
+              completed ? 'line-through text-zinc-400 dark:text-zinc-500 font-normal' : 'text-zinc-900 dark:text-zinc-100 font-semibold'
             }`}
           >
             {habit.name}
@@ -91,10 +91,10 @@ export const HabitRow: React.FC<HabitRowProps> = ({
         <div className="shrink-0 ml-2">
           <span
             id={`habit-target-${habit.id}`}
-            className={`text-[11px] sm:text-xs px-2 py-0.5 rounded font-mono truncate max-w-[120px] sm:max-w-none inline-block ${
+            className={`text-[11px] sm:text-xs px-2.5 py-0.5 rounded-full font-mono truncate max-w-[120px] sm:max-w-none inline-block backdrop-blur-xs transition-colors ${
               completed
-                ? 'bg-zinc-100 dark:bg-zinc-800/60 text-zinc-400 dark:text-zinc-500'
-                : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border border-zinc-200/60 dark:border-zinc-700/60'
+                ? 'bg-zinc-200/40 dark:bg-zinc-800/40 text-zinc-400 dark:text-zinc-500 border border-transparent'
+                : 'bg-zinc-100/90 dark:bg-zinc-800/80 text-zinc-700 dark:text-zinc-300 border border-zinc-200/80 dark:border-white/10'
             }`}
           >
             {habit.target}
