@@ -11,6 +11,7 @@ interface HabitModalProps {
     target: string;
     icon: string;
     time?: string;
+    frequency?: string;
     reminderEnabled?: boolean;
     reminderTime?: string;
   }) => void;
@@ -40,6 +41,7 @@ export const HabitModal: React.FC<HabitModalProps> = ({
   const [selectedIcon, setSelectedIcon] = useState('check');
   const [hasScheduledTime, setHasScheduledTime] = useState(true);
   const [scheduledTime, setScheduledTime] = useState('08:00');
+  const [frequency, setFrequency] = useState('Every day');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -50,6 +52,7 @@ export const HabitModal: React.FC<HabitModalProps> = ({
       setName(initialHabit.name || '');
       setTarget(initialHabit.target || '');
       setSelectedIcon(initialHabit.icon || 'check');
+      setFrequency(initialHabit.frequency || 'Every day');
       const timeVal = initialHabit.time || initialHabit.reminderTime;
       if (timeVal) {
         setHasScheduledTime(true);
@@ -62,6 +65,7 @@ export const HabitModal: React.FC<HabitModalProps> = ({
       setName('');
       setTarget('');
       setSelectedIcon('check');
+      setFrequency('Every day');
       setHasScheduledTime(true);
       setScheduledTime('08:00');
     }
@@ -84,6 +88,7 @@ export const HabitModal: React.FC<HabitModalProps> = ({
       target: target.trim(),
       icon: selectedIcon,
       time: finalTime,
+      frequency,
       reminderEnabled: hasScheduledTime,
       reminderTime: finalTime,
     });
@@ -290,6 +295,32 @@ export const HabitModal: React.FC<HabitModalProps> = ({
                   />
                 </div>
               )}
+            </div>
+
+            {/* Frequency Selector */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-zinc-800 dark:text-zinc-200 block">
+                Frequency
+              </label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                {['Every day', 'Weekdays', 'Weekends', '3x a week'].map((freqOption) => {
+                  const isSelected = frequency === freqOption;
+                  return (
+                    <button
+                      key={freqOption}
+                      type="button"
+                      onClick={() => setFrequency(freqOption)}
+                      className={`py-1.5 px-2 text-xs font-medium rounded-lg border transition-all cursor-pointer text-center ${
+                        isSelected
+                          ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-950 border-zinc-900 dark:border-zinc-100 shadow-xs'
+                          : 'bg-zinc-100/70 dark:bg-zinc-800/50 text-zinc-600 dark:text-zinc-300 border-zinc-200/70 dark:border-white/5 hover:bg-zinc-200/70 dark:hover:bg-zinc-700/60'
+                      }`}
+                    >
+                      {freqOption}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             {/* Error Message */}

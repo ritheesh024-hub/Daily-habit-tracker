@@ -5,6 +5,7 @@ export interface HabitItem {
   icon?: string;
   order: number;
   time?: string; // HH:mm format e.g. "06:30", "20:30"
+  frequency?: string; // e.g. "Daily", "Weekdays", "Weekends", "Custom"
   googleCalendarEventId?: string; // Associated Google Calendar recurring event ID
   googleCalendarSynced?: boolean;
   lastSyncedAt?: string;
@@ -142,6 +143,8 @@ export interface Milestone {
   progressText: string;
 }
 
+export type MilestoneItem = Milestone;
+
 export interface UnlockedMilestoneRecord {
   id: string;
   unlockedAt: string;
@@ -156,3 +159,36 @@ export interface CalendarSyncResult {
   updatedHabits: HabitItem[];
   error?: string;
 }
+
+export interface MonthlyHabitPerformance {
+  id: string;
+  name: string;
+  icon?: string;
+  target?: string;
+  completedCount: number;
+  eligibleDays: number;
+  percentage: number;
+}
+
+export interface MonthlyRecapData {
+  year: number;
+  monthIndex: number; // 0 to 11
+  monthName: string; // e.g. "September 2026"
+  completionPercentage: number;
+  totalCompletedHabits: number;
+  totalPossibleHabits: number;
+  daysActive: number;
+  perfectDays: number;
+  bestStreakDuringMonth: number;
+  mostCompletedHabit: MonthlyHabitPerformance | null;
+  leastCompletedHabit: MonthlyHabitPerformance | null;
+  habitPerformanceList: MonthlyHabitPerformance[];
+  previousMonthComparison?: {
+    prevMonthName: string;
+    prevPercentage: number;
+    difference: number; // e.g. +8
+  };
+  insights: string[];
+  hasEnoughData: boolean;
+}
+

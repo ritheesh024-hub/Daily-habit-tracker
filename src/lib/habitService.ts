@@ -1392,15 +1392,15 @@ export async function fetchHabitHistoryAndStreaks(
     totalActiveCount: number;
   }> = [];
 
-  // 1. Fetch lightweight 35-day window from dailyLogs
+  // 1. Fetch multi-month window from dailyLogs for streaks and monthly recaps
   try {
     const logsCol = collection(db, 'users', userId, 'dailyLogs');
     let snapshot;
     try {
-      const q = query(logsCol, orderBy('date', 'desc'), limit(35));
+      const q = query(logsCol, orderBy('date', 'desc'), limit(180));
       snapshot = await getDocs(q);
     } catch {
-      const fallbackQ = query(logsCol, limit(50));
+      const fallbackQ = query(logsCol, limit(180));
       snapshot = await getDocs(fallbackQ);
     }
 

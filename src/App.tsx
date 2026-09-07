@@ -97,6 +97,12 @@ import { LoginView } from './components/LoginView';
 import { LandingPage } from './components/LandingPage';
 import { OnboardingModal } from './components/OnboardingModal';
 import { WeeklyWeightModal } from './components/WeeklyWeightModal';
+import { BottomNav, MainNavTab } from './components/BottomNav';
+import { ManageHabitsView } from './components/ManageHabitsView';
+import { AnalyticsView } from './components/AnalyticsView';
+import { FutureView } from './components/FutureView';
+import { ProfileView } from './components/ProfileView';
+import { HabitModal } from './components/HabitModal';
 
 const DEFAULT_ANALYTICS: AnalyticsStats = {
   currentStreak: 0,
@@ -183,11 +189,19 @@ export function App() {
     return getCachedMilestones(cachedUser?.uid) || {};
   });
 
-  // UI Modals State
+  // UI Modals & Navigation State
+  const [activeTab, setActiveTab] = useState<MainNavTab>('task');
+  const [isHabitModalOpen, setIsHabitModalOpen] = useState<boolean>(false);
+  const [editingHabit, setEditingHabit] = useState<HabitItem | null>(null);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [profileModalTab, setProfileModalTab] = useState<TabType>('analytics');
   const [isSavingLog, setIsSavingLog] = useState(false);
   const [isSyncingCalendar, setIsSyncingCalendar] = useState(false);
+
+  // User Weight History derived for Analytics
+  const weightHistory = useMemo(() => {
+    return currentUser?.uid ? getCachedWeightHistory(currentUser.uid) : [];
+  }, [currentUser?.uid, currentUser?.weight, currentUser?.lastWeightCheckInDate]);
 
   // Network offline tracker
   const [isOnline, setIsOnline] = useState<boolean>(
@@ -1094,6 +1108,7 @@ export function App() {
       time?: string;
       reminderEnabled?: boolean;
       reminderTime?: string;
+      frequency?: string;
     },
     editingHabit?: HabitItem | null
   ) => {
@@ -1111,6 +1126,7 @@ export function App() {
         time: scheduledTime,
         reminderEnabled: !!scheduledTime,
         reminderTime: scheduledTime || '08:00',
+        frequency: data.frequency || editingHabit.frequency || 'Every day',
       };
 
       const nextHabits = habits.map((h) => (h.id === savedHabit.id ? savedHabit : h));
@@ -1128,6 +1144,7 @@ export function App() {
         time: scheduledTime,
         reminderEnabled: !!scheduledTime,
         reminderTime: scheduledTime || '08:00',
+        frequency: data.frequency || 'Every day',
         createdAt: new Date().toISOString(),
       };
 
@@ -1163,6 +1180,30 @@ export function App() {
         }
       }
     }
+  };
+
+  // Habit modal handlers for top-level navigation
+  const handleSaveHabitModal = async (
+    data: {
+      name: string;
+      target: string;
+      icon: string;
+      time?: string;
+      reminderEnabled?: boolean;
+      reminderTime?: string;
+      frequency?: string;
+    },
+    habitToUpdate?: HabitItem | null
+  ) => {
+    await handleSaveHabitFromProfile(data, habitToUpdate || editingHabit);
+    setIsHabitModalOpen(false);
+    setEditingHabit(null);
+  };
+
+  const handleDeleteHabitModal = async (habitId: string) => {
+    await handleDeleteHabitFromProfile(habitId);
+    setIsHabitModalOpen(false);
+    setEditingHabit(null);
   };
 
   // Delete habit handler
@@ -1255,10 +1296,7 @@ export function App() {
       <Header
         user={currentUser}
         currentDate={selectedDate}
-        onOpenProfile={() => {
-          setProfileModalTab('analytics');
-          setIsProfileModalOpen(true);
-        }}
+        onOpenProfile={() => setActiveTab('profile')}
         isSyncing={isSavingLog}
       />
 
@@ -1273,97 +1311,148 @@ export function App() {
         </div>
       )}
 
-      {/* Main Single Page Content */}
-      <main id="main-content" className="relative z-10 flex-1 max-w-2xl w-full mx-auto p-3 sm:p-5 space-y-3.5 sm:space-y-4">
-        {/* Date Selector / Notice when viewing historical past days */}
-        {!isToday && (
-          <div
-            id="past-date-banner"
-            className="flex items-center justify-between p-3 rounded-xl glass-card text-xs text-zinc-800 dark:text-zinc-200 animate-slideUp"
-          >
-            <div className="flex items-center gap-2">
-              <span className="font-semibold text-zinc-900 dark:text-zinc-100">Viewing past date:</span>
-              <span className="font-mono">{formatHeaderDate(selectedDate)}</span>
-            </div>
-            <button
-              id="return-to-today-btn"
-              type="button"
-              onClick={() => setSelectedDate(todayDate)}
-              className="inline-flex items-center gap-1 font-semibold text-zinc-900 dark:text-zinc-100 hover:opacity-80 transition-opacity underline cursor-pointer active:scale-[0.98]"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              Back to Today
-            </button>
+      {/* Main Content Area - Renders based on activeTab */}
+      <main id="main-content" className="relative z-10 flex-1 max-w-2xl w-full mx-auto p-3 sm:p-5 pb-24 sm:pb-28 space-y-4">
+        {/* MODULE 1: TASK (Main Dashboard) */}
+        {activeTab === 'task' && (
+          <div id="module-task-dashboard" className="space-y-3.5 sm:space-y-4 animate-fadeIn">
+            {/* Date Selector / Notice when viewing historical past days */}
+            {!isToday && (
+              <div
+                id="past-date-banner"
+                className="flex items-center justify-between p-3 rounded-xl glass-card text-xs text-zinc-800 dark:text-zinc-200 animate-slideUp"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-zinc-900 dark:text-zinc-100">Viewing past date:</span>
+                  <span className="font-mono">{formatHeaderDate(selectedDate)}</span>
+                </div>
+                <button
+                  id="return-to-today-btn"
+                  type="button"
+                  onClick={() => setSelectedDate(todayDate)}
+                  className="inline-flex items-center gap-1 font-semibold text-zinc-900 dark:text-zinc-100 hover:opacity-80 transition-opacity underline cursor-pointer active:scale-[0.98]"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  Back to Today
+                </button>
+              </div>
+            )}
+
+            {/* Streaks Statistics */}
+            <StreakStatsCard stats={streaks} />
+
+            {/* Daily Completion Progress Section */}
+            <ProgressBar
+              completed={completedCount}
+              total={totalCount}
+            />
+
+            {/* Habit List Section */}
+            <section id="habit-checklist-section" className="space-y-2">
+              <div className="flex items-center justify-between">
+                <h2 id="checklist-heading" className="text-xs sm:text-sm font-semibold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider">
+                  {isToday ? "Today's Checklist" : `Checklist for ${formatHeaderDate(selectedDate)}`}
+                </h2>
+              </div>
+
+              <HabitList
+                habits={habits}
+                completedHabits={dailyLog.completedHabits}
+                onToggleHabit={handleToggleHabit}
+              />
+            </section>
+
+            {/* Daily Note Section */}
+            <DailyNote
+              selectedDate={selectedDate}
+              isToday={isToday}
+              note={dailyLog.note || ''}
+              onSaveNote={handleSaveDailyNote}
+              onClearNote={handleClearDailyNote}
+              isSaving={isSavingNote}
+            />
+
+            {/* 7-Day History Section */}
+            <HistoryList
+              history={history}
+              currentSelectedDate={selectedDate}
+              todayDate={todayDate}
+              onSelectDate={handleSelectDate}
+            />
           </div>
         )}
 
-        {/* Streaks Statistics */}
-        <StreakStatsCard stats={streaks} />
-
-        {/* Daily Completion Progress Section */}
-        <ProgressBar
-          completed={completedCount}
-          total={totalCount}
-        />
-
-        {/* Habit List Section */}
-        <section id="habit-checklist-section" className="space-y-2">
-          <div className="flex items-center justify-between">
-            <h2 id="checklist-heading" className="text-xs sm:text-sm font-semibold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider">
-              {isToday ? "Today's Checklist" : `Checklist for ${formatHeaderDate(selectedDate)}`}
-            </h2>
-          </div>
-
-          <HabitList
+        {/* MODULE 2: NEW HABIT (Manage Habits View) */}
+        {activeTab === 'new_habit' && (
+          <ManageHabitsView
             habits={habits}
-            completedHabits={dailyLog.completedHabits}
-            onToggleHabit={handleToggleHabit}
+            onAddNewHabit={() => {
+              setEditingHabit(null);
+              setIsHabitModalOpen(true);
+            }}
+            onEditHabit={(habit) => {
+              setEditingHabit(habit);
+              setIsHabitModalOpen(true);
+            }}
+            onDeleteHabit={handleDeleteHabitFromProfile}
+            isCalendarConnected={!!currentUser?.googleCalendarConnected}
           />
-        </section>
+        )}
 
-        {/* Daily Note Section */}
-        <DailyNote
-          selectedDate={selectedDate}
-          isToday={isToday}
-          note={dailyLog.note || ''}
-          onSaveNote={handleSaveDailyNote}
-          onClearNote={handleClearDailyNote}
-          isSaving={isSavingNote}
-        />
+        {/* MODULE 3: ANALYTICS (Professional Analytics Dashboard) */}
+        {activeTab === 'analytics' && (
+          <AnalyticsView
+            analytics={analytics}
+            rawLogsMap={rawLogsMap}
+            habits={habits}
+            todayDate={todayDate}
+            userProfile={currentUser}
+            weightHistory={weightHistory}
+            onOpenWeightModal={() => setShowWeeklyWeightModal(true)}
+          />
+        )}
 
-        {/* 7-Day History Section */}
-        <HistoryList
-          history={history}
-          currentSelectedDate={selectedDate}
-          todayDate={todayDate}
-          onSelectDate={handleSelectDate}
-        />
+        {/* MODULE 4: FUTURE (Roadmap & Milestones) */}
+        {activeTab === 'future' && (
+          <FutureView
+            milestones={milestones}
+            streaks={streaks}
+          />
+        )}
+
+        {/* MODULE 5: PROFILE (Account & Settings) */}
+        {activeTab === 'profile' && (
+          <ProfileView
+            user={currentUser}
+            onUpdateProfile={handleUpdateProfile}
+            onConnectGoogleCalendar={handleConnectGoogleCalendar}
+            onDisconnectGoogleCalendar={handleDisconnectGoogleCalendar}
+            onSyncHabitsToCalendar={handleSyncHabitsToCalendar}
+            isSyncingCalendar={isSyncingCalendar}
+            theme={theme}
+            onThemeChange={handleThemeChange}
+            onSignOut={handleSignOut}
+            onExportData={handleExportUserData}
+            onClearData={handleClearUserData}
+            onDeleteAccount={handleDeleteUserAccount}
+            habits={habits}
+            rawLogsMap={rawLogsMap}
+            todayDate={todayDate}
+          />
+        )}
       </main>
 
-      {/* Profile, Manage Habits, Analytics & Integrations Modal */}
-      <ProfileModal
-        isOpen={isProfileModalOpen}
-        onClose={() => setIsProfileModalOpen(false)}
-        user={currentUser}
-        onUpdateProfile={handleUpdateProfile}
-        habits={habits}
-        onSaveHabit={handleSaveHabitFromProfile}
-        onDeleteHabit={handleDeleteHabitFromProfile}
-        onConnectGoogleCalendar={handleConnectGoogleCalendar}
-        onDisconnectGoogleCalendar={handleDisconnectGoogleCalendar}
-        onSyncHabitsToCalendar={handleSyncHabitsToCalendar}
-        isSyncingCalendar={isSyncingCalendar}
-        analytics={analytics}
-        milestones={milestones}
-        rawLogsMap={rawLogsMap}
-        todayDate={todayDate}
-        onSignOut={handleSignOut}
-        onExportData={handleExportUserData}
-        onClearData={handleClearUserData}
-        onDeleteAccount={handleDeleteUserAccount}
-        initialTab={profileModalTab}
-        theme={theme}
-        onThemeChange={handleThemeChange}
+      {/* Habit Creation & Editing Modal */}
+      <HabitModal
+        isOpen={isHabitModalOpen}
+        onClose={() => {
+          setIsHabitModalOpen(false);
+          setEditingHabit(null);
+        }}
+        onSave={handleSaveHabitModal}
+        onDelete={editingHabit ? () => handleDeleteHabitModal(editingHabit.id) : undefined}
+        initialData={editingHabit}
+        isEditing={!!editingHabit}
       />
 
       {/* Weekly Weight Check-in Voluntary Modal */}
@@ -1375,6 +1464,12 @@ export function App() {
         onSave={handleSaveWeeklyWeight}
         currentWeight={currentUser?.weight}
         currentUnit={currentUser?.weightUnit}
+      />
+
+      {/* 5-Module Bottom Navigation */}
+      <BottomNav
+        activeTab={activeTab}
+        onSelectTab={setActiveTab}
       />
 
       {/* Subtle Footer */}
