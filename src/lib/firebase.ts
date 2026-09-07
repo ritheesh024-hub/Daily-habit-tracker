@@ -5,8 +5,9 @@ import { getAnalytics, isSupported } from 'firebase/analytics';
 import fallbackConfig from '../../firebase-applet-config.json';
 
 // Resolves environment variables from Vercel / Vite env if provided, otherwise falls back to config file
+const rawFallback = fallbackConfig as Record<string, any>;
 const envProjectId = import.meta.env.VITE_FIREBASE_PROJECT_ID;
-const projectId = envProjectId || fallbackConfig.projectId || '';
+const projectId = envProjectId || rawFallback.projectId || '';
 
 // Determine database ID: if custom project is set via env, only use (default) unless explicitly specified
 const envDatabaseId = import.meta.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID;
@@ -14,18 +15,18 @@ let firestoreDatabaseId = '(default)';
 
 if (envDatabaseId && envDatabaseId !== '(default)') {
   firestoreDatabaseId = envDatabaseId;
-} else if (!envProjectId && fallbackConfig.firestoreDatabaseId && fallbackConfig.firestoreDatabaseId !== '(default)') {
-  firestoreDatabaseId = fallbackConfig.firestoreDatabaseId;
+} else if (!envProjectId && rawFallback.firestoreDatabaseId && rawFallback.firestoreDatabaseId !== '(default)') {
+  firestoreDatabaseId = rawFallback.firestoreDatabaseId;
 }
 
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || fallbackConfig.apiKey || '',
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || fallbackConfig.authDomain || '',
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || rawFallback.apiKey || '',
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || rawFallback.authDomain || '',
   projectId,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || fallbackConfig.storageBucket || '',
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || fallbackConfig.messagingSenderId || '',
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || fallbackConfig.appId || '',
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || fallbackConfig.measurementId || '',
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || rawFallback.storageBucket || '',
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || rawFallback.messagingSenderId || '',
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || rawFallback.appId || '',
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || rawFallback.measurementId || '',
 };
 
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();

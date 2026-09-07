@@ -15,6 +15,8 @@ export const HistoryList: React.FC<HistoryListProps> = ({
   todayDate,
   onSelectDate,
 }) => {
+  const safeHistory = Array.isArray(history) ? history : [];
+
   return (
     <section id="seven-day-history-section" className="pt-2 transition-colors">
       <div className="flex items-center justify-between mb-2 px-0.5">
@@ -26,13 +28,13 @@ export const HistoryList: React.FC<HistoryListProps> = ({
         </span>
       </div>
 
-      {history.length === 0 ? (
+      {safeHistory.length === 0 ? (
         <div id="history-empty" className="py-5 text-center text-xs text-zinc-500 dark:text-zinc-400 border border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl glass-card">
           No completed days yet.
         </div>
       ) : (
         <div id="seven-day-history-list" className="divide-y divide-zinc-200/50 dark:divide-white/5 rounded-xl overflow-hidden glass-card shadow-sm">
-          {history.map((item) => {
+          {safeHistory.map((item) => {
             const isSelected = item.date === currentSelectedDate;
             const isToday = item.date === todayDate;
             const isFull = item.isCompleted;

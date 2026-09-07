@@ -4,21 +4,26 @@ export interface HabitItem {
   target?: string;
   icon?: string;
   order: number;
+  time?: string; // HH:mm format e.g. "06:30", "20:30"
+  googleCalendarEventId?: string; // Associated Google Calendar recurring event ID
+  googleCalendarSynced?: boolean;
+  lastSyncedAt?: string;
+  // Backward compatibility fields
   reminderEnabled?: boolean;
-  reminderTime?: string; // HH:mm format e.g. "06:30", "20:30"
+  reminderTime?: string;
   createdAt?: string;
   updatedAt?: string;
 }
 
 export const DEFAULT_HABITS: HabitItem[] = [
-  { id: 'wakeUp', name: 'Wake Up At', target: '6:30 AM', icon: 'sun', order: 0, reminderEnabled: true, reminderTime: '06:30' },
-  { id: 'water', name: 'Water', target: '8 glasses', icon: 'droplet', order: 1, reminderEnabled: true, reminderTime: '08:00' },
-  { id: 'gym', name: 'Gym', target: '1 hour', icon: 'dumbbell', order: 2, reminderEnabled: false, reminderTime: '18:00' },
-  { id: 'breakfast', name: 'Breakfast', icon: 'utensils', order: 3, reminderEnabled: false, reminderTime: '08:30' },
-  { id: 'lunch', name: 'Lunch', icon: 'utensils', order: 4, reminderEnabled: false, reminderTime: '12:30' },
-  { id: 'dinner', name: 'Dinner', icon: 'utensils', order: 5, reminderEnabled: false, reminderTime: '19:30' },
-  { id: 'reading', name: 'Reading', target: '1 hour', icon: 'book', order: 6, reminderEnabled: true, reminderTime: '20:30' },
-  { id: 'sleep', name: 'Sleep', target: '10:30 PM', icon: 'moon', order: 7, reminderEnabled: true, reminderTime: '22:30' },
+  { id: 'wakeUp', name: 'Wake Up At', target: '6:30 AM', time: '06:30', icon: 'sun', order: 0, reminderTime: '06:30', reminderEnabled: true },
+  { id: 'water', name: 'Water', target: '8 glasses', time: '08:00', icon: 'droplet', order: 1, reminderTime: '08:00', reminderEnabled: true },
+  { id: 'breakfast', name: 'Breakfast', time: '08:30', icon: 'utensils', order: 2, reminderTime: '08:30', reminderEnabled: true },
+  { id: 'lunch', name: 'Lunch', time: '12:30', icon: 'utensils', order: 3, reminderTime: '12:30', reminderEnabled: true },
+  { id: 'gym', name: 'Gym', target: '1 hour', time: '18:00', icon: 'dumbbell', order: 4, reminderTime: '18:00', reminderEnabled: true },
+  { id: 'dinner', name: 'Dinner', time: '19:30', icon: 'utensils', order: 5, reminderTime: '19:30', reminderEnabled: true },
+  { id: 'reading', name: 'Reading', target: '1 hour', time: '20:30', icon: 'book', order: 6, reminderTime: '20:30', reminderEnabled: true },
+  { id: 'sleep', name: 'Sleep', target: '10:30 PM', time: '22:30', icon: 'moon', order: 7, reminderTime: '22:30', reminderEnabled: true },
 ];
 
 export interface DailyLogData {
@@ -43,6 +48,9 @@ export interface UserProfile {
   weightUnit?: 'kg' | 'lbs';
   onboardingCompleted?: boolean;
   lastWeightCheckInDate?: string; // YYYY-MM-DD
+  googleCalendarConnected?: boolean;
+  googleCalendarEmail?: string;
+  lastGoogleCalendarSync?: string;
   createdAt?: string;
   updatedAt?: string;
   lastLoginAt?: string;
@@ -125,13 +133,13 @@ export interface Milestone {
   id: string;
   title: string;
   description: string;
-  icon: string; // 'flame' | 'check' | 'book' | 'target'
+  icon: string;
   category: 'streak' | 'perfect_days' | 'completions' | 'consistency';
   currentValue: number;
   targetValue: number;
   isUnlocked: boolean;
-  unlockedAt?: string; // e.g. "Aug 20" or ISO date
-  progressText: string; // e.g. "7 / 7 days", "10 / 10 perfect days"
+  unlockedAt?: string;
+  progressText: string;
 }
 
 export interface UnlockedMilestoneRecord {
@@ -141,22 +149,10 @@ export interface UnlockedMilestoneRecord {
 
 export type ThemeMode = 'system' | 'light' | 'dark';
 
-export interface UserReminderSettings {
-  remindersEnabled: boolean;
-  reminderTime: string; // HH:mm format e.g. "20:00"
-  updatedAt?: string;
+export interface CalendarSyncResult {
+  success: boolean;
+  syncedCount: number;
+  totalScheduled: number;
+  updatedHabits: HabitItem[];
+  error?: string;
 }
-
-export const DEFAULT_REMINDER_SETTINGS: UserReminderSettings = {
-  remindersEnabled: true,
-  reminderTime: '20:00',
-};
-
-export interface ActiveSmartReminderNotice {
-  id: string;
-  title: string;
-  body: string;
-  incompleteHabits: HabitItem[];
-  timestamp: number;
-}
-

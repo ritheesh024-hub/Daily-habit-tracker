@@ -11,8 +11,6 @@ import {
   AnalyticsStats,
   DayHistorySummary,
   DEFAULT_HABITS,
-  UserReminderSettings,
-  DEFAULT_REMINDER_SETTINGS,
   WeightHistoryEntry,
 } from '../types';
 import { getLocalDateKey } from './dateUtils';
@@ -52,14 +50,18 @@ export function getCachedHabits(userId?: string): HabitItem[] {
   }
   try {
     const raw = localStorage.getItem(`${PREFIX}habits_${userId}`);
-    if (raw) {
+    if (raw !== null) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
+      if (Array.isArray(parsed)) {
         return parsed;
       }
     }
   } catch (e) {
     console.warn(`Cache read error (habits for ${userId}):`, e);
+  }
+  const cachedUser = getCachedUserProfile(userId);
+  if (cachedUser?.onboardingCompleted) {
+    return [];
   }
   return DEFAULT_HABITS.map((h) => ({ ...h }));
 }
@@ -150,37 +152,6 @@ export function setCachedMilestones(userId: string, records: Record<string, stri
   }
 }
 
-export function getCachedReminderSettings(userId?: string): UserReminderSettings {
-  if (!userId) {
-    return { ...DEFAULT_REMINDER_SETTINGS };
-  }
-  try {
-    const raw = localStorage.getItem(`${PREFIX}reminders_${userId}`);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (typeof parsed === 'object' && parsed !== null) {
-        return {
-          remindersEnabled: typeof parsed.remindersEnabled === 'boolean' ? parsed.remindersEnabled : true,
-          reminderTime: typeof parsed.reminderTime === 'string' ? parsed.reminderTime : '20:00',
-          updatedAt: parsed.updatedAt,
-        };
-      }
-    }
-  } catch (e) {
-    console.warn(`Cache read error (reminders for ${userId}):`, e);
-  }
-  return { ...DEFAULT_REMINDER_SETTINGS };
-}
-
-export function setCachedReminderSettings(userId: string, settings: UserReminderSettings): void {
-  if (!userId) return;
-  try {
-    localStorage.setItem(`${PREFIX}reminders_${userId}`, JSON.stringify(settings));
-  } catch (e) {
-    console.warn(`Cache write error (reminders for ${userId}):`, e);
-  }
-}
-
 export function getCachedWeightHistory(userId?: string): WeightHistoryEntry[] {
   if (!userId) return [];
   try {
@@ -205,7 +176,7 @@ export function setCachedWeightHistory(userId: string, entries: WeightHistoryEnt
 }
 
 /**
- * Clears user habit records, logs, history, milestones, reminders, weight, and notes from cache
+ * Clears user habit records, logs, history, milestones, weight, and notes from cache
  * while preserving the user's active session and basic profile state.
  */
 export function clearUserAppData(userId: string): void {
@@ -214,8 +185,15 @@ export function clearUserAppData(userId: string): void {
     localStorage.removeItem(`${PREFIX}history_${userId}`);
     localStorage.removeItem(`${PREFIX}milestones_${userId}`);
     localStorage.removeItem(`${PREFIX}weight_${userId}`);
+    localStorage.removeItem(`${PREFIX}streaks_${userId}`);
+    localStorage.removeItem(`${PREFIX}analytics_${userId}`);
     localStorage.removeItem(`dh_food_logs_${userId}`);
     localStorage.removeItem(`dh_weight_prompt_dismissed_until_${userId}`);
+    localStorage.removeItem(`dh_gcal_token_${userId}`);
+    localStorage.removeItem(`dh_gcal_email_${userId}`);
+
+    // Set habits to empty array
+    localStorage.setItem(`${PREFIX}habits_${userId}`, JSON.stringify([]));
 
     // Remove all cached date logs and user-specific entries
     const toRemove: string[] = [];
@@ -225,27 +203,26 @@ export function clearUserAppData(userId: string): void {
         key &&
         (key.startsWith(`${PREFIX}log_${userId}_`) ||
           key.startsWith(`dh_weight_prompt_dismissed_until_${userId}`) ||
-          key.startsWith(`dh_food_logs_${userId}`))
+          key.startsWith(`dh_food_logs_${userId}`) ||
+          key.startsWith(`dh_gcal_token_${userId}`) ||
+          key.startsWith(`dh_gcal_email_${userId}`))
       ) {
         toRemove.push(key);
       }
     }
     toRemove.forEach((k) => localStorage.removeItem(k));
 
-    // Reset habits to default habits
-    const defaultHabits = DEFAULT_HABITS.map((h, idx) => ({ ...h, order: idx }));
-    localStorage.setItem(`${PREFIX}habits_${userId}`, JSON.stringify(defaultHabits));
-
-    // Reset reminders to default settings
-    localStorage.setItem(`${PREFIX}reminders_${userId}`, JSON.stringify(DEFAULT_REMINDER_SETTINGS));
-
-    // Update cached profile to clear weight & preserve onboarding completed
+    // Update cached profile to clear weight & calendar metadata while preserving onboarding completed
     const cachedUser = getCachedUserProfile(userId);
     if (cachedUser) {
       const cleanedProfile: UserProfile = {
         ...cachedUser,
         weight: undefined,
+        weightUnit: undefined,
         lastWeightCheckInDate: undefined,
+        googleCalendarConnected: false,
+        googleCalendarEmail: undefined,
+        lastGoogleCalendarSync: undefined,
         onboardingCompleted: true,
       };
       localStorage.setItem(`${PREFIX}user_${userId}`, JSON.stringify(cleanedProfile));
@@ -265,10 +242,14 @@ export function clearUserCache(userId: string): void {
     localStorage.removeItem(`${PREFIX}habits_${userId}`);
     localStorage.removeItem(`${PREFIX}history_${userId}`);
     localStorage.removeItem(`${PREFIX}milestones_${userId}`);
-    localStorage.removeItem(`${PREFIX}reminders_${userId}`);
     localStorage.removeItem(`${PREFIX}theme_${userId}`);
     localStorage.removeItem(`${PREFIX}weight_${userId}`);
+    localStorage.removeItem(`${PREFIX}streaks_${userId}`);
+    localStorage.removeItem(`${PREFIX}analytics_${userId}`);
     localStorage.removeItem(`dh_food_logs_${userId}`);
+    localStorage.removeItem(`dh_weight_prompt_dismissed_until_${userId}`);
+    localStorage.removeItem(`dh_gcal_token_${userId}`);
+    localStorage.removeItem(`dh_gcal_email_${userId}`);
 
     // Clean up all date logs and any keys matching this user
     const toRemove: string[] = [];

@@ -1,23 +1,30 @@
 import React, { useState, useEffect } from 'react';
-import { X, Trash2, AlertCircle } from 'lucide-react';
+import { X, Trash2, AlertCircle, Clock } from 'lucide-react';
 import { HabitItem } from '../types';
 import { AVAILABLE_ICONS, HabitIcon } from './HabitIcon';
 
 interface HabitModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (habitData: { name: string; target: string; icon: string; reminderEnabled?: boolean; reminderTime?: string }) => void;
+  onSave: (habitData: {
+    name: string;
+    target: string;
+    icon: string;
+    time?: string;
+    reminderEnabled?: boolean;
+    reminderTime?: string;
+  }) => void;
   onDelete?: (habitId: string) => void;
   initialHabit?: HabitItem | null;
   isSaving?: boolean;
 }
 
 const PRESET_EXAMPLES = [
-  { name: 'Meditation', target: '20 mins', icon: 'activity', reminderTime: '07:00' },
-  { name: 'Walking', target: '30 mins', icon: 'footprints', reminderTime: '17:30' },
-  { name: 'Study', target: '2 hours', icon: 'brain', reminderTime: '19:00' },
-  { name: 'Cold Shower', target: '5 mins', icon: 'droplet', reminderTime: '07:30' },
-  { name: 'Journaling', target: '10 mins', icon: 'book', reminderTime: '21:00' },
+  { name: 'Meditation', target: '20 mins', icon: 'activity', time: '07:00' },
+  { name: 'Walking', target: '30 mins', icon: 'footprints', time: '17:30' },
+  { name: 'Study', target: '2 hours', icon: 'brain', time: '19:00' },
+  { name: 'Cold Shower', target: '5 mins', icon: 'droplet', time: '07:30' },
+  { name: 'Journaling', target: '10 mins', icon: 'book', time: '21:00' },
 ];
 
 export const HabitModal: React.FC<HabitModalProps> = ({
@@ -31,8 +38,8 @@ export const HabitModal: React.FC<HabitModalProps> = ({
   const [name, setName] = useState('');
   const [target, setTarget] = useState('');
   const [selectedIcon, setSelectedIcon] = useState('check');
-  const [reminderEnabled, setReminderEnabled] = useState(false);
-  const [reminderTime, setReminderTime] = useState('08:00');
+  const [hasScheduledTime, setHasScheduledTime] = useState(true);
+  const [scheduledTime, setScheduledTime] = useState('08:00');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -43,14 +50,20 @@ export const HabitModal: React.FC<HabitModalProps> = ({
       setName(initialHabit.name || '');
       setTarget(initialHabit.target || '');
       setSelectedIcon(initialHabit.icon || 'check');
-      setReminderEnabled(!!initialHabit.reminderEnabled);
-      setReminderTime(initialHabit.reminderTime || '08:00');
+      const timeVal = initialHabit.time || initialHabit.reminderTime;
+      if (timeVal) {
+        setHasScheduledTime(true);
+        setScheduledTime(timeVal);
+      } else {
+        setHasScheduledTime(false);
+        setScheduledTime('08:00');
+      }
     } else {
       setName('');
       setTarget('');
       setSelectedIcon('check');
-      setReminderEnabled(false);
-      setReminderTime('08:00');
+      setHasScheduledTime(true);
+      setScheduledTime('08:00');
     }
     setShowDeleteConfirm(false);
     setError(null);
@@ -65,21 +78,24 @@ export const HabitModal: React.FC<HabitModalProps> = ({
       setError('Please enter a habit name');
       return;
     }
+    const finalTime = hasScheduledTime ? scheduledTime : undefined;
     onSave({
       name: trimmedName,
       target: target.trim(),
       icon: selectedIcon,
-      reminderEnabled,
-      reminderTime,
+      time: finalTime,
+      reminderEnabled: hasScheduledTime,
+      reminderTime: finalTime,
     });
   };
 
-  const handleApplyPreset = (preset: typeof PRESET_EXAMPLES[0]) => {
+  const handleApplyPreset = (preset: (typeof PRESET_EXAMPLES)[0]) => {
     setName(preset.name);
     setTarget(preset.target);
     setSelectedIcon(preset.icon);
-    if (preset.reminderTime) {
-      setReminderTime(preset.reminderTime);
+    if (preset.time) {
+      setHasScheduledTime(true);
+      setScheduledTime(preset.time);
     }
     setError(null);
   };
@@ -121,7 +137,7 @@ export const HabitModal: React.FC<HabitModalProps> = ({
               <div className="text-xs space-y-1">
                 <p className="font-bold text-red-950 dark:text-red-100">Delete habit "{initialHabit.name}"?</p>
                 <p className="text-red-700 dark:text-red-300">
-                  This will remove it from your active daily list. Past completion records in history will be preserved.
+                  This will remove it from your active daily list and delete its synchronized event from Google Calendar if connected. Past completion records in history will be preserved.
                 </p>
               </div>
             </div>
@@ -238,35 +254,38 @@ export const HabitModal: React.FC<HabitModalProps> = ({
               </div>
             </div>
 
-            {/* Reminder Setting inside Form */}
+            {/* Scheduled Daily Time */}
             <div className="p-3.5 bg-zinc-100/70 dark:bg-zinc-800/50 border border-zinc-200/70 dark:border-white/5 rounded-xl space-y-2.5">
               <div className="flex items-center justify-between">
-                <div>
-                  <span className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 block">Daily Reminder</span>
-                  <span className="text-[10px] text-zinc-500 dark:text-zinc-400">Get notified at scheduled time</span>
+                <div className="flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-zinc-600 dark:text-zinc-400" />
+                  <div>
+                    <span className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 block">Scheduled Time</span>
+                    <span className="text-[10px] text-zinc-500 dark:text-zinc-400">Syncs with Google Calendar</span>
+                  </div>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input
                     type="checkbox"
-                    id="modal-reminder-toggle"
-                    checked={reminderEnabled}
-                    onChange={(e) => setReminderEnabled(e.target.checked)}
+                    id="modal-schedule-toggle"
+                    checked={hasScheduledTime}
+                    onChange={(e) => setHasScheduledTime(e.target.checked)}
                     className="sr-only peer"
                   />
                   <div className="w-9 h-5 bg-zinc-300 dark:bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 dark:after:border-zinc-600 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-zinc-900 dark:peer-checked:bg-zinc-100 dark:peer-checked:after:bg-zinc-900"></div>
                 </label>
               </div>
 
-              {reminderEnabled && (
+              {hasScheduledTime && (
                 <div className="pt-2 border-t border-zinc-200/70 dark:border-white/10 flex items-center justify-between">
-                  <label htmlFor="modal-reminder-time" className="text-xs text-zinc-700 dark:text-zinc-300 font-medium">
-                    Reminder Time:
+                  <label htmlFor="modal-scheduled-time" className="text-xs text-zinc-700 dark:text-zinc-300 font-medium">
+                    Daily Time:
                   </label>
                   <input
-                    id="modal-reminder-time"
+                    id="modal-scheduled-time"
                     type="time"
-                    value={reminderTime}
-                    onChange={(e) => setReminderTime(e.target.value)}
+                    value={scheduledTime}
+                    onChange={(e) => setScheduledTime(e.target.value)}
                     className="px-3 py-1.5 text-xs font-mono bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 border border-zinc-300 dark:border-zinc-700 rounded-lg focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-zinc-100"
                   />
                 </div>

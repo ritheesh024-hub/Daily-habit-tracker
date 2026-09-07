@@ -15,8 +15,9 @@ interface MilestonesViewProps {
 }
 
 export const MilestonesView: React.FC<MilestonesViewProps> = ({ milestones }) => {
-  const unlockedList = milestones.filter((m) => m.isUnlocked);
-  const lockedList = milestones.filter((m) => !m.isUnlocked);
+  const safeMilestones = Array.isArray(milestones) ? milestones : [];
+  const unlockedList = safeMilestones.filter((m) => m.isUnlocked);
+  const lockedList = safeMilestones.filter((m) => !m.isUnlocked);
 
   const getMilestoneIcon = (iconName: string, isUnlocked: boolean) => {
     const iconClass = isUnlocked ? 'w-4 h-4 text-emerald-600 dark:text-emerald-400' : 'w-4 h-4 text-zinc-400 dark:text-zinc-500';
@@ -50,7 +51,7 @@ export const MilestonesView: React.FC<MilestonesViewProps> = ({ milestones }) =>
           id="milestones-progress-badge"
           className="inline-flex items-center gap-1 text-xs font-mono font-medium px-2.5 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700"
         >
-          <span>{unlockedList.length} of {milestones.length} unlocked</span>
+          <span>{unlockedList.length} of {safeMilestones.length} unlocked</span>
         </div>
       </div>
 

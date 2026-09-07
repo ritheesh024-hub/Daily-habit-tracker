@@ -23,12 +23,14 @@ interface LandingPageProps {
   onGetStarted: () => void;
   isLoading: boolean;
   error: string | null;
+  notification?: string | null;
 }
 
 export const LandingPage: React.FC<LandingPageProps> = ({
   onGetStarted,
   isLoading,
   error,
+  notification,
 }) => {
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 font-sans antialiased selection:bg-zinc-200 dark:selection:bg-zinc-800 transition-colors">
@@ -152,6 +154,17 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           <p className="text-sm sm:text-base md:text-lg text-zinc-600 dark:text-zinc-400 mt-4 sm:mt-5 max-w-xl leading-relaxed">
             Track your routines, stay consistent, and see your progress every day with a clean, distraction-free tracker.
           </p>
+
+          {/* Status / Success Notification */}
+          {notification && (
+            <div
+              id="landing-status-notification"
+              className="w-full max-w-md mt-5 p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-xs text-emerald-900 dark:text-emerald-200 flex items-center gap-2.5 text-left shadow-xs"
+            >
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+              <span className="font-semibold leading-relaxed">{notification}</span>
+            </div>
+          )}
 
           {/* Auth Error Banner (if any) */}
           {error && (

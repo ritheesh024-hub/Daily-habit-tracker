@@ -15,10 +15,12 @@ export const HabitList: React.FC<HabitListProps> = ({
   onToggleHabit,
   disabled = false,
 }) => {
+  const safeHabits = Array.isArray(habits) ? habits : [];
+
   return (
     <div id="habit-list-section" className="space-y-1.5 sm:space-y-2">
       {/* Habit Items */}
-      {habits.length === 0 ? (
+      {safeHabits.length === 0 ? (
         <div
           id="no-habits-empty-state"
           className="py-6 px-4 text-center border border-dashed border-zinc-200 dark:border-zinc-800 rounded-lg text-zinc-500 dark:text-zinc-400 text-xs space-y-1"
@@ -28,7 +30,7 @@ export const HabitList: React.FC<HabitListProps> = ({
         </div>
       ) : (
         <div id="habit-list-container" className="space-y-1.5 sm:space-y-2">
-          {habits.map((habit, index) => (
+          {safeHabits.map((habit, index) => (
             <HabitRow
               key={habit.id}
               habit={habit}

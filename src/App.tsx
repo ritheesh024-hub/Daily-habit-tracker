@@ -22,10 +22,8 @@ import {
   DEFAULT_HABITS,
   StreakStats,
   UserProfile,
-  UserReminderSettings,
-  ActiveSmartReminderNotice,
-  DEFAULT_REMINDER_SETTINGS,
   ThemeMode,
+  CalendarSyncResult,
 } from './types';
 import { getTodayDateString, formatHeaderDate } from './lib/dateUtils';
 import {
@@ -53,8 +51,6 @@ import {
   fetchHabitHistoryAndStreaks,
   calculateStreaks,
   getLocalDateKey,
-  fetchUserReminderSettings,
-  saveUserReminderSettings,
   saveOnboardingProfileAndHabits,
   saveWeightEntry,
   checkWeeklyWeightReminderNeeded,
@@ -73,8 +69,6 @@ import {
   setCachedHistoryBundle,
   getCachedMilestones,
   setCachedMilestones,
-  getCachedReminderSettings,
-  setCachedReminderSettings,
   getCachedWeightHistory,
   clearUserCache,
   clearActiveSession,
@@ -85,11 +79,13 @@ import {
   persistUnlockedMilestones,
 } from './lib/milestoneService';
 import {
-  triggerBrowserNotification,
-  triggerSmartBrowserNotification,
-  getIncompleteHabits,
-  generateSmartReminderMessage,
-} from './lib/reminderService';
+  connectGoogleCalendar,
+  disconnectGoogleCalendar,
+  syncHabitToGoogleCalendar,
+  syncAllHabitsToGoogleCalendar,
+  deleteHabitFromGoogleCalendar,
+  getCachedCalendarToken,
+} from './lib/googleCalendarService';
 import { Header } from './components/Header';
 import { ProgressBar } from './components/ProgressBar';
 import { StreakStatsCard } from './components/StreakStatsCard';
@@ -101,7 +97,6 @@ import { LoginView } from './components/LoginView';
 import { LandingPage } from './components/LandingPage';
 import { OnboardingModal } from './components/OnboardingModal';
 import { WeeklyWeightModal } from './components/WeeklyWeightModal';
-import { ReminderToast, ActiveReminderNotice } from './components/ReminderToast';
 
 const DEFAULT_ANALYTICS: AnalyticsStats = {
   currentStreak: 0,
@@ -131,95 +126,83 @@ const DEFAULT_ANALYTICS: AnalyticsStats = {
   hasEnoughData: false,
 };
 
-export default function App() {
-  const [todayDate, setTodayDate] = useState<string>(getTodayDateString);
-  const [selectedDate, setSelectedDate] = useState<string>(getTodayDateString);
-
-  // Cached-first Auth State: 0ms initial load
+export function App() {
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => getCachedUserProfile());
-  const [isAuthLoading, setIsAuthLoading] = useState<boolean>(() => !getCachedUserProfile());
+  const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [landingNotification, setLandingNotification] = useState<string | null>(null);
 
-  // Habits configuration: loaded synchronously from cache
-  const [habits, setHabits] = useState<HabitItem[]>(() => getCachedHabits(currentUser?.uid));
+  // Today date tracker & selected date tracker for time machine / date switching
+  const [todayDate, setTodayDate] = useState<string>(() => getTodayDateString());
+  const [selectedDate, setSelectedDate] = useState<string>(() => getTodayDateString());
 
-  // Daily log state for selected date: loaded synchronously from cache
-  const [dailyLog, setDailyLog] = useState<DailyLogData>(() => {
-    const today = getTodayDateString();
-    const cached = currentUser?.uid ? getCachedDailyLog(currentUser.uid, today) : null;
-    return cached || createDefaultDailyLog(today, habits.length);
+  // Main state with instant offline-first cache
+  const [habits, setHabits] = useState<HabitItem[]>(() => {
+    const cachedUser = getCachedUserProfile();
+    return getCachedHabits(cachedUser?.uid);
   });
-  const [isSavingLog, setIsSavingLog] = useState<boolean>(false);
 
-  // 7-day history & streak states: loaded synchronously from cache
+  const [dailyLog, setDailyLog] = useState<DailyLogData>(() => {
+    const cachedUser = getCachedUserProfile();
+    const cached = getCachedDailyLog(cachedUser?.uid, getTodayDateString());
+    return cached || createDefaultDailyLog(getTodayDateString(), 8);
+  });
+
   const [history, setHistory] = useState<DayHistorySummary[]>(() => {
-    const bundle = currentUser?.uid ? getCachedHistoryBundle(currentUser.uid) : null;
+    const cachedUser = getCachedUserProfile();
+    const bundle = getCachedHistoryBundle(cachedUser?.uid);
     return bundle?.history7Days || [];
   });
+
   const [historyMap, setHistoryMap] = useState<Record<string, { completed: number; total: number }>>(() => {
-    const bundle = currentUser?.uid ? getCachedHistoryBundle(currentUser.uid) : null;
+    const cachedUser = getCachedUserProfile();
+    const bundle = getCachedHistoryBundle(cachedUser?.uid);
     return bundle?.historyMap || {};
   });
+
   const [rawLogsMap, setRawLogsMap] = useState<Record<string, DailyLogData>>(() => {
-    const bundle = currentUser?.uid ? getCachedHistoryBundle(currentUser.uid) : null;
+    const cachedUser = getCachedUserProfile();
+    const bundle = getCachedHistoryBundle(cachedUser?.uid);
     return bundle?.rawLogsMap || {};
   });
+
   const [streaks, setStreaks] = useState<StreakStats>(() => {
-    const bundle = currentUser?.uid ? getCachedHistoryBundle(currentUser.uid) : null;
+    const cachedUser = getCachedUserProfile();
+    const bundle = getCachedHistoryBundle(cachedUser?.uid);
     return bundle?.streaks || { currentStreak: 0, bestStreak: 0 };
   });
+
   const [analytics, setAnalytics] = useState<AnalyticsStats>(() => {
-    const bundle = currentUser?.uid ? getCachedHistoryBundle(currentUser.uid) : null;
+    const cachedUser = getCachedUserProfile();
+    const bundle = getCachedHistoryBundle(cachedUser?.uid);
     return bundle?.analytics || DEFAULT_ANALYTICS;
   });
 
-  // Milestones persisted unlock mapping: loaded synchronously from cache
-  const [persistedMilestonesMap, setPersistedMilestonesMap] = useState<Record<string, string>>(() => {
-    const cached = currentUser?.uid ? getCachedMilestones(currentUser.uid) : null;
-    return cached || {};
+  const [persistedMilestonesMap, setPersistedMilestonesMap] = useState<Record<string, { unlockedAt: string; metricValue?: number }>>(() => {
+    const cachedUser = getCachedUserProfile();
+    return getCachedMilestones(cachedUser?.uid) || {};
   });
 
-  // Profile Modal state
-  const [isProfileModalOpen, setIsProfileModalOpen] = useState<boolean>(false);
+  // UI Modals State
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [profileModalTab, setProfileModalTab] = useState<TabType>('analytics');
+  const [isSavingLog, setIsSavingLog] = useState(false);
+  const [isSyncingCalendar, setIsSyncingCalendar] = useState(false);
 
-  // Smart Reminder Settings state
-  const [reminderSettings, setReminderSettings] = useState<UserReminderSettings>(() =>
-    getCachedReminderSettings(currentUser?.uid)
-  );
-
-  // Appearance Theme state ('system' | 'light' | 'dark')
-  const [theme, setTheme] = useState<ThemeMode>(() => getCachedTheme(currentUser?.uid));
-
-  // Initialize and apply theme on mount and whenever theme or currentUser changes
-  useEffect(() => {
-    applyTheme(theme);
-    if (theme === 'system') {
-      const unsubscribe = listenToSystemThemeChange(() => {
-        applyTheme('system');
-      });
-      return () => unsubscribe();
-    }
-  }, [theme]);
-
-  const handleThemeChange = (newTheme: ThemeMode) => {
-    setTheme(newTheme);
-    setCachedTheme(newTheme, currentUser?.uid);
-    applyTheme(newTheme);
-  };
-
-  // Active Toast reminders in state
-  const [activeReminders, setActiveReminders] = useState<ActiveReminderNotice[]>([]);
-  const [activeSmartReminders, setActiveSmartReminders] = useState<ActiveSmartReminderNotice[]>([]);
-  const notifiedHabitTimesRef = useRef<Record<string, boolean>>({});
-  const smartReminderNotifiedDatesRef = useRef<Record<string, boolean>>({});
-  const currentDateFetchRef = useRef<string>(selectedDate);
-
-  // Online / Offline state
-  const [isOnline, setIsOnline] = useState<boolean>(() =>
+  // Network offline tracker
+  const [isOnline, setIsOnline] = useState<boolean>(
     typeof navigator !== 'undefined' ? navigator.onLine : true
   );
 
+  // Current Date Fetch reference
+  const currentDateFetchRef = useRef<string>(selectedDate);
+
+  // Theme state
+  const [theme, setTheme] = useState<ThemeMode>(() => getCachedTheme());
+
+  const isToday = selectedDate === todayDate;
+
+  // Listen to network status changes
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
@@ -233,13 +216,29 @@ export default function App() {
     };
   }, []);
 
-  const isToday = selectedDate === todayDate;
+  // Initialize theme on start & listen to system changes
+  useEffect(() => {
+    applyTheme(theme);
+    const cleanup = listenToSystemThemeChange(() => {
+      const currentSetting = getCachedTheme();
+      if (currentSetting === 'system') {
+        applyTheme('system');
+      }
+    });
+    return cleanup;
+  }, [theme]);
 
-  // Listen to Firebase auth state & handle redirect login result
+  const handleThemeChange = (newTheme: ThemeMode) => {
+    setTheme(newTheme);
+    setCachedTheme(newTheme, currentUser?.uid);
+    applyTheme(newTheme);
+  };
+
+  // Firebase Auth State Listener & Redirect Handler
   useEffect(() => {
     getRedirectResult(auth)
-      .then(async (result) => {
-        if (result?.user) {
+      .then((result) => {
+        if (result && result.user) {
           const profile = syncUserProfile(result.user, (syncedProfile) => {
             setCurrentUser(syncedProfile);
             setCachedUserProfile(syncedProfile);
@@ -319,11 +318,6 @@ export default function App() {
           // Load user-specific cached milestones
           const cachedMilestones = getCachedMilestones(user.uid);
           setPersistedMilestonesMap(cachedMilestones || {});
-
-          // Fetch and sync user-specific reminder settings
-          fetchUserReminderSettings(user.uid).then((settings) => {
-            setReminderSettings(settings);
-          });
         } else {
           setCurrentUser(null);
           setCachedUserProfile(null);
@@ -336,11 +330,6 @@ export default function App() {
           setStreaks({ currentStreak: 0, bestStreak: 0 });
           setAnalytics(DEFAULT_ANALYTICS);
           setPersistedMilestonesMap({});
-          setReminderSettings(DEFAULT_REMINDER_SETTINGS);
-          setActiveReminders([]);
-          setActiveSmartReminders([]);
-          notifiedHabitTimesRef.current = {};
-          smartReminderNotifiedDatesRef.current = {};
         }
         setIsAuthLoading(false);
       },
@@ -363,8 +352,6 @@ export default function App() {
           setSelectedDate((prevSelected) =>
             prevSelected === prevToday ? realToday : prevSelected
           );
-          notifiedHabitTimesRef.current = {};
-          smartReminderNotifiedDatesRef.current = {};
           return realToday;
         }
         return prevToday;
@@ -402,18 +389,21 @@ export default function App() {
       });
   }, [currentUser?.uid]);
 
-  // Sync full history in background on initial login or date roll (Data Saver: 35 days limit)
-  const habitsKey = habits.map((h) => `${h.id}_${h.name}`).join('|');
+  // Sync full history in background on initial login or date roll
+  const safeHabitsList = Array.isArray(habits) ? habits : [];
+  const habitsKey = safeHabitsList.map((h) => `${h?.id || ''}_${h?.name || ''}`).join('|');
   useEffect(() => {
-    if (!currentUser?.uid || habits.length === 0) return;
+    if (!currentUser?.uid || safeHabitsList.length === 0) return;
 
-    fetchHabitHistoryAndStreaks(currentUser.uid, todayDate, habits)
+    fetchHabitHistoryAndStreaks(currentUser.uid, todayDate, safeHabitsList)
       .then((historyData) => {
-        setHistory(historyData.history7Days);
-        setHistoryMap(historyData.historyMap);
-        setRawLogsMap(historyData.rawLogsMap);
-        setStreaks(historyData.streaks);
-        setAnalytics(historyData.analytics);
+        if (historyData) {
+          setHistory(Array.isArray(historyData.history7Days) ? historyData.history7Days : []);
+          setHistoryMap(historyData.historyMap || {});
+          setRawLogsMap(historyData.rawLogsMap || {});
+          setStreaks(historyData.streaks || { currentStreak: 0, bestStreak: 0 });
+          setAnalytics(historyData.analytics || DEFAULT_ANALYTICS);
+        }
       })
       .catch((err) => {
         console.warn('Background history sync:', err);
@@ -469,7 +459,7 @@ export default function App() {
     currentUser?.uid,
   ]);
 
-  // Instant switch when selectedDate changes (Data-Saver: 0 internet calls when in memory / local storage)
+  // Instant switch when selectedDate changes
   useEffect(() => {
     if (!currentUser?.uid) return;
 
@@ -502,13 +492,12 @@ export default function App() {
       return;
     }
 
-    // 3. Set clean blank state immediately so previous day's habits never linger
+    // 3. Set clean blank state immediately
     const blankLog = createDefaultDailyLog(selectedDate, habits.length);
     setDailyLog(blankLog);
 
     // 4. Fetch document from Firestore if not in cache
     getDailyLog(currentUser.uid, selectedDate, habits).then((remoteLog) => {
-      // Prevent stale response race condition
       if (currentDateFetchRef.current === selectedDate) {
         setDailyLog(remoteLog);
         setRawLogsMap((prev) => ({ ...prev, [selectedDate]: remoteLog }));
@@ -516,82 +505,11 @@ export default function App() {
     });
   }, [selectedDate, currentUser?.uid, habits]);
 
-  // Habit & Smart Reminder Scheduler Loop
-  useEffect(() => {
-    if (habits.length === 0) return;
-
-    const checkReminders = () => {
-      const now = new Date();
-      const currentHours = String(now.getHours()).padStart(2, '0');
-      const currentMinutes = String(now.getMinutes()).padStart(2, '0');
-      const currentTimeStr = `${currentHours}:${currentMinutes}`;
-      const todayStr = getTodayDateString();
-
-      // 1. Check Smart Reminder
-      if (reminderSettings.remindersEnabled && reminderSettings.reminderTime === currentTimeStr) {
-        if (!smartReminderNotifiedDatesRef.current[todayStr]) {
-          smartReminderNotifiedDatesRef.current[todayStr] = true;
-
-          const todayLog =
-            (selectedDate === todayStr ? dailyLog : rawLogsMap[todayStr]) ||
-            (currentUser?.uid ? getCachedDailyLog(currentUser.uid, todayStr) : null) ||
-            createDefaultDailyLog(todayStr, habits.length);
-
-          const completedMap = todayLog.completedHabits || {};
-          const incomplete = getIncompleteHabits(habits, completedMap);
-
-          // Only send reminder if there are incomplete habits!
-          if (incomplete.length > 0) {
-            const message = generateSmartReminderMessage(incomplete);
-            if (message) {
-              triggerSmartBrowserNotification(message.title, message.body);
-
-              const noticeId = `smart-${todayStr}-${Date.now()}`;
-              setActiveSmartReminders((prev) => [
-                ...prev.filter((item) => !item.id.startsWith(`smart-${todayStr}`)),
-                {
-                  id: noticeId,
-                  title: message.title,
-                  body: message.body,
-                  incompleteHabits: incomplete,
-                  timestamp: Date.now(),
-                },
-              ]);
-            }
-          }
-        }
-      }
-
-      // 2. Check Individual Habit Reminders
-      habits.forEach((habit) => {
-        if (!habit.reminderEnabled || !habit.reminderTime) return;
-
-        if (habit.reminderTime === currentTimeStr) {
-          const triggerKey = `${habit.id}_${todayStr}_${currentTimeStr}`;
-          if (!notifiedHabitTimesRef.current[triggerKey]) {
-            notifiedHabitTimesRef.current[triggerKey] = true;
-            triggerBrowserNotification(habit);
-
-            const noticeId = `${habit.id}-${Date.now()}`;
-            setActiveReminders((prev) => [
-              ...prev.filter((item) => item.habit.id !== habit.id),
-              { id: noticeId, habit, timestamp: Date.now() },
-            ]);
-          }
-        }
-      });
-    };
-
-    checkReminders();
-    const timer = setInterval(checkReminders, 15000);
-
-    return () => clearInterval(timer);
-  }, [habits, reminderSettings, dailyLog, rawLogsMap, selectedDate, currentUser?.uid]);
-
   // Google Sign-in handler
   const handleGoogleSignIn = async () => {
     setIsAuthLoading(true);
     setAuthError(null);
+    setLandingNotification(null);
     try {
       const result = await signInWithPopup(auth, googleProvider);
       const profile = syncUserProfile(result.user);
@@ -638,6 +556,7 @@ export default function App() {
         clearUserCache(currentUser.uid);
       }
       clearActiveSession();
+      disconnectGoogleCalendar();
       await signOut(auth);
       setCurrentUser(null);
       setHabits(getCachedHabits());
@@ -648,8 +567,6 @@ export default function App() {
       setStreaks({ currentStreak: 0, bestStreak: 0 });
       setAnalytics(DEFAULT_ANALYTICS);
       setIsProfileModalOpen(false);
-      setActiveReminders([]);
-      notifiedHabitTimesRef.current = {};
     } catch (error) {
       console.error('Sign out error:', error);
     }
@@ -657,17 +574,23 @@ export default function App() {
 
   // Weekly Weight Modal state
   const [showWeeklyWeightModal, setShowWeeklyWeightModal] = useState<boolean>(false);
+  const hasPromptedWeeklyWeightThisSession = useRef<boolean>(false);
 
   // Check if weekly weight reminder is needed
   useEffect(() => {
-    if (currentUser?.uid && currentUser.onboardingCompleted) {
+    if (
+      currentUser?.uid &&
+      currentUser.onboardingCompleted &&
+      !hasPromptedWeeklyWeightThisSession.current
+    ) {
       if (checkWeeklyWeightReminderNeeded(currentUser)) {
+        hasPromptedWeeklyWeightThisSession.current = true;
         setShowWeeklyWeightModal(true);
       }
     }
   }, [currentUser]);
 
-  // Update Profile (Name, Date of Birth, Height, Weight)
+  // Update Profile
   const handleUpdateProfile = async (updates: {
     displayName: string;
     dateOfBirth?: string;
@@ -675,6 +598,9 @@ export default function App() {
     heightUnit?: 'cm' | 'in';
     weight?: number;
     weightUnit?: 'kg' | 'lbs';
+    googleCalendarConnected?: boolean;
+    googleCalendarEmail?: string;
+    lastGoogleCalendarSync?: string;
   }) => {
     if (!currentUser?.uid) return;
     const updated = await updateUserProfile(currentUser.uid, updates);
@@ -715,13 +641,30 @@ export default function App() {
 
   // Save Weekly Weight Check-in
   const handleSaveWeeklyWeight = async (weight: number, unit: 'kg' | 'lbs') => {
-    if (!currentUser?.uid) return;
-    await saveWeightEntry(currentUser.uid, weight, unit);
+    const uid = auth.currentUser?.uid || currentUser?.uid;
+    if (!uid) {
+      throw new Error('Please sign in to save your weight.');
+    }
+
+    const todayDateStr = getLocalDateKey();
+    await saveWeightEntry(uid, weight, unit, todayDateStr);
+
+    dismissWeeklyWeightReminder(uid);
+    hasPromptedWeeklyWeightThisSession.current = true;
+
     const updatedUser: UserProfile = {
-      ...currentUser,
+      ...(currentUser || {
+        uid,
+        displayName: auth.currentUser?.displayName || 'User',
+        email: auth.currentUser?.email || null,
+        photoURL: auth.currentUser?.photoURL || null,
+        onboardingCompleted: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }),
       weight,
       weightUnit: unit,
-      lastWeightCheckInDate: getTodayDateString(),
+      lastWeightCheckInDate: todayDateStr,
     };
     setCurrentUser(updatedUser);
     setCachedUserProfile(updatedUser);
@@ -729,13 +672,15 @@ export default function App() {
   };
 
   const handleDismissWeeklyWeight = () => {
-    if (currentUser?.uid) {
-      dismissWeeklyWeightReminder(currentUser.uid);
+    const uid = auth.currentUser?.uid || currentUser?.uid;
+    if (uid) {
+      dismissWeeklyWeightReminder(uid);
     }
+    hasPromptedWeeklyWeightThisSession.current = true;
     setShowWeeklyWeightModal(false);
   };
 
-  // Clear all user habit data & reset dashboard to clean initial state
+  // Clear all user habit data & reset dashboard to clean empty state
   const handleClearUserData = async () => {
     const user = auth.currentUser;
     const uid = user?.uid || currentUser?.uid;
@@ -745,7 +690,6 @@ export default function App() {
 
     await clearUserData(uid);
 
-    const freshHabits = DEFAULT_HABITS.map((h, idx) => ({ ...h, order: idx }));
     const resetUser: UserProfile = {
       ...(currentUser || {
         uid,
@@ -756,59 +700,56 @@ export default function App() {
       onboardingCompleted: true,
       weight: undefined,
       lastWeightCheckInDate: undefined,
+      googleCalendarConnected: false,
+      googleCalendarEmail: undefined,
+      lastGoogleCalendarSync: undefined,
     };
 
     setCurrentUser(resetUser);
     setCachedUserProfile(resetUser);
 
-    setHabits(freshHabits);
-    setDailyLog(createDefaultDailyLog(todayDate, freshHabits.length));
+    setHabits([]);
+    setDailyLog(createDefaultDailyLog(todayDate, 0));
     setHistory([]);
     setHistoryMap({});
     setRawLogsMap({});
     setStreaks({ currentStreak: 0, bestStreak: 0 });
     setAnalytics(DEFAULT_ANALYTICS);
     setPersistedMilestonesMap({});
-    setReminderSettings(DEFAULT_REMINDER_SETTINGS);
-    setActiveReminders([]);
-    setActiveSmartReminders([]);
-    notifiedHabitTimesRef.current = {};
-    smartReminderNotifiedDatesRef.current = {};
   };
 
   // Permanently delete user account & all cloud records
   const handleDeleteUserAccount = async () => {
     const user = auth.currentUser;
     const uid = user?.uid || currentUser?.uid;
-
-    try {
-      if (user) {
-        await deleteUserAccount(user);
-      } else if (uid) {
-        await clearUserData(uid);
-      }
-    } finally {
-      if (uid) {
-        clearUserCache(uid);
-      }
-      clearActiveSession();
-      setCurrentUser(null);
-      setCachedUserProfile(null);
-      setIsProfileModalOpen(false);
-      setHabits(getCachedHabits());
-      setDailyLog(createDefaultDailyLog(getTodayDateString(), 8));
-      setHistory([]);
-      setHistoryMap({});
-      setRawLogsMap({});
-      setStreaks({ currentStreak: 0, bestStreak: 0 });
-      setAnalytics(DEFAULT_ANALYTICS);
-      setPersistedMilestonesMap({});
-      setReminderSettings(DEFAULT_REMINDER_SETTINGS);
-      setActiveReminders([]);
-      setActiveSmartReminders([]);
-      notifiedHabitTimesRef.current = {};
-      smartReminderNotifiedDatesRef.current = {};
+    if (!user && !uid) {
+      throw new Error('No authenticated user found.');
     }
+
+    if (user) {
+      await deleteUserAccount(user);
+    } else if (uid) {
+      await clearUserData(uid);
+    }
+
+    // Only executed if deletion succeeded without error:
+    if (uid) {
+      clearUserCache(uid);
+    }
+    clearActiveSession();
+    disconnectGoogleCalendar();
+    setCurrentUser(null);
+    setCachedUserProfile(null);
+    setIsProfileModalOpen(false);
+    setHabits([]);
+    setDailyLog(createDefaultDailyLog(getTodayDateString(), 0));
+    setHistory([]);
+    setHistoryMap({});
+    setRawLogsMap({});
+    setStreaks({ currentStreak: 0, bestStreak: 0 });
+    setAnalytics(DEFAULT_ANALYTICS);
+    setPersistedMilestonesMap({});
+    setLandingNotification('Your Daily Habits account has been deleted.');
   };
 
   // Export complete user data backup as JSON
@@ -817,7 +758,7 @@ export default function App() {
       const weightHistory = currentUser?.uid ? getCachedWeightHistory(currentUser.uid) : [];
       const exportPayload = {
         app: 'Daily Habits',
-        version: '1.5',
+        version: '2.0',
         exportedAt: new Date().toISOString(),
         user: {
           uid: currentUser?.uid,
@@ -828,6 +769,8 @@ export default function App() {
           heightUnit: currentUser?.heightUnit,
           weight: currentUser?.weight,
           weightUnit: currentUser?.weightUnit,
+          googleCalendarConnected: currentUser?.googleCalendarConnected,
+          lastGoogleCalendarSync: currentUser?.lastGoogleCalendarSync,
           createdAt: currentUser?.createdAt,
           lastLoginAt: currentUser?.lastLoginAt,
           onboardingCompleted: currentUser?.onboardingCompleted,
@@ -838,7 +781,6 @@ export default function App() {
         milestones,
         streaks,
         analytics,
-        reminderSettings,
       };
 
       const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: 'application/json' });
@@ -855,13 +797,12 @@ export default function App() {
     }
   };
 
-  // Toggle habit checkbox for a specific date: completely isolated by user + targetDate + habitId
+  // Toggle habit checkbox for a specific date
   const handleToggleHabitForDate = async (targetDateInput: string, habitId: string) => {
     if (!currentUser?.uid) return;
 
     const targetDate = getLocalDateKey(targetDateInput);
 
-    // Retrieve the base log specifically for targetDate
     let baseLog: DailyLogData;
     if (selectedDate === targetDate && dailyLog.date === targetDate) {
       baseLog = dailyLog;
@@ -883,36 +824,32 @@ export default function App() {
     const isCurrentCompleted = !!(baseLog.completedHabits && baseLog.completedHabits[habitId]);
     const nextCompleted = !isCurrentCompleted;
 
-    // 1. If currently viewing targetDate, update dailyLog immediately
     if (selectedDate === targetDate) {
       setDailyLog(updatedLog);
     }
 
-    // 2. Update rawLogsMap for targetDate
     const nextRawLogsMap = {
       ...rawLogsMap,
       [targetDate]: updatedLog,
     };
     setRawLogsMap(nextRawLogsMap);
 
-    // 3. Update historyMap for targetDate
     const updatedHistoryMap = {
       ...historyMap,
       [targetDate]: { completed: completedCount, total: totalCount },
     };
     setHistoryMap(updatedHistoryMap);
 
-    // 4. Recalculate streaks
     const newStreaks = calculateStreaks(updatedHistoryMap, todayDate);
     setStreaks(newStreaks);
 
-    // 5. Update 7-day history list
     const percentage = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
     const isCompleted = totalCount > 0 && completedCount >= totalCount;
 
     let updatedHistoryList: DayHistorySummary[] = [];
     setHistory((prevHistory) => {
-      const nextList = prevHistory.map((item) =>
+      const safePrev = Array.isArray(prevHistory) ? prevHistory : [];
+      const nextList = safePrev.map((item) =>
         item.date === targetDate
           ? {
               ...item,
@@ -927,7 +864,6 @@ export default function App() {
       return nextList;
     });
 
-    // 6. Update analytics
     setAnalytics((prev) => {
       const nextTotalCompleted = nextCompleted
         ? prev.totalCompletedHabits + 1
@@ -941,7 +877,6 @@ export default function App() {
         totalCompletedHabits: nextTotalCompleted,
       };
 
-      // Persist history bundle cache with latest calculated state
       setCachedHistoryBundle(currentUser.uid, {
         history7Days: updatedHistoryList.length > 0 ? updatedHistoryList : history,
         historyMap: updatedHistoryMap,
@@ -953,16 +888,13 @@ export default function App() {
       return nextAnalytics;
     });
 
-    // 7. Save to local storage cache specifically for targetDate
     setCachedDailyLog(currentUser.uid, targetDate, updatedLog);
 
-    // 8. Save to Firestore in background without blocking
     setIsSavingLog(true);
     try {
       await saveDailyLog(currentUser.uid, targetDate, updatedLog);
     } catch (error) {
       console.warn(`Background daily log save notice for ${targetDate}:`, error);
-      // If saving fails while online due to a real error, gracefully rollback optimistic change
       if (typeof navigator !== 'undefined' && navigator.onLine) {
         if (selectedDate === targetDate) {
           setDailyLog(baseLog);
@@ -975,12 +907,11 @@ export default function App() {
     }
   };
 
-  // Toggle habit on currently selected date
   const handleToggleHabit = (habitId: string) => {
     handleToggleHabitForDate(selectedDate, habitId);
   };
 
-  // State & Handlers for Daily Note (Strictly Date-Isolated)
+  // State & Handlers for Daily Note
   const [isSavingNote, setIsSavingNote] = useState(false);
 
   const handleSaveDailyNote = async (targetDate: string, noteText: string) => {
@@ -991,7 +922,6 @@ export default function App() {
     try {
       const updatedLog = await saveDailyNote(currentUser.uid, dateKey, noteText);
 
-      // If the saved note belongs to the currently displayed date, update state
       if (dateKey === selectedDate) {
         setDailyLog((prev) => ({
           ...prev,
@@ -999,7 +929,6 @@ export default function App() {
         }));
       }
 
-      // Update in-memory rawLogsMap & cached bundle without mutating streak/analytics
       setRawLogsMap((prev) => {
         const existing = prev[dateKey] || createDefaultDailyLog(dateKey, habits.length);
         const nextMap = {
@@ -1070,41 +999,139 @@ export default function App() {
     }
   };
 
+  // Google Calendar Integration Handlers
+  const handleConnectGoogleCalendar = async () => {
+    if (!currentUser?.uid) return;
+    const res = await connectGoogleCalendar();
+
+    const now = new Date().toISOString();
+    const updatedUser = await updateUserProfile(currentUser.uid, {
+      googleCalendarConnected: true,
+      googleCalendarEmail: res.email || currentUser.email || undefined,
+      lastGoogleCalendarSync: now,
+    });
+    setCurrentUser(updatedUser);
+    setCachedUserProfile(updatedUser);
+
+    // Automatically perform initial sync of scheduled habits
+    setIsSyncingCalendar(true);
+    try {
+      const syncRes = await syncAllHabitsToGoogleCalendar(habits, res.accessToken);
+      if (syncRes.success && syncRes.updatedHabits) {
+        setHabits(syncRes.updatedHabits);
+        setCachedHabits(currentUser.uid, syncRes.updatedHabits);
+        for (const h of syncRes.updatedHabits) {
+          if (h.googleCalendarSynced) {
+            await saveHabitSetting(currentUser.uid, h);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Initial calendar sync notice:', err);
+    } finally {
+      setIsSyncingCalendar(false);
+    }
+  };
+
+  const handleDisconnectGoogleCalendar = async () => {
+    if (!currentUser?.uid) return;
+    disconnectGoogleCalendar();
+    const updatedUser = await updateUserProfile(currentUser.uid, {
+      googleCalendarConnected: false,
+      googleCalendarEmail: undefined,
+      lastGoogleCalendarSync: undefined,
+    });
+    setCurrentUser(updatedUser);
+    setCachedUserProfile(updatedUser);
+  };
+
+  const handleSyncHabitsToCalendar = async (): Promise<CalendarSyncResult | null> => {
+    if (!currentUser?.uid) return null;
+
+    let token = getCachedCalendarToken();
+    if (!token) {
+      // Prompt OAuth connection if token not currently in memory
+      const conn = await connectGoogleCalendar();
+      token = conn.accessToken;
+      const updatedUser = await updateUserProfile(currentUser.uid, {
+        googleCalendarConnected: true,
+        googleCalendarEmail: conn.email || currentUser.email || undefined,
+      });
+      setCurrentUser(updatedUser);
+      setCachedUserProfile(updatedUser);
+    }
+
+    setIsSyncingCalendar(true);
+    try {
+      const result = await syncAllHabitsToGoogleCalendar(habits, token);
+      if (result.success && result.updatedHabits) {
+        setHabits(result.updatedHabits);
+        setCachedHabits(currentUser.uid, result.updatedHabits);
+        for (const h of result.updatedHabits) {
+          if (h.googleCalendarSynced) {
+            await saveHabitSetting(currentUser.uid, h);
+          }
+        }
+        const now = new Date().toISOString();
+        const updated = await updateUserProfile(currentUser.uid, {
+          lastGoogleCalendarSync: now,
+        });
+        setCurrentUser(updated);
+        setCachedUserProfile(updated);
+      }
+      return result;
+    } finally {
+      setIsSyncingCalendar(false);
+    }
+  };
+
   // Save changes from HabitModal
   const handleSaveHabitFromProfile = async (
-    data: { name: string; target: string; icon: string; reminderEnabled?: boolean; reminderTime?: string },
+    data: {
+      name: string;
+      target: string;
+      icon: string;
+      time?: string;
+      reminderEnabled?: boolean;
+      reminderTime?: string;
+    },
     editingHabit?: HabitItem | null
   ) => {
     if (!currentUser?.uid) return;
 
+    const scheduledTime = data.time || data.reminderTime;
+    let savedHabit: HabitItem;
+
     if (editingHabit) {
-      const updatedHabit: HabitItem = {
+      savedHabit = {
         ...editingHabit,
         name: data.name,
         target: data.target,
         icon: data.icon,
-        reminderEnabled: typeof data.reminderEnabled === 'boolean' ? data.reminderEnabled : editingHabit.reminderEnabled,
-        reminderTime: data.reminderTime || editingHabit.reminderTime || '08:00',
+        time: scheduledTime,
+        reminderEnabled: !!scheduledTime,
+        reminderTime: scheduledTime || '08:00',
       };
 
-      const nextHabits = habits.map((h) => (h.id === updatedHabit.id ? updatedHabit : h));
+      const nextHabits = habits.map((h) => (h.id === savedHabit.id ? savedHabit : h));
       setHabits(nextHabits);
       setCachedHabits(currentUser.uid, nextHabits);
-      await saveHabitSetting(currentUser.uid, updatedHabit);
+      await saveHabitSetting(currentUser.uid, savedHabit);
     } else {
       const newId = `custom_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-      const newHabit: HabitItem = {
+      savedHabit = {
         id: newId,
         name: data.name,
         target: data.target,
         icon: data.icon,
         order: habits.length,
-        reminderEnabled: !!data.reminderEnabled,
-        reminderTime: data.reminderTime || '08:00',
+        time: scheduledTime,
+        reminderEnabled: !!scheduledTime,
+        reminderTime: scheduledTime || '08:00',
         createdAt: new Date().toISOString(),
       };
 
-      const nextHabits = [...habits, newHabit];
+      const nextHabits = [...habits, savedHabit];
       setHabits(nextHabits);
       setCachedHabits(currentUser.uid, nextHabits);
 
@@ -1117,130 +1144,24 @@ export default function App() {
       };
       setDailyLog(updatedLog);
 
-      await saveHabitSetting(currentUser.uid, newHabit);
+      await saveHabitSetting(currentUser.uid, savedHabit);
       await saveDailyLog(currentUser.uid, updatedLog);
     }
-  };
 
-  // Update specific habit reminder settings
-  const handleUpdateHabitReminder = async (
-    habitId: string,
-    reminderEnabled: boolean,
-    reminderTime: string
-  ) => {
-    if (!currentUser?.uid) return;
-
-    const habit = habits.find((h) => h.id === habitId);
-    if (!habit) return;
-
-    const updatedHabit: HabitItem = {
-      ...habit,
-      reminderEnabled,
-      reminderTime,
-    };
-
-    const nextHabits = habits.map((h) => (h.id === habitId ? updatedHabit : h));
-    setHabits(nextHabits);
-    setCachedHabits(currentUser.uid, nextHabits);
-
-    try {
-      await saveHabitSetting(currentUser.uid, updatedHabit);
-    } catch (err) {
-      console.warn('Failed to update habit reminder setting:', err);
-    }
-  };
-
-  // Update user global smart reminder settings
-  const handleUpdateReminderSettings = async (settings: UserReminderSettings) => {
-    setReminderSettings(settings);
-    if (currentUser?.uid) {
-      try {
-        await saveUserReminderSettings(currentUser.uid, settings);
-      } catch (err) {
-        console.warn('Failed to save reminder settings to Firestore:', err);
+    // If Google Calendar is connected, automatically sync this habit to Google Calendar
+    if (currentUser.googleCalendarConnected && scheduledTime) {
+      const token = getCachedCalendarToken();
+      if (token) {
+        try {
+          const { habit: syncedHabit } = await syncHabitToGoogleCalendar(savedHabit, token);
+          const withSync = habits.map((h) => (h.id === syncedHabit.id ? syncedHabit : h));
+          setHabits(withSync);
+          setCachedHabits(currentUser.uid, withSync);
+          await saveHabitSetting(currentUser.uid, syncedHabit);
+        } catch (err) {
+          console.warn('Auto calendar sync error for habit:', err);
+        }
       }
-    }
-  };
-
-  // Test Smart Reminder Trigger (evaluates today's unfinished habits)
-  const handleTestSmartReminder = () => {
-    const todayLog =
-      (selectedDate === todayDate ? dailyLog : rawLogsMap[todayDate]) ||
-      (currentUser?.uid ? getCachedDailyLog(currentUser.uid, todayDate) : null) ||
-      createDefaultDailyLog(todayDate, habits.length);
-
-    const completedMap = todayLog.completedHabits || {};
-    const incomplete = getIncompleteHabits(habits, completedMap);
-
-    if (incomplete.length === 0) {
-      // All completed for today
-      triggerSmartBrowserNotification('Daily Habits', 'All habits are completed for today! Keep up the great work.');
-      const noticeId = `smart-test-${Date.now()}`;
-      setActiveSmartReminders((prev) => [
-        ...prev.filter((r) => r.id !== noticeId),
-        {
-          id: noticeId,
-          title: 'Daily Habits',
-          body: 'All habits are completed for today! Keep up the great work.',
-          incompleteHabits: [],
-          timestamp: Date.now(),
-        },
-      ]);
-    } else {
-      const msg = generateSmartReminderMessage(incomplete);
-      if (msg) {
-        triggerSmartBrowserNotification(msg.title, msg.body);
-        const noticeId = `smart-test-${Date.now()}`;
-        setActiveSmartReminders((prev) => [
-          ...prev.filter((r) => r.id !== noticeId),
-          {
-            id: noticeId,
-            title: msg.title,
-            body: msg.body,
-            incompleteHabits: incomplete,
-            timestamp: Date.now(),
-          },
-        ]);
-      }
-    }
-  };
-
-  // Dismiss a smart reminder toast
-  const handleDismissSmartReminder = (noticeId: string) => {
-    setActiveSmartReminders((prev) => prev.filter((item) => item.id !== noticeId));
-  };
-
-  // Test Notification Trigger
-  const handleTestNotification = () => {
-    const sampleHabit: HabitItem = habits[0] || {
-      id: 'reading',
-      name: 'Reading',
-      target: '1 hour',
-      icon: 'book',
-      order: 0,
-      reminderEnabled: true,
-      reminderTime: '20:30',
-    };
-
-    triggerBrowserNotification(sampleHabit);
-
-    const noticeId = `test-${Date.now()}`;
-    setActiveReminders((prev) => [
-      ...prev.filter((r) => r.id !== noticeId),
-      { id: noticeId, habit: sampleHabit, timestamp: Date.now() },
-    ]);
-  };
-
-  // Dismiss a reminder toast
-  const handleDismissReminder = (noticeId: string) => {
-    setActiveReminders((prev) => prev.filter((item) => item.id !== noticeId));
-  };
-
-  // Mark habit done directly from in-app toast (always applies to today's date)
-  const handleCompleteHabitFromToast = (habitId: string) => {
-    const todayLog = rawLogsMap[todayDate] || (selectedDate === todayDate ? dailyLog : getCachedDailyLog(currentUser?.uid || '', todayDate));
-    if (!todayLog?.completedHabits?.[habitId]) {
-      handleToggleHabitForDate(todayDate, habitId);
     }
   };
 
@@ -1248,6 +1169,7 @@ export default function App() {
   const handleDeleteHabitFromProfile = async (habitId: string) => {
     if (!currentUser?.uid) return;
 
+    const habitToDelete = habits.find((h) => h.id === habitId);
     const nextHabits = habits.filter((h) => h.id !== habitId);
     setHabits(nextHabits);
     setCachedHabits(currentUser.uid, nextHabits);
@@ -1263,20 +1185,33 @@ export default function App() {
 
     await deleteHabitSetting(currentUser.uid, habitId);
     await saveDailyLog(currentUser.uid, updatedLog);
+
+    // If habit had a synced Google Calendar event, remove it from calendar
+    if (currentUser.googleCalendarConnected && habitToDelete?.googleCalendarEventId) {
+      const token = getCachedCalendarToken();
+      if (token) {
+        try {
+          await deleteHabitFromGoogleCalendar(habitToDelete.googleCalendarEventId, token);
+        } catch (err) {
+          console.warn('Calendar event deletion notice:', err);
+        }
+      }
+    }
   };
 
-  // Select a date from history or return to today (Instant switch)
+  // Select a date from history or return to today
   const handleSelectDate = (date: string) => {
     setSelectedDate(date);
   };
 
-  // If not authenticated, show clean Google landing / login view
+  // If not authenticated, show clean landing / login view
   if (!currentUser) {
     return (
       <LandingPage
         onGetStarted={handleGoogleSignIn}
         isLoading={isAuthLoading}
         error={authError}
+        notification={landingNotification}
       />
     );
   }
@@ -1309,7 +1244,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen relative bg-zinc-100/70 dark:bg-[#0d0d11] text-zinc-900 dark:text-zinc-100 flex flex-col font-sans antialiased selection:bg-zinc-200 dark:selection:bg-zinc-800 transition-colors overflow-x-hidden">
-      {/* Ambient background light gradients (extremely subtle, high aesthetic value) */}
+      {/* Ambient background light gradients */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden z-0" aria-hidden="true">
         <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-[550px] sm:w-[700px] h-[350px] bg-gradient-to-b from-zinc-200/50 via-zinc-300/20 to-transparent dark:from-zinc-800/25 dark:via-zinc-900/10 dark:to-transparent rounded-full blur-3xl" />
         <div className="absolute top-[40%] -left-32 w-72 h-72 bg-gradient-to-tr from-zinc-300/30 to-transparent dark:from-zinc-800/15 dark:to-transparent rounded-full blur-3xl opacity-60" />
@@ -1405,7 +1340,7 @@ export default function App() {
         />
       </main>
 
-      {/* Profile, Manage Habits, Analytics & Reminders Modal */}
+      {/* Profile, Manage Habits, Analytics & Integrations Modal */}
       <ProfileModal
         isOpen={isProfileModalOpen}
         onClose={() => setIsProfileModalOpen(false)}
@@ -1414,11 +1349,10 @@ export default function App() {
         habits={habits}
         onSaveHabit={handleSaveHabitFromProfile}
         onDeleteHabit={handleDeleteHabitFromProfile}
-        onUpdateHabitReminder={handleUpdateHabitReminder}
-        onTestNotification={handleTestNotification}
-        reminderSettings={reminderSettings}
-        onUpdateReminderSettings={handleUpdateReminderSettings}
-        onTestSmartReminder={handleTestSmartReminder}
+        onConnectGoogleCalendar={handleConnectGoogleCalendar}
+        onDisconnectGoogleCalendar={handleDisconnectGoogleCalendar}
+        onSyncHabitsToCalendar={handleSyncHabitsToCalendar}
+        isSyncingCalendar={isSyncingCalendar}
         analytics={analytics}
         milestones={milestones}
         rawLogsMap={rawLogsMap}
@@ -1436,18 +1370,11 @@ export default function App() {
       <WeeklyWeightModal
         isOpen={showWeeklyWeightModal}
         onClose={handleDismissWeeklyWeight}
+        onDismiss={handleDismissWeeklyWeight}
+        onSaveWeight={handleSaveWeeklyWeight}
         onSave={handleSaveWeeklyWeight}
         currentWeight={currentUser?.weight}
         currentUnit={currentUser?.weightUnit}
-      />
-
-      {/* Active In-App Reminder Notifications */}
-      <ReminderToast
-        reminders={activeReminders}
-        smartReminders={activeSmartReminders}
-        onDismiss={handleDismissReminder}
-        onDismissSmart={handleDismissSmartReminder}
-        onCompleteHabit={handleCompleteHabitFromToast}
       />
 
       {/* Subtle Footer */}
@@ -1457,3 +1384,6 @@ export default function App() {
     </div>
   );
 }
+
+export default App;
+

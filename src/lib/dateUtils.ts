@@ -32,16 +32,20 @@ export function getTodayDateString(): string {
   return getLocalDateKey();
 }
 
-export function getPreviousDateString(dateString: string): string {
-  const [year, month, day] = dateString.split('-').map(Number);
+export function getPreviousDateString(dateString?: string): string {
+  if (!dateString) return getLocalDateKey();
+  const safeStr = getLocalDateKey(dateString);
+  const [year, month, day] = safeStr.split('-').map(Number);
   const date = new Date(year, month - 1, day);
   date.setDate(date.getDate() - 1);
   return getLocalDateKey(date);
 }
 
-export function formatHeaderDate(dateString: string): string {
+export function formatHeaderDate(dateString?: string): string {
+  if (!dateString) return '';
   try {
-    const [year, month, day] = dateString.split('-').map(Number);
+    const safeStr = getLocalDateKey(dateString);
+    const [year, month, day] = safeStr.split('-').map(Number);
     const date = new Date(year, month - 1, day);
     return date.toLocaleDateString('en-US', {
       weekday: 'short',
@@ -50,42 +54,48 @@ export function formatHeaderDate(dateString: string): string {
       year: 'numeric',
     });
   } catch {
-    return dateString;
+    return dateString || '';
   }
 }
 
-export function formatHeaderFullDate(dateString: string): string {
+export function formatHeaderFullDate(dateString?: string): string {
+  if (!dateString) return '';
   try {
-    const [year, month, day] = dateString.split('-').map(Number);
+    const safeStr = getLocalDateKey(dateString);
+    const [year, month, day] = safeStr.split('-').map(Number);
     const date = new Date(year, month - 1, day);
     const weekday = date.toLocaleDateString('en-US', { weekday: 'short' });
     const dayNum = date.getDate();
     const monthName = date.toLocaleDateString('en-US', { month: 'long' });
     return `${weekday}, ${dayNum} ${monthName}`;
   } catch {
-    return dateString;
+    return dateString || '';
   }
 }
 
-export function formatWeekday(dateString: string): string {
+export function formatWeekday(dateString?: string): string {
+  if (!dateString) return '';
   try {
-    const [year, month, day] = dateString.split('-').map(Number);
+    const safeStr = getLocalDateKey(dateString);
+    const [year, month, day] = safeStr.split('-').map(Number);
     const date = new Date(year, month - 1, day);
     return date.toLocaleDateString('en-US', { weekday: 'short' });
   } catch {
-    return dateString;
+    return dateString || '';
   }
 }
 
-export function formatHistoryDate(dateString: string): string {
+export function formatHistoryDate(dateString?: string): string {
+  if (!dateString) return '';
   try {
-    const [year, month, day] = dateString.split('-').map(Number);
+    const safeStr = getLocalDateKey(dateString);
+    const [year, month, day] = safeStr.split('-').map(Number);
     const date = new Date(year, month - 1, day);
     const dayNum = date.getDate();
     const monthName = date.toLocaleDateString('en-US', { month: 'short' });
     return `${dayNum} ${monthName}`;
   } catch {
-    return dateString;
+    return dateString || '';
   }
 }
 

@@ -17,6 +17,8 @@ import {
   getMonthCalendarDays,
   formatMonthYear,
   formatHeaderDate,
+  getLocalDateKey,
+  getTodayDateString,
 } from '../lib/dateUtils';
 
 interface AnalyticsViewProps {
@@ -34,12 +36,13 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
 }) => {
   // Calendar month state
   const [currentYearMonth, setCurrentYearMonth] = useState<{ year: number; monthIndex: number }>(() => {
-    const [y, m] = todayDate.split('-').map(Number);
-    return { year: y, monthIndex: m - 1 };
+    const safeDate = todayDate ? getLocalDateKey(todayDate) : getTodayDateString();
+    const [y, m] = safeDate.split('-').map(Number);
+    return { year: y || new Date().getFullYear(), monthIndex: (m || 1) - 1 };
   });
 
   // Selected date in calendar for read-only inspection
-  const [inspectedDate, setInspectedDate] = useState<string>(todayDate);
+  const [inspectedDate, setInspectedDate] = useState<string>(() => todayDate || getTodayDateString());
 
   const handlePrevMonth = () => {
     setCurrentYearMonth((prev) => {
@@ -60,9 +63,10 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
   };
 
   // Inspect details for selected date
-  const inspectedLog = rawLogsMap[inspectedDate];
+  const safeHabits = Array.isArray(habits) ? habits : [];
+  const inspectedLog = (rawLogsMap && inspectedDate) ? rawLogsMap[inspectedDate] : undefined;
   const inspectedCompletedHabits = inspectedLog?.completedHabits || {};
-  const activeHabitIds = useMemo(() => habits.map((h) => h.id), [habits]);
+  const activeHabitIds = useMemo(() => safeHabits.map((h) => h.id), [safeHabits]);
   const inspectedCompletedCount = inspectedLog
     ? typeof inspectedLog.completedCount === 'number'
       ? inspectedLog.completedCount
@@ -70,18 +74,18 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
     : 0;
   const inspectedTotalCount = inspectedLog?.totalActiveCount && inspectedLog.totalActiveCount > 0
     ? inspectedLog.totalActiveCount
-    : habits.length || 8;
+    : safeHabits.length || 8;
   const inspectedPercentage = inspectedTotalCount > 0
     ? Math.round((inspectedCompletedCount / inspectedTotalCount) * 100)
     : 0;
 
   const completedHabitsList = useMemo(
-    () => habits.filter((h) => inspectedCompletedHabits[h.id]),
-    [habits, inspectedCompletedHabits]
+    () => safeHabits.filter((h) => inspectedCompletedHabits[h.id]),
+    [safeHabits, inspectedCompletedHabits]
   );
   const incompleteHabitsList = useMemo(
-    () => habits.filter((h) => !inspectedCompletedHabits[h.id]),
-    [habits, inspectedCompletedHabits]
+    () => safeHabits.filter((h) => !inspectedCompletedHabits[h.id]),
+    [safeHabits, inspectedCompletedHabits]
   );
 
   // Calendar days grid
@@ -224,7 +228,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
 
         {/* 7-Day Visual Bars */}
         <div className="grid grid-cols-7 gap-1.5 pt-1">
-          {analytics.sevenDayBreakdown.map((day) => {
+          {(analytics?.sevenDayBreakdown || []).map((day) => {
             const isDayToday = day.date === todayDate;
             return (
               <div
@@ -573,7 +577,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
         </div>
 
         <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
-          {analytics.habitBreakdown.map((item) => (
+          {(analytics?.habitBreakdown || []).map((item) => (
             <div
               key={item.habitId}
               className="p-2.5 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200/80 dark:border-zinc-700/80 rounded-lg flex items-center justify-between gap-3 text-xs"

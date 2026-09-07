@@ -10,8 +10,20 @@ import {
   getDocs,
   writeBatch,
 } from 'firebase/firestore';
-import { User, updateProfile, deleteUser, reauthenticateWithPopup, signOut } from 'firebase/auth';
+import {
+  User,
+  updateProfile,
+  deleteUser,
+  reauthenticateWithPopup,
+  signOut,
+  GoogleAuthProvider,
+} from 'firebase/auth';
 import { db, auth, googleProvider } from './firebase';
+import {
+  deleteHabitFromGoogleCalendar,
+  getCachedCalendarToken,
+  disconnectGoogleCalendar,
+} from './googleCalendarService';
 import {
   DEFAULT_HABITS,
   HabitItem,
@@ -21,8 +33,6 @@ import {
   UserProfile,
   AnalyticsStats,
   HabitConsistency,
-  UserReminderSettings,
-  DEFAULT_REMINDER_SETTINGS,
   ThemeMode,
   WeightHistoryEntry,
 } from '../types';
@@ -43,8 +53,6 @@ import {
   setCachedHistoryBundle,
   getCachedUserProfile,
   setCachedUserProfile,
-  getCachedReminderSettings,
-  setCachedReminderSettings,
   getCachedWeightHistory,
   setCachedWeightHistory,
   clearUserAppData,
@@ -113,6 +121,9 @@ export function syncUserProfile(
     weightUnit: cached?.weightUnit || 'kg',
     onboardingCompleted: cached?.onboardingCompleted,
     lastWeightCheckInDate: cached?.lastWeightCheckInDate,
+    googleCalendarConnected: cached?.googleCalendarConnected,
+    googleCalendarEmail: cached?.googleCalendarEmail,
+    lastGoogleCalendarSync: cached?.lastGoogleCalendarSync,
     createdAt: cached?.createdAt,
     updatedAt: cached?.updatedAt,
     lastLoginAt: now,
@@ -145,6 +156,12 @@ export function syncUserProfile(
               ? cached.onboardingCompleted
               : data.createdAt ? true : false,
           lastWeightCheckInDate: data.lastWeightCheckInDate || cached?.lastWeightCheckInDate,
+          googleCalendarConnected:
+            typeof data.googleCalendarConnected === 'boolean'
+              ? data.googleCalendarConnected
+              : cached?.googleCalendarConnected || false,
+          googleCalendarEmail: data.googleCalendarEmail || cached?.googleCalendarEmail,
+          lastGoogleCalendarSync: data.lastGoogleCalendarSync || cached?.lastGoogleCalendarSync,
           createdAt: data.createdAt || cached?.createdAt || now,
           updatedAt: data.updatedAt || cached?.updatedAt,
           lastLoginAt: now,
@@ -174,6 +191,7 @@ export function syncUserProfile(
           email: user.email || null,
           photoURL: user.photoURL || null,
           onboardingCompleted: false,
+          googleCalendarConnected: false,
           createdAt: now,
           updatedAt: now,
           lastLoginAt: now,
@@ -191,6 +209,7 @@ export function syncUserProfile(
             email: user.email || null,
             photoURL: user.photoURL || null,
             onboardingCompleted: false,
+            googleCalendarConnected: false,
             createdAt: now,
             updatedAt: now,
             lastLoginAt: now,
@@ -221,6 +240,9 @@ export async function updateUserProfile(
     weight?: number;
     weightUnit?: 'kg' | 'lbs';
     onboardingCompleted?: boolean;
+    googleCalendarConnected?: boolean;
+    googleCalendarEmail?: string;
+    lastGoogleCalendarSync?: string;
   }
 ): Promise<UserProfile> {
   const cached = getCachedUserProfile(userId);
@@ -242,6 +264,14 @@ export async function updateUserProfile(
     weightUnit: updates.weightUnit || cached?.weightUnit || 'kg',
     onboardingCompleted: updates.onboardingCompleted !== undefined ? updates.onboardingCompleted : (cached?.onboardingCompleted ?? true),
     lastWeightCheckInDate: cached?.lastWeightCheckInDate,
+    googleCalendarConnected:
+      updates.googleCalendarConnected !== undefined
+        ? updates.googleCalendarConnected
+        : (cached?.googleCalendarConnected || false),
+    googleCalendarEmail:
+      updates.googleCalendarEmail !== undefined ? updates.googleCalendarEmail : cached?.googleCalendarEmail,
+    lastGoogleCalendarSync:
+      updates.lastGoogleCalendarSync !== undefined ? updates.lastGoogleCalendarSync : cached?.lastGoogleCalendarSync,
     updatedAt: now,
     lastLoginAt: cached?.lastLoginAt || now,
     createdAt: cached?.createdAt || now,
@@ -275,6 +305,9 @@ export async function updateUserProfile(
   if (updates.weight !== undefined) firestoreUpdates.weight = updates.weight;
   if (updates.weightUnit !== undefined) firestoreUpdates.weightUnit = updates.weightUnit;
   if (updates.onboardingCompleted !== undefined) firestoreUpdates.onboardingCompleted = updates.onboardingCompleted;
+  if (updates.googleCalendarConnected !== undefined) firestoreUpdates.googleCalendarConnected = updates.googleCalendarConnected;
+  if (updates.googleCalendarEmail !== undefined) firestoreUpdates.googleCalendarEmail = updates.googleCalendarEmail;
+  if (updates.lastGoogleCalendarSync !== undefined) firestoreUpdates.lastGoogleCalendarSync = updates.lastGoogleCalendarSync;
 
   await setDoc(userRef, firestoreUpdates, { merge: true });
 
@@ -427,6 +460,10 @@ export async function saveWeightEntry(
   unit: 'kg' | 'lbs',
   dateInput?: string
 ): Promise<WeightHistoryEntry> {
+  if (!userId) {
+    throw new Error('User ID is required to save weight entry.');
+  }
+
   const now = new Date().toISOString();
   const date = dateInput ? getLocalDateKey(dateInput) : getLocalDateKey();
   const id = `weight_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
@@ -440,22 +477,7 @@ export async function saveWeightEntry(
     createdAt: now,
   };
 
-  // Update local cache immediately
-  const existing = getCachedWeightHistory(userId);
-  const updated = [entry, ...existing.filter((e) => e.date !== date)];
-  setCachedWeightHistory(userId, updated);
-
-  const cachedUser = getCachedUserProfile(userId);
-  if (cachedUser) {
-    setCachedUserProfile({
-      ...cachedUser,
-      weight,
-      weightUnit: unit,
-      lastWeightCheckInDate: date,
-    });
-  }
-
-  // Persist to Firestore
+  // Persist to Firestore first to verify successful write
   try {
     const entryRef = doc(db, 'users', userId, 'weightHistory', id);
     await setDoc(entryRef, entry);
@@ -471,8 +493,24 @@ export async function saveWeightEntry(
       },
       { merge: true }
     );
-  } catch (err) {
-    console.warn('Error saving weight entry to Firestore:', err);
+  } catch (err: any) {
+    console.error('Error saving weight entry to Firestore:', err);
+    throw new Error('Unable to save your weight. Please try again.');
+  }
+
+  // Update local cache once Firestore write confirms success
+  const existing = getCachedWeightHistory(userId);
+  const updated = [entry, ...existing.filter((e) => e.date !== date)];
+  setCachedWeightHistory(userId, updated);
+
+  const cachedUser = getCachedUserProfile(userId);
+  if (cachedUser) {
+    setCachedUserProfile({
+      ...cachedUser,
+      weight,
+      weightUnit: unit,
+      lastWeightCheckInDate: date,
+    });
   }
 
   return entry;
@@ -497,30 +535,39 @@ export function checkWeeklyWeightReminderNeeded(user: UserProfile | null): boole
   if (!lastCheckIn) return true;
 
   // Calculate days difference between today and last check-in
-  const [cy, cm, cd] = todayKey.split('-').map(Number);
-  const [ly, lm, ld] = lastCheckIn.split('-').map(Number);
-  const nowDate = new Date(cy, cm - 1, cd).getTime();
-  const prevDate = new Date(ly, lm - 1, ld).getTime();
-  const diffDays = Math.floor((nowDate - prevDate) / (1000 * 60 * 60 * 24));
+  try {
+    const safeLastCheckIn = getLocalDateKey(lastCheckIn);
+    const [cy, cm, cd] = todayKey.split('-').map(Number);
+    const [ly, lm, ld] = safeLastCheckIn.split('-').map(Number);
+    const nowDate = new Date(cy, cm - 1, cd).getTime();
+    const prevDate = new Date(ly, lm - 1, ld).getTime();
+    const diffDays = Math.floor((nowDate - prevDate) / (1000 * 60 * 60 * 24));
 
-  return diffDays >= 7;
+    return diffDays >= 7;
+  } catch {
+    return false;
+  }
 }
 
 /**
  * Dismisses weekly weight check-in prompt for the next 7 days.
  */
 export function dismissWeeklyWeightReminder(userId: string): void {
-  const [y, m, d] = getLocalDateKey().split('-').map(Number);
-  const nextWeek = new Date(y, m - 1, d + 7);
-  const nextWeekKey = getLocalDateKey(nextWeek);
-  localStorage.setItem(`dh_weight_prompt_dismissed_until_${userId}`, nextWeekKey);
+  try {
+    const [y, m, d] = getLocalDateKey().split('-').map(Number);
+    const nextWeek = new Date(y, m - 1, d + 7);
+    const nextWeekKey = getLocalDateKey(nextWeek);
+    localStorage.setItem(`dh_weight_prompt_dismissed_until_${userId}`, nextWeekKey);
+  } catch (err) {
+    console.warn('Error dismissing weekly weight reminder:', err);
+  }
 }
 
 /**
  * Clears all user habit completion history, daily habit logs, custom habits, daily notes,
  * milestones, food logs, weight history, and reminder settings from Firestore and local cache.
  * Preserves the Firebase Auth account and Google account.
- * Re-seeds clean default habits so the user immediately has a working, empty Daily Habits dashboard.
+ * Leaves the user's habits list in a clean empty state.
  */
 export async function clearUserData(userId: string): Promise<void> {
   if (!userId) {
@@ -537,81 +584,51 @@ export async function clearUserData(userId: string): Promise<void> {
     'weightHistory',
   ];
 
-  // 1. Concurrently delete all documents across all user subcollections
-  const deleteSubcollections = async () => {
-    const results = await Promise.allSettled(
-      subcollections.map(async (sub) => {
-        try {
-          const colRef = collection(db, 'users', userId, sub);
-          const snap = await getDocs(colRef);
-          if (!snap.empty) {
-            const docs = snap.docs;
-            for (let i = 0; i < docs.length; i += 400) {
-              const chunk = docs.slice(i, i + 400);
-              const batch = writeBatch(db);
-              chunk.forEach((d) => batch.delete(d.ref));
-              await batch.commit();
-            }
+  // 1. Concurrently delete all documents across all user subcollections in Firestore
+  await Promise.all(
+    subcollections.map(async (sub) => {
+      try {
+        const colRef = collection(db, 'users', userId, sub);
+        const snap = await getDocs(colRef);
+        if (!snap.empty) {
+          const docs = snap.docs;
+          const batches = [];
+          for (let i = 0; i < docs.length; i += 400) {
+            const chunk = docs.slice(i, i + 400);
+            const batch = writeBatch(db);
+            chunk.forEach((d) => batch.delete(d.ref));
+            batches.push(batch.commit());
           }
-        } catch (e) {
-          console.error(`Error clearing subcollection ${sub} for user ${userId}:`, e);
-          throw e;
+          await Promise.all(batches);
         }
-      })
-    );
+      } catch (e) {
+        console.error(`Error clearing subcollection ${sub} for user ${userId}:`, e);
+        throw e;
+      }
+    })
+  );
 
-    const hasCriticalError = results.some(
-      (r) => r.status === 'rejected' && (r as PromiseRejectedResult).reason?.code !== 'permission-denied'
-    );
-    if (hasCriticalError) {
-      console.warn('Some subcollection deletions encountered errors during clear');
-    }
-  };
-
-  // Execute deletion with safety timeout
-  await withTimeout(deleteSubcollections(), 8000, undefined);
-
-  // 2. Re-seed default habits and reminder settings into Firestore
+  // 2. Reset user document in Firestore (preserve profile identity & keep onboardingCompleted: true)
   const now = new Date().toISOString();
   try {
-    const seedBatch = writeBatch(db);
-    for (let idx = 0; idx < DEFAULT_HABITS.length; idx++) {
-      const habit = DEFAULT_HABITS[idx];
-      const item: HabitItem = {
-        ...habit,
-        order: idx,
-        createdAt: now,
-        updatedAt: now,
-      };
-      const hRef = doc(db, 'users', userId, 'habitSettings', item.id);
-      seedBatch.set(hRef, item);
-
-      const rRef = doc(db, 'users', userId, 'reminderSettings', item.id);
-      seedBatch.set(rRef, {
-        habitId: item.id,
-        reminderEnabled: !!item.reminderEnabled,
-        reminderTime: item.reminderTime || '08:00',
-        updatedAt: now,
-      });
-    }
-
-    // Update user document (preserve profile identity & keep onboardingCompleted: true)
     const userRef = doc(db, 'users', userId);
-    seedBatch.set(
+    await setDoc(
       userRef,
       {
         uid: userId,
         weight: null,
+        weightUnit: null,
         lastWeightCheckInDate: null,
+        googleCalendarConnected: false,
+        googleCalendarEmail: null,
+        lastGoogleCalendarSync: null,
         onboardingCompleted: true,
         updatedAt: now,
       },
       { merge: true }
     );
-
-    await seedBatch.commit();
   } catch (err) {
-    console.error('Error re-seeding default settings to Firestore:', err);
+    console.error('Error resetting user document in Firestore:', err);
     throw err;
   }
 
@@ -620,25 +637,46 @@ export async function clearUserData(userId: string): Promise<void> {
 }
 
 /**
- * Helper to race any promise against a timeout.
- */
-function withTimeout<T>(promise: Promise<T>, timeoutMs: number, fallbackValue: T): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<T>((resolve) => setTimeout(() => resolve(fallbackValue), timeoutMs)),
-  ]);
-}
-
-/**
- * Permanently deletes the user's account and all associated Firestore data.
- * - Concurrently wipes all user data in Firestore with quick timeouts to prevent long loading.
- * - Handles Firebase Auth deletion and re-authentication if credentials are stale.
- * - Guaranteed local state and session purging.
+ * Permanently deletes the user's Daily Habits account and all associated Firestore data.
+ * Verifies identity via Google re-authentication before deleting any cloud data.
  */
 export async function deleteUserAccount(currentUser: User): Promise<void> {
   const userId = currentUser.uid;
 
-  // 1. Delete all user subcollections concurrently (bounded by 4s timeout)
+  // 1. Re-authenticate with Google before any deletion to verify session freshness
+  try {
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
+    await reauthenticateWithPopup(currentUser, provider);
+  } catch (reauthErr: any) {
+    if (
+      reauthErr?.code === 'auth/popup-closed-by-user' ||
+      reauthErr?.code === 'auth/cancelled-popup-request'
+    ) {
+      throw new Error('Account deletion was cancelled. Your account and data remain intact.');
+    }
+    if (reauthErr?.code === 'auth/popup-blocked') {
+      throw new Error('Google sign-in popup was blocked by your browser. Please allow popups and try again.');
+    }
+    console.error('Re-authentication failed before deletion:', reauthErr);
+    throw new Error(reauthErr?.message || 'Authentication verification failed. Account was not deleted.');
+  }
+
+  // 2. Safely remove Daily Habits events from Google Calendar (if connected)
+  try {
+    const token = getCachedCalendarToken();
+    if (token) {
+      const habits = getCachedHabits(userId);
+      const syncedHabits = habits.filter((h) => h.googleCalendarEventId);
+      await Promise.allSettled(
+        syncedHabits.map((h) => deleteHabitFromGoogleCalendar(h.googleCalendarEventId!, token))
+      );
+    }
+  } catch (calErr) {
+    console.warn('Non-blocking calendar cleanup error during account deletion:', calErr);
+  }
+
+  // 3. Concurrently delete all documents across all user subcollections in Firestore
   const subcollections = [
     'dailyLogs',
     'habitSettings',
@@ -649,79 +687,56 @@ export async function deleteUserAccount(currentUser: User): Promise<void> {
     'weightHistory',
   ];
 
-  const wipeFirestorePromise = (async () => {
-    // Delete all subcollection documents in parallel
-    await Promise.allSettled(
-      subcollections.map(async (sub) => {
-        try {
-          const colRef = collection(db, 'users', userId, sub);
-          const snap = await getDocs(colRef);
-          if (!snap.empty) {
+  await Promise.all(
+    subcollections.map(async (sub) => {
+      try {
+        const colRef = collection(db, 'users', userId, sub);
+        const snap = await getDocs(colRef);
+        if (!snap.empty) {
+          const docs = snap.docs;
+          const batches = [];
+          for (let i = 0; i < docs.length; i += 400) {
+            const chunk = docs.slice(i, i + 400);
             const batch = writeBatch(db);
-            snap.forEach((d) => {
-              batch.delete(d.ref);
-            });
-            await batch.commit();
+            chunk.forEach((d) => batch.delete(d.ref));
+            batches.push(batch.commit());
           }
-        } catch (e) {
-          console.warn(`Error deleting subcollection ${sub}:`, e);
+          await Promise.all(batches);
         }
-      })
-    );
+      } catch (e) {
+        console.warn(`Error deleting subcollection ${sub}:`, e);
+      }
+    })
+  );
 
-    // Delete user root document
-    try {
-      const userRef = doc(db, 'users', userId);
-      await deleteDoc(userRef);
-    } catch (e) {
-      console.warn('Error deleting user root doc:', e);
-    }
-  })();
+  // 4. Delete user root document in Firestore
+  try {
+    const userRef = doc(db, 'users', userId);
+    await deleteDoc(userRef);
+  } catch (e) {
+    console.warn('Error deleting user root doc:', e);
+  }
 
-  // Race firestore cleanup with a 5 second safety limit
-  await withTimeout(wipeFirestorePromise, 5000, undefined);
-
-  // 2. Always purge all local storage cache for this user
+  // 5. Always purge all local storage cache for this user
+  clearUserAppData(userId);
   clearUserCache(userId);
   clearActiveSession();
+  disconnectGoogleCalendar();
 
-  // 3. Delete Firebase Auth user account
+  // 6. Delete Firebase Auth user account
   try {
     await deleteUser(currentUser);
   } catch (err: any) {
-    console.warn('Initial deleteUser attempt result:', err);
-    if (err?.code === 'auth/requires-recent-login' || err?.code === 'auth/user-token-expired') {
-      try {
-        // Re-authenticate via Google popup
-        const reauthResult = await reauthenticateWithPopup(currentUser, googleProvider);
-        if (reauthResult?.user) {
-          await deleteUser(reauthResult.user);
-        } else {
-          await deleteUser(currentUser);
-        }
-      } catch (reauthErr: any) {
-        console.error('Re-authentication for deletion failed:', reauthErr);
-        // Force sign out so the user is not stuck in a broken state
-        try {
-          await signOut(auth);
-        } catch (_) {}
-
-        if (
-          reauthErr?.code === 'auth/popup-closed-by-user' ||
-          reauthErr?.code === 'auth/cancelled-popup-request'
-        ) {
-          throw new Error('Account deletion was cancelled. All cloud data has been cleared.');
-        } else if (reauthErr?.code === 'auth/popup-blocked') {
-          throw new Error('Google sign-in popup was blocked by your browser. Please allow popups and try again.');
-        } else {
-          throw new Error('Authentication expired. Your local & cloud data was removed, and you have been signed out.');
-        }
+    console.error('deleteUser error in Firebase Auth:', err);
+    if (err?.code === 'auth/requires-recent-login') {
+      const provider = new GoogleAuthProvider();
+      const reauthResult = await reauthenticateWithPopup(currentUser, provider);
+      if (reauthResult?.user) {
+        await deleteUser(reauthResult.user);
+      } else {
+        await deleteUser(currentUser);
       }
     } else {
-      // If any other auth error occurred, sign out to ensure session is cleared
-      try {
-        await signOut(auth);
-      } catch (_) {}
       throw err;
     }
   }
@@ -747,8 +762,12 @@ export async function fetchUserHabitSettings(userId: string): Promise<HabitItem[
           target: data.target || '',
           icon: data.icon || 'check',
           order: typeof data.order === 'number' ? data.order : habits.length,
-          reminderEnabled: typeof data.reminderEnabled === 'boolean' ? data.reminderEnabled : false,
-          reminderTime: data.reminderTime || '08:00',
+          time: data.time || data.reminderTime || '08:00',
+          googleCalendarEventId: data.googleCalendarEventId,
+          googleCalendarSynced: data.googleCalendarSynced || false,
+          lastSyncedAt: data.lastSyncedAt,
+          reminderEnabled: typeof data.reminderEnabled === 'boolean' ? data.reminderEnabled : true,
+          reminderTime: data.reminderTime || data.time || '08:00',
           createdAt: data.createdAt,
           updatedAt: data.updatedAt,
         });
@@ -758,7 +777,25 @@ export async function fetchUserHabitSettings(userId: string): Promise<HabitItem[
       return sorted;
     }
 
-    // Seed default habits if no habits found for this user
+    // Check if user already completed onboarding or has an established profile.
+    // If so, empty habits collection means habits are intentionally empty (e.g. after Clear Data).
+    const cachedProfile = getCachedUserProfile(userId);
+    if (cachedProfile?.onboardingCompleted) {
+      setCachedHabits(userId, []);
+      return [];
+    }
+
+    try {
+      const userDocSnap = await getDoc(doc(db, 'users', userId));
+      if (userDocSnap.exists() && userDocSnap.data()?.onboardingCompleted) {
+        setCachedHabits(userId, []);
+        return [];
+      }
+    } catch {
+      // ignore network errors when checking user doc
+    }
+
+    // Seed default habits ONLY for brand new users
     const batch = writeBatch(db);
     const now = new Date().toISOString();
     const seededHabits: HabitItem[] = DEFAULT_HABITS.map((item, idx) => ({
@@ -767,8 +804,11 @@ export async function fetchUserHabitSettings(userId: string): Promise<HabitItem[
       target: item.target || '',
       icon: item.icon || 'check',
       order: idx,
-      reminderEnabled: typeof item.reminderEnabled === 'boolean' ? item.reminderEnabled : false,
-      reminderTime: item.reminderTime || '08:00',
+      time: item.time || item.reminderTime || '08:00',
+      googleCalendarEventId: item.googleCalendarEventId,
+      googleCalendarSynced: false,
+      reminderEnabled: typeof item.reminderEnabled === 'boolean' ? item.reminderEnabled : true,
+      reminderTime: item.reminderTime || item.time || '08:00',
       createdAt: now,
       updatedAt: now,
     }));
@@ -776,15 +816,6 @@ export async function fetchUserHabitSettings(userId: string): Promise<HabitItem[
     for (const item of seededHabits) {
       const itemRef = doc(db, 'users', userId, 'habitSettings', item.id);
       batch.set(itemRef, item);
-
-      // Also seed reminder settings subcollection
-      const reminderRef = doc(db, 'users', userId, 'reminderSettings', item.id);
-      batch.set(reminderRef, {
-        habitId: item.id,
-        reminderEnabled: !!item.reminderEnabled,
-        reminderTime: item.reminderTime || '08:00',
-        updatedAt: now,
-      });
     }
 
     await batch.commit();
@@ -797,7 +828,7 @@ export async function fetchUserHabitSettings(userId: string): Promise<HabitItem[
 }
 
 /**
- * Saves or updates a single habit setting and its reminder settings document.
+ * Saves or updates a single habit setting.
  */
 export async function saveHabitSetting(userId: string, habit: HabitItem): Promise<void> {
   const now = new Date().toISOString();
@@ -807,8 +838,12 @@ export async function saveHabitSetting(userId: string, habit: HabitItem): Promis
     target: habit.target || '',
     icon: habit.icon || 'check',
     order: typeof habit.order === 'number' ? habit.order : 0,
-    reminderEnabled: typeof habit.reminderEnabled === 'boolean' ? habit.reminderEnabled : false,
-    reminderTime: habit.reminderTime || '08:00',
+    time: habit.time || habit.reminderTime || '08:00',
+    googleCalendarEventId: habit.googleCalendarEventId || null,
+    googleCalendarSynced: habit.googleCalendarSynced || false,
+    lastSyncedAt: habit.lastSyncedAt || null,
+    reminderEnabled: typeof habit.reminderEnabled === 'boolean' ? habit.reminderEnabled : true,
+    reminderTime: habit.reminderTime || habit.time || '08:00',
     createdAt: habit.createdAt || now,
     updatedAt: now,
   };
@@ -818,23 +853,6 @@ export async function saveHabitSetting(userId: string, habit: HabitItem): Promis
     await setDoc(habitRef, payload, { merge: true });
   } catch (error) {
     console.warn('Save habit setting notice:', error);
-  }
-
-  // Sync to reminderSettings subcollection
-  try {
-    const reminderRef = doc(db, 'users', userId, 'reminderSettings', habit.id);
-    await setDoc(
-      reminderRef,
-      {
-        habitId: habit.id,
-        reminderEnabled: typeof habit.reminderEnabled === 'boolean' ? habit.reminderEnabled : false,
-        reminderTime: habit.reminderTime || '08:00',
-        updatedAt: now,
-      },
-      { merge: true }
-    );
-  } catch (reminderErr) {
-    console.warn('Reminder sync notice:', reminderErr);
   }
 }
 
@@ -848,13 +866,6 @@ export async function deleteHabitSetting(userId: string, habitId: string): Promi
   } catch (error) {
     console.warn('Delete habit setting notice:', error);
   }
-
-  try {
-    const reminderRef = doc(db, 'users', userId, 'reminderSettings', habitId);
-    await deleteDoc(reminderRef);
-  } catch (reminderErr) {
-    console.warn('Reminder delete notice:', reminderErr);
-  }
 }
 
 /**
@@ -867,7 +878,8 @@ export async function fetchDailyLog(
   activeHabits: HabitItem[] = []
 ): Promise<DailyLogData> {
   const date = getLocalDateKey(dateInput);
-  const activeIds = activeHabits.map((h) => h.id);
+  const safeActiveHabits = Array.isArray(activeHabits) ? activeHabits : [];
+  const activeIds = safeActiveHabits.map((h) => h.id);
 
   // Check local cache first
   const cached = getCachedDailyLog(userId, date);
@@ -877,7 +889,7 @@ export async function fetchDailyLog(
       ...cached,
       date,
       completedCount: progress.completedCount,
-      totalActiveCount: activeHabits.length,
+      totalActiveCount: safeActiveHabits.length,
     };
     return updated;
   }
@@ -1060,14 +1072,15 @@ export function toggleHabit(
     [habitId]: !currentCompleted,
   };
 
-  const activeHabitIds = habits.map((h) => h.id);
+  const safeHabits = Array.isArray(habits) ? habits : [];
+  const activeHabitIds = safeHabits.map((h) => h.id);
   const progress = calculateDailyProgress(updatedCompletedHabits, activeHabitIds);
 
   const updatedLog: DailyLogData = {
     date,
     completedHabits: updatedCompletedHabits,
     completedCount: progress.completedCount,
-    totalActiveCount: habits.length,
+    totalActiveCount: safeHabits.length,
     note: typeof currentLog.note === 'string' ? currentLog.note : '',
     updatedAt: new Date().toISOString(),
   };
@@ -1153,8 +1166,9 @@ export function calculateAnalytics(
   todayDate: string,
   streaks: StreakStats
 ): AnalyticsStats {
-  const activeIds = habits.map((h) => h.id);
-  const totalActive = habits.length;
+  const safeHabits = Array.isArray(habits) ? habits : [];
+  const activeIds = safeHabits.map((h) => h.id);
+  const totalActive = safeHabits.length;
 
   // Map of date -> log
   const logByDate: Record<string, { completedHabits: Record<string, boolean>; completedCount: number; totalActiveCount: number }> = {};
@@ -1253,7 +1267,7 @@ export function calculateAnalytics(
   });
 
   // 6. Habit Performance - calculate percentage respecting each habit's creation date
-  const habitBreakdown: HabitConsistency[] = habits.map((h) => {
+  const habitBreakdown: HabitConsistency[] = safeHabits.map((h) => {
     // Determine creation date if available (e.g. "2026-08-20")
     let creationDateStr = '2000-01-01';
     if (h.createdAt) {
@@ -1367,8 +1381,9 @@ export async function fetchHabitHistoryAndStreaks(
 
   const historyMap: Record<string, { completed: number; total: number }> = {};
   const rawLogsMap: Record<string, DailyLogData> = {};
-  const activeIds = habits.map((h) => h.id);
-  const totalHabitsCount = habits.length;
+  const safeHabits = Array.isArray(habits) ? habits : [];
+  const activeIds = safeHabits.map((h) => h.id);
+  const totalHabitsCount = safeHabits.length;
 
   const rawLogs: Array<{
     date: string;
@@ -1458,58 +1473,6 @@ export async function fetchHabitHistoryAndStreaks(
   setCachedHistoryBundle(userId, resultBundle);
 
   return resultBundle;
-}
-
-/**
- * Loads user reminder preferences from users/{userId}/settings/reminders.
- * Cache-first for instant UI loading with background synchronization.
- */
-export async function fetchUserReminderSettings(userId: string): Promise<UserReminderSettings> {
-  const cached = getCachedReminderSettings(userId);
-  try {
-    const settingsDocRef = doc(db, 'users', userId, 'settings', 'reminders');
-    const snap = await getDoc(settingsDocRef);
-    if (snap.exists()) {
-      const data = snap.data();
-      const settings: UserReminderSettings = {
-        remindersEnabled: typeof data.remindersEnabled === 'boolean' ? data.remindersEnabled : true,
-        reminderTime: typeof data.reminderTime === 'string' ? data.reminderTime : '20:00',
-        updatedAt: data.updatedAt,
-      };
-      setCachedReminderSettings(userId, settings);
-      return settings;
-    }
-  } catch (error) {
-    console.warn(`Background reminder settings fetch notice for ${userId}:`, error);
-  }
-  return cached;
-}
-
-/**
- * Saves user reminder preferences to users/{userId}/settings/reminders.
- */
-export async function saveUserReminderSettings(
-  userId: string,
-  settings: UserReminderSettings
-): Promise<void> {
-  const now = new Date().toISOString();
-  const payload: UserReminderSettings = {
-    remindersEnabled: settings.remindersEnabled,
-    reminderTime: settings.reminderTime || '20:00',
-    updatedAt: now,
-  };
-
-  // Immediate local cache update
-  setCachedReminderSettings(userId, payload);
-
-  // Background Firestore persistence
-  try {
-    const settingsDocRef = doc(db, 'users', userId, 'settings', 'reminders');
-    await setDoc(settingsDocRef, payload, { merge: true });
-  } catch (error) {
-    console.warn(`Background save reminder settings error for ${userId}:`, error);
-    throw error;
-  }
 }
 
 /**

@@ -5,20 +5,14 @@ import {
   Edit2,
   Trash2,
   Check,
-  Flame,
   Award,
   Calendar,
   Clock,
-  TrendingUp,
   LogOut,
   AlertCircle,
   User,
   ListOrdered,
   BarChart2,
-  Bell,
-  BellRing,
-  Volume2,
-  Lock,
   Sun,
   Moon,
   Monitor,
@@ -27,19 +21,28 @@ import {
   ShieldAlert,
   Download,
   RotateCcw,
+  RefreshCw,
+  ExternalLink,
+  CheckCircle2,
+  Unlink,
 } from 'lucide-react';
-import { HabitItem, UserProfile, AnalyticsStats, DailyLogData, Milestone, UserReminderSettings, ThemeMode } from '../types';
+import {
+  HabitItem,
+  UserProfile,
+  AnalyticsStats,
+  DailyLogData,
+  Milestone,
+  ThemeMode,
+  CalendarSyncResult,
+} from '../types';
 import { HabitIcon } from './HabitIcon';
 import { HabitModal } from './HabitModal';
 import { AnalyticsView } from './AnalyticsView';
 import { MilestonesView } from './MilestonesView';
-import {
-  formatTime12Hour,
-  getNotificationPermissionStatus,
-  requestNotificationPermission,
-  NotificationSupportStatus,
-} from '../lib/reminderService';
 import { calculateAge, isValidDateOfBirth, getLocalDateKey } from '../lib/dateUtils';
+import { formatTime12Hour } from '../lib/googleCalendarService';
+
+export type TabType = 'analytics' | 'milestones' | 'habits' | 'integrations' | 'profile';
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -52,18 +55,20 @@ interface ProfileModalProps {
     heightUnit?: 'cm' | 'in';
     weight?: number;
     weightUnit?: 'kg' | 'lbs';
+    googleCalendarConnected?: boolean;
+    googleCalendarEmail?: string;
+    lastGoogleCalendarSync?: string;
   }) => Promise<void>;
   habits: HabitItem[];
   onSaveHabit: (
-    data: { name: string; target: string; icon: string; reminderEnabled?: boolean; reminderTime?: string },
+    data: { name: string; target: string; icon: string; time?: string; reminderEnabled?: boolean; reminderTime?: string },
     editingHabit?: HabitItem | null
   ) => Promise<void>;
   onDeleteHabit: (habitId: string) => Promise<void>;
-  onUpdateHabitReminder: (habitId: string, reminderEnabled: boolean, reminderTime: string) => Promise<void>;
-  onTestNotification: () => void;
-  reminderSettings?: UserReminderSettings;
-  onUpdateReminderSettings?: (settings: UserReminderSettings) => Promise<void>;
-  onTestSmartReminder?: () => void;
+  onConnectGoogleCalendar: () => Promise<void>;
+  onDisconnectGoogleCalendar: () => Promise<void>;
+  onSyncHabitsToCalendar: () => Promise<CalendarSyncResult | null>;
+  isSyncingCalendar?: boolean;
   analytics: AnalyticsStats;
   milestones?: Milestone[];
   rawLogsMap?: Record<string, DailyLogData>;
@@ -77,8 +82,6 @@ interface ProfileModalProps {
   onThemeChange?: (newTheme: ThemeMode) => void;
 }
 
-export type TabType = 'analytics' | 'milestones' | 'habits' | 'reminders' | 'profile';
-
 export const ProfileModal: React.FC<ProfileModalProps> = ({
   isOpen,
   onClose,
@@ -87,11 +90,10 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   habits,
   onSaveHabit,
   onDeleteHabit,
-  onUpdateHabitReminder,
-  onTestNotification,
-  reminderSettings = { remindersEnabled: true, reminderTime: '20:00' },
-  onUpdateReminderSettings,
-  onTestSmartReminder,
+  onConnectGoogleCalendar,
+  onDisconnectGoogleCalendar,
+  onSyncHabitsToCalendar,
+  isSyncingCalendar = false,
   analytics,
   milestones = [],
   rawLogsMap = {},
@@ -122,7 +124,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   const [showClearDataConfirm, setShowClearDataConfirm] = useState(false);
   const [isClearingData, setIsClearingData] = useState(false);
   const [isClearSuccess, setIsClearSuccess] = useState(false);
-  const [deleteAccountStep, setDeleteAccountStep] = useState<0 | 1 | 2>(0);
+  const [showDeleteAccountConfirm, setShowDeleteAccountConfirm] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [accountActionError, setAccountActionError] = useState<string | null>(null);
 
@@ -132,9 +134,10 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   const [habitToDelete, setHabitToDelete] = useState<HabitItem | null>(null);
   const [isDeletingHabit, setIsDeletingHabit] = useState(false);
 
-  // Notification Permission State
-  const [permissionStatus, setPermissionStatus] = useState<NotificationSupportStatus>('default');
-  const [isRequestingPermission, setIsRequestingPermission] = useState(false);
+  // Google Calendar Integration State
+  const [isConnectingCalendar, setIsConnectingCalendar] = useState(false);
+  const [calendarActionError, setCalendarActionError] = useState<string | null>(null);
+  const [calendarSyncSuccessMessage, setCalendarSyncSuccessMessage] = useState<string | null>(null);
 
   // Calculate age live from the currently entered date of birth
   const liveAge = useMemo(() => {
@@ -144,8 +147,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   useEffect(() => {
     if (user?.displayName) {
       setDisplayNameInput(user.displayName);
-    } else if (user?.email) {
-      setDisplayNameInput(user.email.split('@')[0]);
+    } else if (user?.email && typeof user.email === 'string') {
+      setDisplayNameInput(user.email.split('@')[0] || '');
     } else {
       setDisplayNameInput('');
     }
@@ -173,9 +176,10 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     setFormError(null);
     setProfileSavedSuccess(false);
     setShowClearDataConfirm(false);
-    setDeleteAccountStep(0);
+    setShowDeleteAccountConfirm(false);
     setAccountActionError(null);
-    setPermissionStatus(getNotificationPermissionStatus());
+    setCalendarActionError(null);
+    setCalendarSyncSuccessMessage(null);
   }, [user, isOpen]);
 
   useEffect(() => {
@@ -217,7 +221,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
       });
       setProfileSavedSuccess(true);
       setTimeout(() => setProfileSavedSuccess(false), 3000);
-    } catch (err) {
+    } catch {
       setFormError('Failed to update profile. Please try again.');
     } finally {
       setIsSavingProfile(false);
@@ -234,7 +238,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     try {
       const exportPayload = {
         app: 'Daily Habits',
-        version: '1.5',
+        version: '2.0',
         exportedAt: new Date().toISOString(),
         user: {
           uid: user?.uid,
@@ -245,6 +249,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
           heightUnit: user?.heightUnit,
           weight: user?.weight,
           weightUnit: user?.weightUnit,
+          googleCalendarConnected: user?.googleCalendarConnected,
+          lastGoogleCalendarSync: user?.lastGoogleCalendarSync,
           createdAt: user?.createdAt,
           lastLoginAt: user?.lastLoginAt,
         },
@@ -252,7 +258,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
         dailyLogs: rawLogsMap,
         milestones,
         analytics,
-        reminderSettings,
       };
 
       const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(exportPayload, null, 2));
@@ -280,26 +285,28 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
       setTimeout(() => {
         setIsClearSuccess(false);
         setShowClearDataConfirm(false);
-        onClose();
-      }, 1100);
+      }, 1500);
     } catch (err: any) {
       console.error('Failed to clear user data technical error:', err);
-      setAccountActionError('Unable to clear your data. Please try again.');
+      setAccountActionError(err?.message || 'Unable to clear your data. Please try again.');
     } finally {
       setIsClearingData(false);
     }
   };
 
   const handleExecuteDeleteAccount = async () => {
-    if (!onDeleteAccount) return;
+    if (!onDeleteAccount || isDeletingAccount) return;
     setIsDeletingAccount(true);
     setAccountActionError(null);
     try {
       await onDeleteAccount();
-      setDeleteAccountStep(0);
+      setShowDeleteAccountConfirm(false);
       onClose();
     } catch (err: any) {
-      setAccountActionError(err?.message || 'Failed to delete account. You may need to sign in again to verify identity.');
+      console.error('Failed to delete account:', err);
+      setAccountActionError(
+        err?.message || 'Failed to delete account. You may need to sign in again to verify identity.'
+      );
     } finally {
       setIsDeletingAccount(false);
     }
@@ -328,29 +335,48 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     }
   };
 
-  const handleRequestPermission = async () => {
-    setIsRequestingPermission(true);
+  const handleConnectCalendar = async () => {
+    setIsConnectingCalendar(true);
+    setCalendarActionError(null);
+    setCalendarSyncSuccessMessage(null);
     try {
-      const res = await requestNotificationPermission();
-      setPermissionStatus(res);
+      await onConnectGoogleCalendar();
+    } catch (err: any) {
+      setCalendarActionError(err.message || 'Failed to connect Google Calendar.');
     } finally {
-      setIsRequestingPermission(false);
+      setIsConnectingCalendar(false);
     }
   };
 
-  const handleToggleReminder = async (habit: HabitItem, enabled: boolean) => {
-    if (enabled && permissionStatus === 'default') {
-      const res = await requestNotificationPermission();
-      setPermissionStatus(res);
+  const handleDisconnectCalendar = async () => {
+    setCalendarActionError(null);
+    setCalendarSyncSuccessMessage(null);
+    try {
+      await onDisconnectGoogleCalendar();
+    } catch (err: any) {
+      setCalendarActionError(err.message || 'Failed to disconnect Google Calendar.');
     }
-    const time = habit.reminderTime || '08:00';
-    await onUpdateHabitReminder(habit.id, enabled, time);
   };
 
-  const handleChangeReminderTime = async (habit: HabitItem, newTime: string) => {
-    if (!newTime) return;
-    await onUpdateHabitReminder(habit.id, !!habit.reminderEnabled, newTime);
+  const handleTriggerSync = async () => {
+    setCalendarActionError(null);
+    setCalendarSyncSuccessMessage(null);
+    try {
+      const res = await onSyncHabitsToCalendar();
+      if (res && res.success) {
+        setCalendarSyncSuccessMessage(
+          `Successfully synchronized ${res.syncedCount} habit${res.syncedCount === 1 ? '' : 's'} to Google Calendar!`
+        );
+        setTimeout(() => setCalendarSyncSuccessMessage(null), 5000);
+      } else if (res && res.error) {
+        setCalendarActionError(res.error);
+      }
+    } catch (err: any) {
+      setCalendarActionError(err.message || 'Failed to sync habits with Google Calendar.');
+    }
   };
+
+  const scheduledHabitsCount = habits.filter((h) => !!(h.time || h.reminderTime)).length;
 
   return (
     <>
@@ -385,7 +411,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                 )}
                 <div>
                   <h2 id="profile-modal-name" className="text-base font-bold text-zinc-900 dark:text-zinc-100 leading-tight">
-                    {user?.displayName || user?.email?.split('@')[0] || 'User'}
+                    {user?.displayName || (user?.email && typeof user.email === 'string' ? user.email.split('@')[0] : '') || 'User'}
                   </h2>
                   <p id="profile-modal-email" className="text-xs text-zinc-500 dark:text-zinc-400 font-mono mt-0.5">
                     {user?.email || 'No email provided'}
@@ -470,26 +496,18 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
               <button
                 type="button"
-                id="tab-reminders"
-                onClick={() => setActiveTab('reminders')}
+                id="tab-integrations"
+                onClick={() => setActiveTab('integrations')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer shrink-0 ${
-                  activeTab === 'reminders'
+                  activeTab === 'integrations'
                     ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 shadow-sm scale-[1.02]'
                     : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-white/50 dark:hover:bg-white/5'
                 }`}
               >
-                <Bell className="w-3.5 h-3.5" />
-                <span>Reminders</span>
-                {habits.filter((h) => h.reminderEnabled).length > 0 && (
-                  <span
-                    className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-medium ${
-                      activeTab === 'reminders'
-                        ? 'bg-zinc-700 text-zinc-100 dark:bg-zinc-200 dark:text-zinc-900'
-                        : 'bg-zinc-200/80 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300'
-                    }`}
-                  >
-                    {habits.filter((h) => h.reminderEnabled).length}
-                  </span>
+                <Calendar className="w-3.5 h-3.5" />
+                <span>Integrations</span>
+                {user?.googleCalendarConnected && (
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                 )}
               </button>
 
@@ -504,128 +522,103 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                 }`}
               >
                 <User className="w-3.5 h-3.5" />
-                <span>Profile & Settings</span>
+                <span>Profile</span>
               </button>
             </div>
           </div>
 
-          {/* Modal Scrollable Body */}
-          <div className="p-4 sm:p-5 overflow-y-auto flex-1 space-y-5">
-            {/* TAB 1: ANALYTICS */}
+          {/* Modal Body / Tab Content */}
+          <div className="p-4 sm:p-5 overflow-y-auto flex-1 space-y-4">
+            {/* TAB 1: ANALYTICS & INSIGHTS */}
             {activeTab === 'analytics' && (
-              <AnalyticsView
-                analytics={analytics}
-                rawLogsMap={rawLogsMap}
-                habits={habits}
-                todayDate={todayDate}
-              />
+              <AnalyticsView analytics={analytics} rawLogsMap={rawLogsMap} />
             )}
 
-            {/* TAB 2: MILESTONES */}
+            {/* TAB 2: MILESTONES & ACHIEVEMENTS */}
             {activeTab === 'milestones' && (
               <MilestonesView milestones={milestones} />
             )}
 
             {/* TAB 3: MANAGE HABITS */}
             {activeTab === 'habits' && (
-              <div id="manage-habits-panel" className="space-y-4">
+              <div id="manage-habits-panel" className="space-y-3.5">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-xs font-semibold text-zinc-800 dark:text-zinc-200 uppercase tracking-wider">
-                      Current Habits ({habits.length})
+                    <h3 className="text-xs font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider">
+                      Your Habits ({habits.length})
                     </h3>
-                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400">Edit habit names, targets, or add new ones.</p>
+                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                      Add, update scheduled times, or remove habits.
+                    </p>
                   </div>
                   <button
-                    id="profile-add-habit-btn"
                     type="button"
+                    id="add-new-habit-btn"
                     onClick={handleOpenAddHabit}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-zinc-900 hover:bg-black dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 text-xs font-medium rounded-lg transition-colors cursor-pointer shadow-2xs"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white dark:text-zinc-900 bg-zinc-900 hover:bg-black dark:bg-zinc-100 dark:hover:bg-white rounded-xl transition-all shadow-sm cursor-pointer active:scale-95"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     <span>Add Habit</span>
                   </button>
                 </div>
 
-                {/* Delete Confirmation Inside Manage Habits */}
-                {habitToDelete && (
-                  <div
-                    id="manage-habits-delete-dialog"
-                    className="p-3.5 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800/70 rounded-lg text-red-900 dark:text-red-200 space-y-2 animate-fadeIn"
-                  >
-                    <div className="flex items-start gap-2.5">
-                      <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 mt-0.5 shrink-0" />
-                      <div className="text-xs">
-                        <p className="font-semibold">Delete habit "{habitToDelete.name}"?</p>
-                        <p className="text-red-700 dark:text-red-300 text-[11px] mt-0.5">
-                          It will be removed from your daily checklist. Past days in history will remain intact.
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-end gap-2 pt-1">
-                      <button
-                        type="button"
-                        onClick={() => setHabitToDelete(null)}
-                        disabled={isDeletingHabit}
-                        className="px-2.5 py-1 text-xs font-medium text-zinc-700 dark:text-zinc-300 bg-white dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 border border-zinc-300 dark:border-zinc-700 rounded transition-colors cursor-pointer"
+                <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
+                  {(Array.isArray(habits) ? habits : []).map((habit) => {
+                    const timeVal = habit.time || habit.reminderTime;
+                    return (
+                      <div
+                        key={habit.id}
+                        id={`manage-habit-card-${habit.id}`}
+                        className="p-3 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200/80 dark:border-zinc-700/80 rounded-xl flex items-center justify-between gap-3 hover:border-zinc-300 dark:hover:border-zinc-600 transition-colors"
                       >
-                        Cancel
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleConfirmDeleteHabit}
-                        disabled={isDeletingHabit}
-                        className="px-2.5 py-1 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded transition-colors cursor-pointer"
-                      >
-                        {isDeletingHabit ? 'Deleting...' : 'Confirm Delete'}
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Habits List */}
-                <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-                  {habits.map((habit) => (
-                    <div
-                      key={habit.id}
-                      id={`manage-habit-row-${habit.id}`}
-                      className="p-3 bg-zinc-50 dark:bg-zinc-800/60 hover:bg-zinc-100/80 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-700/80 rounded-lg flex items-center justify-between gap-3 transition-colors"
-                    >
-                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                        <div className="w-7 h-7 rounded-md bg-white dark:bg-zinc-800 border border-zinc-200/80 dark:border-zinc-700 flex items-center justify-center text-zinc-700 dark:text-zinc-300 shrink-0">
-                          <HabitIcon name={habit.icon} className="w-3.5 h-3.5" />
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          <div className="w-8 h-8 rounded-lg bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center text-zinc-800 dark:text-zinc-200 shrink-0 shadow-2xs">
+                            <HabitIcon name={habit.icon} className="w-4 h-4" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold text-zinc-900 dark:text-zinc-100 truncate">
+                              {habit.name}
+                            </p>
+                            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                              {habit.target && (
+                                <span className="text-[11px] text-zinc-500 dark:text-zinc-400 font-mono">
+                                  {habit.target}
+                                </span>
+                              )}
+                              {timeVal && (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.2 rounded-md bg-zinc-200/80 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300">
+                                  <Clock className="w-2.5 h-2.5" />
+                                  {formatTime12Hour(timeVal)}
+                                </span>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                        <div className="min-w-0">
-                          <p className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 truncate">{habit.name}</p>
-                          {habit.target && (
-                            <p className="text-[11px] text-zinc-500 dark:text-zinc-400 font-mono truncate">{habit.target}</p>
-                          )}
+
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            type="button"
+                            id={`edit-habit-btn-${habit.id}`}
+                            onClick={() => handleOpenEditHabit(habit)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-zinc-100 bg-white dark:bg-zinc-800 hover:bg-zinc-200/70 dark:hover:bg-zinc-700 border border-zinc-200 dark:border-zinc-700 rounded-lg transition-colors cursor-pointer"
+                            title="Edit Habit"
+                          >
+                            <Edit2 className="w-3 h-3" />
+                            <span>Edit</span>
+                          </button>
+                          <button
+                            type="button"
+                            id={`delete-habit-btn-${habit.id}`}
+                            onClick={() => setHabitToDelete(habit)}
+                            className="p-1 text-zinc-400 dark:text-zinc-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg transition-colors cursor-pointer"
+                            title="Delete Habit"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </div>
                       </div>
-
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <button
-                          type="button"
-                          id={`edit-habit-btn-${habit.id}`}
-                          onClick={() => handleOpenEditHabit(habit)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-zinc-100 bg-white dark:bg-zinc-800 hover:bg-zinc-200/70 dark:hover:bg-zinc-700 border border-zinc-200 dark:border-zinc-700 rounded transition-colors cursor-pointer"
-                          title="Edit Habit"
-                        >
-                          <Edit2 className="w-3 h-3" />
-                          <span>Edit</span>
-                        </button>
-                        <button
-                          type="button"
-                          id={`delete-habit-btn-${habit.id}`}
-                          onClick={() => setHabitToDelete(habit)}
-                          className="p-1 text-zinc-400 dark:text-zinc-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded transition-colors cursor-pointer"
-                          title="Delete Habit"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
 
                   {habits.length === 0 && (
                     <div className="text-center py-8 text-zinc-400 dark:text-zinc-500 text-xs">
@@ -636,212 +629,185 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
               </div>
             )}
 
-            {/* TAB 4: REMINDER SETTINGS */}
-            {activeTab === 'reminders' && (
-              <div id="reminder-settings-panel" className="space-y-4">
-                {/* 1. Main Smart Reminders Card */}
+            {/* TAB 4: INTEGRATIONS (GOOGLE CALENDAR) */}
+            {activeTab === 'integrations' && (
+              <div id="integrations-panel" className="space-y-4">
+                {/* Main Google Calendar Card */}
                 <div
-                  id="smart-reminders-card"
-                  className="p-4 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700/80 rounded-xl space-y-4"
+                  id="google-calendar-integration-card"
+                  className="p-4 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700/80 rounded-2xl space-y-4"
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-lg bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 flex items-center justify-center shrink-0 shadow-2xs">
-                        <Bell className="w-4 h-4" />
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center shrink-0 shadow-sm">
+                        <Calendar className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                       </div>
                       <div>
-                        <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 leading-tight">
-                          Smart Reminders
+                        <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                          Google Calendar
+                          {user?.googleCalendarConnected && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600 dark:text-emerald-400" /> Connected
+                            </span>
+                          )}
                         </h3>
-                        <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
-                          Reminds you only about habits that are still unfinished today.
+                        <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5 leading-relaxed">
+                          Sync your scheduled habits with Google Calendar and receive reminders from Google Calendar.
                         </p>
                       </div>
                     </div>
-
-                    {/* Enable/Disable Toggle */}
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-xs font-semibold font-mono text-zinc-700 dark:text-zinc-300">
-                        {reminderSettings.remindersEnabled ? 'ON' : 'OFF'}
-                      </span>
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input
-                          type="checkbox"
-                          id="smart-reminders-toggle"
-                          checked={reminderSettings.remindersEnabled}
-                          onChange={async (e) => {
-                            const newEnabled = e.target.checked;
-                            if (newEnabled && permissionStatus === 'default') {
-                              const res = await requestNotificationPermission();
-                              setPermissionStatus(res);
-                            }
-                            if (onUpdateReminderSettings) {
-                              await onUpdateReminderSettings({
-                                ...reminderSettings,
-                                remindersEnabled: newEnabled,
-                              });
-                            }
-                          }}
-                          className="sr-only peer"
-                        />
-                        <div className="w-9 h-5 bg-zinc-300 dark:bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 dark:after:border-zinc-600 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-zinc-900 dark:peer-checked:bg-zinc-100 dark:peer-checked:after:bg-zinc-900"></div>
-                      </label>
-                    </div>
                   </div>
 
-                  {/* Reminder Time Setting */}
-                  <div className="pt-3 border-t border-zinc-200/80 dark:border-zinc-700/80 flex items-center justify-between gap-3">
-                    <div>
-                      <span className="text-xs font-semibold text-zinc-800 dark:text-zinc-200 block">
-                        Reminder Time
-                      </span>
-                      <span className="text-[11px] text-zinc-500 dark:text-zinc-400">
-                        Local time: {formatTime12Hour(reminderSettings.reminderTime || '20:00')}
-                      </span>
+                  {/* Feedback Messages */}
+                  {calendarActionError && (
+                    <div className="p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800/80 rounded-xl text-xs text-red-700 dark:text-red-300 flex items-start gap-2">
+                      <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+                      <span>{calendarActionError}</span>
                     </div>
+                  )}
 
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="time"
-                        id="smart-reminder-time-input"
-                        value={reminderSettings.reminderTime || '20:00'}
-                        disabled={!reminderSettings.remindersEnabled}
-                        onChange={async (e) => {
-                          const newTime = e.target.value;
-                          if (!newTime) return;
-                          if (onUpdateReminderSettings) {
-                            await onUpdateReminderSettings({
-                              ...reminderSettings,
-                              reminderTime: newTime,
-                            });
-                          }
-                        }}
-                        className={`px-2.5 py-1.5 text-xs font-mono rounded-lg border transition-colors ${
-                          reminderSettings.remindersEnabled
-                            ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 border-zinc-300 dark:border-zinc-700 focus:ring-1 focus:ring-zinc-900 dark:focus:ring-zinc-100'
-                            : 'bg-zinc-100 dark:bg-zinc-800/40 text-zinc-400 dark:text-zinc-500 border-zinc-200 dark:border-zinc-800 cursor-not-allowed'
-                        }`}
-                      />
+                  {calendarSyncSuccessMessage && (
+                    <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/80 rounded-xl text-xs text-emerald-800 dark:text-emerald-300 flex items-start gap-2">
+                      <Check className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                      <span>{calendarSyncSuccessMessage}</span>
                     </div>
-                  </div>
+                  )}
 
-                  {/* Notification Permission & Test Banner */}
-                  <div className="pt-3 border-t border-zinc-200/80 dark:border-zinc-700/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-                    <div className="flex items-center gap-2">
-                      {permissionStatus === 'denied' ? (
-                        <div className="text-[11px] text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/70 px-2.5 py-1 rounded-md">
-                          Notifications are disabled in your browser settings.
+                  {/* Disconnected State */}
+                  {!user?.googleCalendarConnected ? (
+                    <div className="pt-2 border-t border-zinc-200/80 dark:border-zinc-700/80 space-y-3.5">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-zinc-600 dark:text-zinc-400">
+                        <div className="p-2.5 bg-white dark:bg-zinc-900/50 rounded-xl border border-zinc-200/70 dark:border-white/5">
+                          <p className="font-semibold text-zinc-900 dark:text-zinc-200">Daily Recurring Events</p>
+                          <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
+                            Habits with scheduled times appear automatically in your daily calendar.
+                          </p>
                         </div>
-                      ) : permissionStatus === 'granted' ? (
-                        <div className="inline-flex items-center gap-1 text-[11px] text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/70 px-2.5 py-1 rounded-md font-mono">
-                          <Check className="w-3 h-3" /> Notifications enabled
+                        <div className="p-2.5 bg-white dark:bg-zinc-900/50 rounded-xl border border-zinc-200/70 dark:border-white/5">
+                          <p className="font-semibold text-zinc-900 dark:text-zinc-200">Phone & Desktop Alerts</p>
+                          <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
+                            Receive notifications via Google Calendar at your scheduled times.
+                          </p>
                         </div>
-                      ) : (
+                      </div>
+
+                      <div className="pt-1 flex items-center justify-between">
+                        <span className="text-xs text-zinc-500 dark:text-zinc-400 font-mono">
+                          {scheduledHabitsCount} habit{scheduledHabitsCount === 1 ? '' : 's'} ready to sync
+                        </span>
                         <button
                           type="button"
-                          id="request-permission-btn"
-                          onClick={handleRequestPermission}
-                          disabled={isRequestingPermission}
-                          className="px-2.5 py-1 bg-zinc-900 hover:bg-black dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 text-xs font-medium rounded-md transition-colors cursor-pointer"
+                          id="connect-google-calendar-btn"
+                          onClick={handleConnectCalendar}
+                          disabled={isConnectingCalendar}
+                          className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white dark:text-zinc-900 bg-zinc-900 hover:bg-black dark:bg-zinc-100 dark:hover:bg-white rounded-xl transition-all shadow-sm cursor-pointer active:scale-95 disabled:opacity-50"
                         >
-                          {isRequestingPermission ? 'Requesting...' : 'Enable Browser Alerts'}
+                          {isConnectingCalendar ? (
+                            <>
+                              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                              <span>Connecting...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Calendar className="w-3.5 h-3.5" />
+                              <span>Connect Google Calendar</span>
+                            </>
+                          )}
                         </button>
-                      )}
-                    </div>
-
-                    <button
-                      type="button"
-                      id="test-smart-reminder-btn"
-                      onClick={() => {
-                        if (onTestSmartReminder) {
-                          onTestSmartReminder();
-                        } else {
-                          onTestNotification();
-                        }
-                      }}
-                      className="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-zinc-100 bg-white dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 px-3 py-1.5 rounded-md border border-zinc-300 dark:border-zinc-700 transition-colors cursor-pointer self-start sm:self-auto"
-                    >
-                      <Volume2 className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />
-                      <span>Test Smart Reminder</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* 2. Habit-Specific Reminder Schedule */}
-                <div className="space-y-2 pt-2">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-xs font-semibold text-zinc-800 dark:text-zinc-200 uppercase tracking-wider">
-                      Individual Habit Times
-                    </h3>
-                    <span className="text-[11px] text-zinc-400 dark:text-zinc-500 font-mono">Optional</span>
-                  </div>
-
-                  <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
-                    {habits.map((habit) => {
-                      const isEnabled = !!habit.reminderEnabled;
-                      const timeValue = habit.reminderTime || '08:00';
-
-                      return (
-                        <div
-                          key={habit.id}
-                          id={`reminder-row-${habit.id}`}
-                          className={`p-2.5 border rounded-lg flex items-center justify-between gap-3 transition-colors ${
-                            isEnabled
-                              ? 'bg-zinc-50 dark:bg-zinc-800/80 border-zinc-300 dark:border-zinc-700'
-                              : 'bg-white dark:bg-zinc-900/60 border-zinc-200/80 dark:border-zinc-800 opacity-70 hover:opacity-100'
-                          }`}
-                        >
-                          {/* Habit Info */}
-                          <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                            <div className="w-7 h-7 rounded-md bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center text-zinc-700 dark:text-zinc-300 shrink-0">
-                              <HabitIcon name={habit.icon} className="w-3.5 h-3.5" />
-                            </div>
-                            <div className="min-w-0">
-                              <p className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 truncate">
-                                {habit.name}
-                              </p>
-                              <p className="text-[11px] text-zinc-500 dark:text-zinc-400 font-mono truncate">
-                                {isEnabled ? formatTime12Hour(timeValue) : 'Reminder Off'}
-                              </p>
-                            </div>
-                          </div>
-
-                          {/* Controls: Time Picker + Toggle */}
-                          <div className="flex items-center gap-2.5 shrink-0">
-                            <input
-                              type="time"
-                              id={`reminder-time-input-${habit.id}`}
-                              value={timeValue}
-                              onChange={(e) => handleChangeReminderTime(habit, e.target.value)}
-                              disabled={!isEnabled}
-                              className={`px-2 py-1 text-xs font-mono rounded border transition-colors ${
-                                isEnabled
-                                  ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 border-zinc-300 dark:border-zinc-700 focus:ring-1 focus:ring-zinc-900 dark:focus:ring-zinc-100'
-                                  : 'bg-zinc-100 dark:bg-zinc-800/40 text-zinc-400 dark:text-zinc-500 border-zinc-200 dark:border-zinc-800 cursor-not-allowed'
-                              }`}
-                            />
-
-                            <label className="relative inline-flex items-center cursor-pointer">
-                              <input
-                                type="checkbox"
-                                id={`reminder-toggle-${habit.id}`}
-                                checked={isEnabled}
-                                onChange={(e) => handleToggleReminder(habit, e.target.checked)}
-                                className="sr-only peer"
-                              />
-                              <div className="w-8 h-4.5 bg-zinc-300 dark:bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 dark:after:border-zinc-600 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-zinc-900 dark:peer-checked:bg-zinc-100 dark:peer-checked:after:bg-zinc-900"></div>
-                            </label>
-                          </div>
-                        </div>
-                      );
-                    })}
-
-                    {habits.length === 0 && (
-                      <div className="text-center py-6 text-zinc-400 dark:text-zinc-500 text-xs">
-                        No habits found to set reminders for.
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  ) : (
+                    /* Connected State */
+                    <div className="pt-2 border-t border-zinc-200/80 dark:border-zinc-700/80 space-y-4">
+                      {/* Connection Details */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-white dark:bg-zinc-900/60 rounded-xl border border-zinc-200/70 dark:border-white/5">
+                        <div>
+                          <p className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+                            Connected Account
+                          </p>
+                          <p className="text-xs font-bold text-zinc-900 dark:text-zinc-100 mt-0.5 font-mono truncate">
+                            {user?.googleCalendarEmail || user?.email || 'Google Calendar'}
+                          </p>
+                          {user?.lastGoogleCalendarSync && (
+                            <p className="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono mt-0.5">
+                              Last synced: {new Date(user.lastGoogleCalendarSync).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Action Buttons: Sync Habits & Disconnect */}
+                        <div className="flex items-center gap-2 self-start sm:self-auto">
+                          <button
+                            type="button"
+                            id="sync-habits-calendar-btn"
+                            onClick={handleTriggerSync}
+                            disabled={isSyncingCalendar}
+                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-white dark:text-zinc-900 bg-zinc-900 hover:bg-black dark:bg-zinc-100 dark:hover:bg-white rounded-xl transition-all shadow-sm cursor-pointer active:scale-95 disabled:opacity-50"
+                          >
+                            <RefreshCw className={`w-3.5 h-3.5 ${isSyncingCalendar ? 'animate-spin' : ''}`} />
+                            <span>{isSyncingCalendar ? 'Syncing...' : 'Sync Habits'}</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            id="disconnect-google-calendar-btn"
+                            onClick={handleDisconnectCalendar}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:text-red-600 dark:hover:text-red-400 bg-zinc-100 dark:bg-zinc-800 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-xl border border-zinc-200 dark:border-zinc-700 transition-colors cursor-pointer"
+                          >
+                            <Unlink className="w-3.5 h-3.5" />
+                            <span>Disconnect</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Synced Habits Preview List */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-xs font-semibold text-zinc-800 dark:text-zinc-200 uppercase tracking-wider">
+                            Calendar Habits ({scheduledHabitsCount})
+                          </h4>
+                          <span className="text-[11px] text-zinc-400 dark:text-zinc-500 font-mono">
+                            Daily recurring
+                          </span>
+                        </div>
+
+                        <div className="space-y-1.5 max-h-44 overflow-y-auto pr-1">
+                          {(Array.isArray(habits) ? habits : []).map((habit) => {
+                            const timeVal = habit.time || habit.reminderTime;
+                            return (
+                              <div
+                                key={habit.id}
+                                className="p-2 bg-white dark:bg-zinc-900/40 border border-zinc-200/70 dark:border-white/5 rounded-xl flex items-center justify-between gap-2"
+                              >
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <HabitIcon name={habit.icon} className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400 shrink-0" />
+                                  <span className="text-xs font-medium text-zinc-900 dark:text-zinc-100 truncate">
+                                    {habit.name}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  {timeVal ? (
+                                    <span className="text-[11px] font-mono font-medium text-zinc-700 dark:text-zinc-300 px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800">
+                                      {formatTime12Hour(timeVal)}
+                                    </span>
+                                  ) : (
+                                    <span className="text-[10px] text-zinc-400 dark:text-zinc-500 italic">
+                                      No time set
+                                    </span>
+                                  )}
+                                  {habit.googleCalendarSynced && (
+                                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 flex items-center gap-0.5">
+                                      <Check className="w-3 h-3" />
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -949,91 +915,58 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                       id="edit-name-input"
                       type="text"
                       value={displayNameInput}
-                      onChange={(e) => {
-                        setDisplayNameInput(e.target.value);
-                        setFormError(null);
-                      }}
+                      onChange={(e) => setDisplayNameInput(e.target.value)}
                       placeholder="Your name"
-                      className="w-full px-3 py-2 text-xs font-medium border border-zinc-300 dark:border-zinc-700 rounded-lg focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-zinc-100 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
-                      maxLength={50}
-                      required
+                      className="w-full px-3 py-2 text-xs bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 border border-zinc-300 dark:border-zinc-700 rounded-lg focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-zinc-100"
                     />
                   </div>
 
-                  {/* 4. Date of Birth & Automatic Age Calculation */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label htmlFor="edit-dob-input" className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                  {/* 4. Date of Birth & Live Age */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label htmlFor="edit-dob-input" className="block text-xs font-medium text-zinc-700 dark:text-zinc-300">
                         Date of Birth
                       </label>
-                      <input
-                        id="edit-dob-input"
-                        type="date"
-                        value={dobInput}
-                        max={todayDate}
-                        onChange={(e) => {
-                          setDobInput(e.target.value);
-                          setFormError(null);
-                        }}
-                        className="w-full px-3 py-2 text-xs font-mono border border-zinc-300 dark:border-zinc-700 rounded-lg focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-zinc-100 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
-                      />
+                      {liveAge !== null && (
+                        <span id="profile-live-age-badge" className="text-[11px] font-mono text-zinc-600 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded">
+                          {liveAge} years old
+                        </span>
+                      )}
                     </div>
-
-                    <div>
-                      <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
-                        Age
-                      </label>
-                      <div
-                        id="edit-profile-age-display"
-                        className="w-full px-3 py-2 text-xs font-mono font-medium text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg flex items-center"
-                      >
-                        <span>{liveAge !== null ? `${liveAge} years` : dobInput ? 'Invalid date' : '—'}</span>
-                      </div>
-                    </div>
+                    <input
+                      id="edit-dob-input"
+                      type="date"
+                      value={dobInput}
+                      onChange={(e) => setDobInput(e.target.value)}
+                      className="w-full px-3 py-2 text-xs font-mono bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 border border-zinc-300 dark:border-zinc-700 rounded-lg focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-zinc-100"
+                    />
                   </div>
 
-                  {/* 5. Height & Weight */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* 5. Height & Weight Fields */}
+                  <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label htmlFor="edit-height-input" className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
                         Height
                       </label>
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex rounded-lg border border-zinc-300 dark:border-zinc-700 overflow-hidden bg-white dark:bg-zinc-800 focus-within:ring-1 focus-within:ring-zinc-900 dark:focus-within:ring-zinc-100">
                         <input
                           id="edit-height-input"
                           type="number"
-                          step="0.1"
-                          min="0"
-                          max="300"
+                          step="any"
                           value={heightInput}
                           onChange={(e) => setHeightInput(e.target.value)}
-                          placeholder={heightUnit === 'cm' ? 'e.g. 175' : 'e.g. 68'}
-                          className="flex-1 px-3 py-2 text-xs font-mono border border-zinc-300 dark:border-zinc-700 rounded-lg focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-zinc-100 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
+                          placeholder="e.g. 175"
+                          className="w-full px-2.5 py-1.5 text-xs bg-transparent text-zinc-900 dark:text-zinc-100 focus:outline-none"
                         />
-                        <div className="flex rounded-lg border border-zinc-300 dark:border-zinc-700 overflow-hidden bg-zinc-100 dark:bg-zinc-800 p-0.5">
-                          <button
-                            type="button"
-                            onClick={() => setHeightUnit('cm')}
-                            className={`px-2 py-1 text-[11px] font-semibold rounded transition-colors cursor-pointer ${
-                              heightUnit === 'cm'
-                                ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-2xs'
-                                : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
-                            }`}
-                          >
-                            cm
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setHeightUnit('in')}
-                            className={`px-2 py-1 text-[11px] font-semibold rounded transition-colors cursor-pointer ${
-                              heightUnit === 'in'
-                                ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-2xs'
-                                : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
-                            }`}
-                          >
-                            in
-                          </button>
-                        </div>
+                        <select
+                          id="edit-height-unit"
+                          value={heightUnit}
+                          onChange={(e) => setHeightUnit(e.target.value as 'cm' | 'in')}
+                          className="px-2 py-1.5 text-xs bg-zinc-100 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-200 border-l border-zinc-300 dark:border-zinc-700 focus:outline-none cursor-pointer"
+                        >
+                          <option value="cm">cm</option>
+                          <option value="in">in</option>
+                        </select>
                       </div>
                     </div>
 
@@ -1041,299 +974,296 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                       <label htmlFor="edit-weight-input" className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
                         Weight
                       </label>
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex rounded-lg border border-zinc-300 dark:border-zinc-700 overflow-hidden bg-white dark:bg-zinc-800 focus-within:ring-1 focus-within:ring-zinc-900 dark:focus-within:ring-zinc-100">
                         <input
                           id="edit-weight-input"
                           type="number"
-                          step="0.1"
-                          min="0"
-                          max="500"
+                          step="any"
                           value={weightInput}
                           onChange={(e) => setWeightInput(e.target.value)}
-                          placeholder={weightUnit === 'kg' ? 'e.g. 70' : 'e.g. 154'}
-                          className="flex-1 px-3 py-2 text-xs font-mono border border-zinc-300 dark:border-zinc-700 rounded-lg focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-zinc-100 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
+                          placeholder="e.g. 70"
+                          className="w-full px-2.5 py-1.5 text-xs bg-transparent text-zinc-900 dark:text-zinc-100 focus:outline-none"
                         />
-                        <div className="flex rounded-lg border border-zinc-300 dark:border-zinc-700 overflow-hidden bg-zinc-100 dark:bg-zinc-800 p-0.5">
-                          <button
-                            type="button"
-                            onClick={() => setWeightUnit('kg')}
-                            className={`px-2 py-1 text-[11px] font-semibold rounded transition-colors cursor-pointer ${
-                              weightUnit === 'kg'
-                                ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-2xs'
-                                : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
-                            }`}
-                          >
-                            kg
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setWeightUnit('lbs')}
-                            className={`px-2 py-1 text-[11px] font-semibold rounded transition-colors cursor-pointer ${
-                              weightUnit === 'lbs'
-                                ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-2xs'
-                                : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
-                            }`}
-                          >
-                            lbs
-                          </button>
-                        </div>
+                        <select
+                          id="edit-weight-unit"
+                          value={weightUnit}
+                          onChange={(e) => setWeightUnit(e.target.value as 'kg' | 'lbs')}
+                          className="px-2 py-1.5 text-xs bg-zinc-100 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-200 border-l border-zinc-300 dark:border-zinc-700 focus:outline-none cursor-pointer"
+                        >
+                          <option value="kg">kg</option>
+                          <option value="lbs">lbs</option>
+                        </select>
                       </div>
                     </div>
                   </div>
 
-                  {/* 6. Gmail (Read-Only) */}
-                  <div>
-                    <label htmlFor="edit-email-display" className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
-                      Gmail
-                    </label>
-                    <div className="relative">
-                      <input
-                        id="edit-email-display"
-                        type="email"
-                        value={user?.email || ''}
-                        readOnly
-                        disabled
-                        className="w-full px-3 py-2 text-xs font-mono text-zinc-600 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-lg cursor-not-allowed select-none pr-8"
-                      />
-                      <Lock className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500 absolute right-3 top-1/2 -translate-y-1/2" />
-                    </div>
-                  </div>
-
-                  {/* Feedback notices */}
                   {formError && (
-                    <div
-                      id="profile-form-error"
-                      className="p-2.5 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800/80 rounded-lg text-xs text-red-700 dark:text-red-300 flex items-center gap-2 animate-fadeIn"
-                    >
-                      <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 shrink-0" />
-                      <span>{formError}</span>
-                    </div>
+                    <p id="profile-form-error" className="text-xs text-red-600 dark:text-red-400 font-medium">
+                      {formError}
+                    </p>
                   )}
 
                   {profileSavedSuccess && (
-                    <div
-                      id="profile-form-success"
-                      className="p-2.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/80 rounded-lg text-xs text-emerald-800 dark:text-emerald-300 flex items-center gap-2 animate-fadeIn"
-                    >
+                    <div id="profile-saved-toast" className="p-2.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-lg flex items-center gap-2 text-xs text-emerald-800 dark:text-emerald-300 font-medium">
                       <Check className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                      <span>Profile updated successfully.</span>
+                      <span>Profile updated successfully!</span>
                     </div>
                   )}
 
-                  {/* Save Button */}
-                  <div className="flex items-center justify-end pt-1">
+                  <div className="pt-2 flex justify-end">
                     <button
                       id="save-profile-btn"
                       type="submit"
-                      disabled={isSavingProfile || !displayNameInput.trim()}
-                      className="px-4 py-2 bg-zinc-900 hover:bg-black dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 text-xs font-medium rounded-lg transition-colors cursor-pointer disabled:opacity-50 inline-flex items-center gap-1.5 shadow-2xs"
+                      disabled={isSavingProfile}
+                      className="px-4 py-2 text-xs font-semibold text-white dark:text-zinc-900 bg-zinc-900 hover:bg-black dark:bg-zinc-100 dark:hover:bg-white rounded-xl transition-all shadow-sm active:scale-95 disabled:opacity-50 cursor-pointer"
                     >
-                      {isSavingProfile ? (
-                        <>
-                          <span className="w-3 h-3 border-2 border-white/30 dark:border-zinc-900/30 border-t-white dark:border-t-zinc-900 rounded-full animate-spin" />
-                          <span>Saving...</span>
-                        </>
-                      ) : (
-                        <span>Save Profile</span>
-                      )}
+                      {isSavingProfile ? 'Saving...' : 'Save Profile'}
                     </button>
                   </div>
                 </form>
 
-                {/* Account Action Error */}
-                {accountActionError && (
-                  <div className="p-2.5 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-lg text-xs text-red-700 dark:text-red-300 flex items-center gap-2">
-                    <AlertTriangle className="w-4 h-4 text-red-600 dark:text-red-400 shrink-0" />
-                    <span>{accountActionError}</span>
-                  </div>
-                )}
+                {/* 6. Export Data Card */}
+                <div
+                  id="export-data-card"
+                  className="p-3.5 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700/80 rounded-xl space-y-2"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <h4 className="text-xs font-semibold text-zinc-900 dark:text-zinc-100">
+                        Export Data Backup
+                      </h4>
+                      <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                        Download a full JSON backup of your habits, completion logs, and milestones.
+                      </p>
+                    </div>
 
-                {/* Compressed Data & Account Management Section */}
-                <div className="pt-3.5 border-t border-zinc-200 dark:border-zinc-800 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
-                      Data & Account
-                    </span>
-                    {exportSuccess && (
-                      <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium inline-flex items-center gap-1 animate-fadeIn">
-                        <Check className="w-3 h-3" /> Backup exported
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                    {/* Export Data */}
                     <button
                       type="button"
-                      id="profile-export-data-btn"
+                      id="export-data-btn"
                       onClick={handleExportData}
-                      className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-zinc-700 dark:text-zinc-300 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700/80 rounded-lg border border-zinc-200 dark:border-zinc-700 transition-colors cursor-pointer"
-                      title="Download a JSON backup of your habits, daily logs, notes, and progress"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-zinc-100 bg-white dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 border border-zinc-300 dark:border-zinc-700 rounded-lg transition-colors cursor-pointer shrink-0"
                     >
-                      <Download className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />
-                      <span>Export Data</span>
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Export JSON</span>
                     </button>
+                  </div>
 
-                    {/* Clear Data */}
-                    {onClearData && (
-                      <button
-                        type="button"
-                        id="profile-clear-data-btn"
-                        onClick={() => setShowClearDataConfirm(true)}
-                        className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-amber-700 dark:text-amber-400 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 dark:hover:bg-amber-900/50 rounded-lg border border-amber-200/80 dark:border-amber-800/80 transition-colors cursor-pointer"
-                        title="Clear habit logs, notes, analytics, and reset onboarding"
-                      >
-                        <RotateCcw className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-                        <span>Clear Data</span>
-                      </button>
-                    )}
+                  {exportSuccess && (
+                    <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
+                      ✓ Data backup downloaded successfully!
+                    </p>
+                  )}
+                </div>
 
-                    {/* Delete Account */}
-                    {onDeleteAccount && (
-                      <button
-                        type="button"
-                        id="profile-delete-account-btn"
-                        onClick={() => setDeleteAccountStep(1)}
-                        className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-red-600 dark:text-red-400 hover:text-white dark:hover:text-white bg-red-50 hover:bg-red-600 dark:bg-red-950/30 dark:hover:bg-red-700 rounded-lg border border-red-200/80 dark:border-red-900/50 transition-colors cursor-pointer"
-                        title="Permanently delete account and all cloud data"
-                      >
-                        <ShieldAlert className="w-3.5 h-3.5 text-red-600 dark:text-red-400" />
-                        <span>Delete Account</span>
-                      </button>
-                    )}
+                {/* 7. Clear Habits & Reset Data Card */}
+                <div
+                  id="clear-data-card"
+                  className="p-3.5 bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/30 rounded-xl space-y-2"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <h4 className="text-xs font-bold text-amber-950 dark:text-amber-200 flex items-center gap-1.5">
+                        <AlertTriangle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                        Clear Habit History & Data
+                      </h4>
+                      <p className="text-[11px] text-amber-800 dark:text-amber-300/90 mt-0.5">
+                        Permanently remove your habits, completion history, notes, milestones, and streak records.
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      id="open-clear-data-modal-btn"
+                      onClick={() => {
+                        setAccountActionError(null);
+                        setShowClearDataConfirm(true);
+                      }}
+                      disabled={isClearingData || isDeletingAccount}
+                      className="px-3 py-1.5 text-xs font-semibold text-amber-900 dark:text-amber-200 bg-amber-100 dark:bg-amber-950/60 hover:bg-amber-200/80 dark:hover:bg-amber-900 border border-amber-300 dark:border-amber-700 rounded-xl transition-colors cursor-pointer shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Clear All Data
+                    </button>
                   </div>
                 </div>
 
-                {/* Logout Action */}
-                <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
-                  <div>
-                    <span className="text-xs font-medium text-zinc-800 dark:text-zinc-200 block">Sign Out</span>
-                    <span className="text-[11px] text-zinc-400 dark:text-zinc-500">Logout of this session</span>
+                {/* 8. Danger Zone: Delete Account */}
+                <div
+                  id="danger-zone-card"
+                  className="p-3.5 bg-red-500/10 dark:bg-red-500/15 border border-red-500/30 rounded-xl space-y-2"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <h4 className="text-xs font-bold text-red-950 dark:text-red-200 flex items-center gap-1.5">
+                        <ShieldAlert className="w-3.5 h-3.5 text-red-600 dark:text-red-400" />
+                        Delete Account
+                      </h4>
+                      <p className="text-[11px] text-red-800 dark:text-red-300/90 mt-0.5">
+                        Permanently delete your Daily Habits account and all associated cloud data.
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      id="open-delete-account-modal-btn"
+                      onClick={() => {
+                        setAccountActionError(null);
+                        setShowDeleteAccountConfirm(true);
+                      }}
+                      disabled={isClearingData || isDeletingAccount}
+                      className="px-3 py-1.5 text-xs font-semibold text-red-700 dark:text-red-300 bg-red-100 dark:bg-red-950/60 hover:bg-red-200/80 dark:hover:bg-red-900 border border-red-300 dark:border-red-800 rounded-xl transition-colors cursor-pointer shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Delete Account
+                    </button>
                   </div>
+                </div>
+
+                {/* 9. Sign Out Button */}
+                <div className="pt-2 border-t border-zinc-200/70 dark:border-white/10 flex justify-end">
                   <button
-                    id="profile-logout-btn"
                     type="button"
+                    id="profile-signout-btn"
                     onClick={() => {
-                      onClose();
                       onSignOut();
+                      onClose();
                     }}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:text-red-600 dark:hover:text-red-400 bg-zinc-100 dark:bg-zinc-800 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg border border-zinc-200 dark:border-zinc-700 transition-colors cursor-pointer"
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-zinc-100 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-xl border border-zinc-200 dark:border-zinc-700 transition-colors cursor-pointer"
                   >
                     <LogOut className="w-3.5 h-3.5" />
-                    <span>Logout</span>
+                    <span>Sign Out</span>
                   </button>
                 </div>
               </div>
             )}
           </div>
-
-          {/* Modal Footer */}
-          <div className="px-5 py-3 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/80 flex items-center justify-between text-xs text-zinc-400 dark:text-zinc-500">
-            <span className="font-mono">Daily Habits v1.5</span>
-            <button
-              type="button"
-              onClick={onClose}
-              className="font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 cursor-pointer"
-            >
-              Done
-            </button>
-          </div>
         </div>
       </div>
 
-      {/* Habit Add/Edit Form Modal */}
+      {/* Embedded Habit Edit/Add Modal */}
       <HabitModal
         isOpen={isHabitFormOpen}
-        onClose={() => {
-          setIsHabitFormOpen(false);
-          setHabitToEdit(null);
-        }}
+        onClose={() => setIsHabitFormOpen(false)}
         onSave={async (data) => {
           await onSaveHabit(data, habitToEdit);
           setIsHabitFormOpen(false);
-          setHabitToEdit(null);
-        }}
-        onDelete={async (habitId) => {
-          await onDeleteHabit(habitId);
-          setIsHabitFormOpen(false);
-          setHabitToEdit(null);
         }}
         initialHabit={habitToEdit}
       />
 
-      {/* Clear Data Confirmation Modal */}
-      {showClearDataConfirm && (
+      {/* Delete Habit Confirmation Dialog */}
+      {habitToDelete && (
         <div
-          id="clear-data-modal-backdrop"
-          className="fixed inset-0 z-60 bg-black/60 dark:bg-black/80 flex items-center justify-center p-4 backdrop-blur-md animate-fadeIn"
+          id="delete-habit-confirm-backdrop"
+          className="fixed inset-0 z-50 bg-black/60 dark:bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm animate-fadeIn"
+          onClick={() => setHabitToDelete(null)}
         >
           <div
-            id="clear-data-card"
-            className="w-full max-w-md glass-modal rounded-2xl shadow-2xl p-5 sm:p-6 transition-all"
+            id="delete-habit-confirm-modal"
+            className="w-full max-w-sm glass-modal rounded-2xl p-5 shadow-2xl space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start gap-3 text-red-600 dark:text-red-400">
+              <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+              <div>
+                <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
+                  Delete "{habitToDelete.name}"?
+                </h3>
+                <p className="text-xs text-zinc-600 dark:text-zinc-400 mt-1">
+                  This will remove the habit from your daily tracking list and Google Calendar if synced. Past history records remain saved.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-200/60 dark:border-white/10">
+              <button
+                type="button"
+                onClick={() => setHabitToDelete(null)}
+                disabled={isDeletingHabit}
+                className="px-3 py-1.5 text-xs font-semibold text-zinc-700 dark:text-zinc-300 bg-zinc-200/60 dark:bg-zinc-800 rounded-xl hover:bg-zinc-300/60 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                id="confirm-delete-habit-btn"
+                onClick={handleConfirmDeleteHabit}
+                disabled={isDeletingHabit}
+                className="px-3.5 py-1.5 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-sm transition-all cursor-pointer"
+              >
+                {isDeletingHabit ? 'Deleting...' : 'Delete Habit'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Clear All Data Confirmation Dialog */}
+      {showClearDataConfirm && (
+        <div
+          id="clear-data-confirm-backdrop"
+          className="fixed inset-0 z-50 bg-black/60 dark:bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm animate-fadeIn"
+          onClick={() => !isClearingData && setShowClearDataConfirm(false)}
+        >
+          <div
+            id="clear-data-confirm-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="clear-data-confirm-title"
+            className="w-full max-w-sm glass-modal rounded-2xl p-5 shadow-2xl space-y-4"
+            onClick={(e) => e.stopPropagation()}
           >
             {isClearSuccess ? (
-              <div className="py-5 text-center space-y-2.5 animate-fadeIn">
-                <div className="w-11 h-11 rounded-xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center justify-center mx-auto shadow-xs">
+              <div className="py-4 text-center space-y-2.5">
+                <div className="w-10 h-10 mx-auto rounded-full bg-emerald-100 dark:bg-emerald-950/80 border border-emerald-300 dark:border-emerald-700 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
                   <Check className="w-5 h-5" />
                 </div>
-                <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
-                  Your data has been cleared.
+                <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
+                  All Daily Habits data has been cleared.
                 </h3>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                  Returning to your clean dashboard...
-                </p>
               </div>
             ) : (
               <>
-                <div className="flex items-start gap-3.5 mb-4">
-                  <div className="w-10 h-10 rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/20 flex items-center justify-center shrink-0">
-                    <AlertTriangle className="w-5 h-5" />
-                  </div>
+                <div className="flex items-start gap-3 text-amber-600 dark:text-amber-400">
+                  <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
                   <div>
-                    <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
+                    <h3
+                      id="clear-data-confirm-title"
+                      className="text-sm font-bold text-zinc-900 dark:text-zinc-100"
+                    >
                       Clear all data?
                     </h3>
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 leading-relaxed">
-                      Your habit history and app data will be permanently removed. Your account will remain active.
+                    <p className="text-xs text-zinc-600 dark:text-zinc-400 mt-1.5 leading-relaxed">
+                      This will permanently remove your habits, completion history, notes, milestones, streak history, and other Daily Habits data. Your account and Google login will remain.
                     </p>
                   </div>
                 </div>
 
                 {accountActionError && (
-                  <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-xs text-red-700 dark:text-red-300 flex items-start gap-2.5">
-                    <AlertTriangle className="w-4 h-4 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
-                    <p className="font-medium">{accountActionError}</p>
+                  <div className="p-2.5 rounded-lg bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-800 text-xs text-red-700 dark:text-red-300">
+                    {accountActionError}
                   </div>
                 )}
 
-                <div className="flex items-center justify-end gap-2.5 pt-2">
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-200/60 dark:border-white/10">
                   <button
                     type="button"
                     id="cancel-clear-data-btn"
+                    onClick={() => setShowClearDataConfirm(false)}
                     disabled={isClearingData}
-                    onClick={() => {
-                      setShowClearDataConfirm(false);
-                      setAccountActionError(null);
-                    }}
-                    className="px-4 py-2 text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-white/60 dark:hover:bg-white/10 rounded-xl transition-colors cursor-pointer disabled:opacity-50"
+                    className="min-h-[38px] px-3.5 py-1.5 text-xs font-semibold text-zinc-700 dark:text-zinc-300 bg-zinc-200/60 dark:bg-zinc-800 rounded-xl hover:bg-zinc-300/60 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Cancel
                   </button>
                   <button
                     type="button"
                     id="confirm-clear-data-btn"
-                    disabled={isClearingData}
                     onClick={handleExecuteClearData}
-                    className="px-4 py-2 text-xs font-semibold text-white bg-amber-600 hover:bg-amber-700 dark:bg-amber-600 dark:hover:bg-amber-500 rounded-xl transition-all cursor-pointer disabled:opacity-50 inline-flex items-center gap-1.5 shadow-sm active:scale-[0.98]"
+                    disabled={isClearingData}
+                    className="min-h-[38px] px-4 py-1.5 text-xs font-semibold text-white bg-amber-600 hover:bg-amber-700 rounded-xl shadow-sm transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
                   >
-                    {isClearingData ? (
-                      <>
-                        <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        <span>Clearing your data...</span>
-                      </>
-                    ) : (
-                      <span>Clear Data</span>
+                    {isClearingData && (
+                      <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                     )}
+                    <span>{isClearingData ? 'Clearing data...' : 'Clear Data'}</span>
                   </button>
                 </div>
               </>
@@ -1342,113 +1272,63 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
         </div>
       )}
 
-      {/* Delete Account Confirmation Modal Step 1 */}
-      {deleteAccountStep === 1 && (
+      {/* Delete Account Confirmation Dialog */}
+      {showDeleteAccountConfirm && (
         <div
-          id="delete-account-step1-backdrop"
-          className="fixed inset-0 z-60 bg-black/60 dark:bg-black/80 flex items-center justify-center p-4 backdrop-blur-md animate-fadeIn"
+          id="delete-account-confirm-backdrop"
+          className="fixed inset-0 z-50 bg-black/60 dark:bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm animate-fadeIn"
+          onClick={() => !isDeletingAccount && setShowDeleteAccountConfirm(false)}
         >
           <div
-            id="delete-account-step1-card"
-            className="w-full max-w-md glass-modal rounded-2xl shadow-2xl p-5 sm:p-6 transition-all"
+            id="delete-account-confirm-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-account-confirm-title"
+            className="w-full max-w-sm glass-modal rounded-2xl p-5 shadow-2xl space-y-4"
+            onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-start gap-3.5 mb-4">
-              <div className="w-10 h-10 rounded-xl bg-red-500/15 text-red-600 dark:text-red-400 border border-red-500/20 flex items-center justify-center shrink-0">
-                <ShieldAlert className="w-5 h-5" />
-              </div>
+            <div className="flex items-start gap-3 text-red-600 dark:text-red-400">
+              <ShieldAlert className="w-5 h-5 shrink-0 mt-0.5" />
               <div>
-                <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
+                <h3
+                  id="delete-account-confirm-title"
+                  className="text-sm font-bold text-zinc-900 dark:text-zinc-100"
+                >
                   Delete your account?
                 </h3>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 leading-relaxed">
-                  Your Daily Habits account and all associated habit tracking, streaks, notes, and cloud records will be permanently deleted. This action cannot be undone.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-2.5 pt-2">
-              <button
-                type="button"
-                id="cancel-delete-step1-btn"
-                onClick={() => setDeleteAccountStep(0)}
-                className="px-4 py-2 text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-white/60 dark:hover:bg-white/10 rounded-xl transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                id="continue-delete-step1-btn"
-                onClick={() => setDeleteAccountStep(2)}
-                className="px-4 py-2 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-500 rounded-xl transition-all cursor-pointer shadow-sm active:scale-[0.98]"
-              >
-                Continue
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Delete Account Confirmation Modal Step 2 */}
-      {deleteAccountStep === 2 && (
-        <div
-          id="delete-account-step2-backdrop"
-          className="fixed inset-0 z-60 bg-black/60 dark:bg-black/80 flex items-center justify-center p-4 backdrop-blur-md animate-fadeIn"
-        >
-          <div
-            id="delete-account-step2-card"
-            className="w-full max-w-md glass-modal rounded-2xl shadow-2xl p-5 sm:p-6 transition-all"
-          >
-            <div className="flex items-start gap-3.5 mb-4">
-              <div className="w-10 h-10 rounded-xl bg-red-500/15 text-red-600 dark:text-red-400 border border-red-500/20 flex items-center justify-center shrink-0">
-                <ShieldAlert className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-base font-bold text-red-600 dark:text-red-400">
-                  Are you sure you want to permanently delete your account?
-                </h3>
-                <p className="text-xs text-zinc-600 dark:text-zinc-300 mt-2 leading-relaxed">
-                  All your data will be permanently lost and cannot be recovered.
+                <p className="text-xs text-zinc-600 dark:text-zinc-400 mt-1.5 leading-relaxed">
+                  This permanently deletes your Daily Habits account and all associated data. This action cannot be undone.
                 </p>
               </div>
             </div>
 
             {accountActionError && (
-              <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-xs text-red-700 dark:text-red-300 flex items-start gap-2.5">
-                <AlertTriangle className="w-4 h-4 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
-                <div className="space-y-1">
-                  <p className="font-medium">{accountActionError}</p>
-                </div>
+              <div className="p-2.5 rounded-lg bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-800 text-xs text-red-700 dark:text-red-300">
+                {accountActionError}
               </div>
             )}
 
-            <div className="flex items-center justify-end gap-2.5 pt-2">
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-200/60 dark:border-white/10">
               <button
                 type="button"
-                id="cancel-delete-step2-btn"
+                id="cancel-delete-account-btn"
+                onClick={() => setShowDeleteAccountConfirm(false)}
                 disabled={isDeletingAccount}
-                onClick={() => {
-                  setDeleteAccountStep(0);
-                  setAccountActionError(null);
-                }}
-                className="px-4 py-2 text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-white/60 dark:hover:bg-white/10 rounded-xl transition-colors cursor-pointer"
+                className="min-h-[38px] px-3.5 py-1.5 text-xs font-semibold text-zinc-700 dark:text-zinc-300 bg-zinc-200/60 dark:bg-zinc-800 rounded-xl hover:bg-zinc-300/60 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Cancel
               </button>
               <button
                 type="button"
-                id="final-delete-account-btn"
-                disabled={isDeletingAccount}
+                id="confirm-delete-account-btn"
                 onClick={handleExecuteDeleteAccount}
-                className="px-4 py-2 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-500 rounded-xl transition-all cursor-pointer disabled:opacity-50 inline-flex items-center gap-1.5 shadow-sm active:scale-[0.98]"
+                disabled={isDeletingAccount}
+                className="min-h-[38px] px-4 py-1.5 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-sm transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
               >
-                {isDeletingAccount ? (
-                  <>
-                    <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    <span>Deleting Account...</span>
-                  </>
-                ) : (
-                  <span>{accountActionError ? 'Retry Deletion' : 'Delete Account'}</span>
+                {isDeletingAccount && (
+                  <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                 )}
+                <span>{isDeletingAccount ? 'Deleting...' : 'Delete Account'}</span>
               </button>
             </div>
           </div>
