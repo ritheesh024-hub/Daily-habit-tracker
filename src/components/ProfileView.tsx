@@ -1,6 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import {
-  User,
   Sun,
   Moon,
   Monitor,
@@ -8,16 +7,14 @@ import {
   RefreshCw,
   Download,
   AlertTriangle,
-  ShieldAlert,
+  Trash2,
   LogOut,
   Check,
   CheckCircle2,
   Unlink,
-  ExternalLink,
 } from 'lucide-react';
 import { UserProfile, ThemeMode, HabitItem, DailyLogData, CalendarSyncResult } from '../types';
 import { calculateAge, isValidDateOfBirth, getLocalDateKey } from '../lib/dateUtils';
-import { formatTime12Hour } from '../lib/googleCalendarService';
 
 interface ProfileViewProps {
   user: UserProfile | null;
@@ -203,74 +200,66 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   };
 
   return (
-    <div id="profile-view-container" className="space-y-6 animate-fadeIn pb-12">
-      {/* Account Info Header */}
-      <div className="p-5 glass-card rounded-2xl flex items-center justify-between gap-4">
-        <div className="flex items-center gap-4 min-w-0">
+    <div id="profile-view-container" className="space-y-3.5 sm:space-y-4 animate-fadeIn pb-12">
+      {/* 1. GOOGLE ACCOUNT */}
+      <section id="profile-google-account-section" className="p-4 sm:p-5 glass-card rounded-2xl flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
           {user?.photoURL ? (
             <img
               id="profile-avatar-img"
               src={user.photoURL}
               alt={user.displayName || 'Profile Photo'}
               referrerPolicy="no-referrer"
-              className="w-14 h-14 rounded-full border-2 border-zinc-200 dark:border-zinc-700 object-cover shadow-sm shrink-0"
+              className="w-12 h-12 rounded-full border-2 border-zinc-200 dark:border-zinc-700 object-cover shadow-xs shrink-0"
             />
           ) : (
             <div
               id="profile-avatar-placeholder"
-              className="w-14 h-14 rounded-full bg-zinc-800 dark:bg-zinc-700 text-white flex items-center justify-center text-xl font-bold shrink-0"
+              className="w-12 h-12 rounded-full bg-zinc-800 dark:bg-zinc-700 text-white flex items-center justify-center text-lg font-bold shrink-0"
             >
               {((user?.displayName || user?.email || 'U')[0] || 'U').toUpperCase()}
             </div>
           )}
 
           <div className="min-w-0">
-            <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 truncate">
-              {user?.displayName || 'Habit Tracker User'}
+            <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-100 truncate leading-tight">
+              {user?.displayName || 'Daily Habits User'}
             </h2>
-            <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate">
-              {user?.email || 'Connected Account'}
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate mt-0.5 font-mono">
+              {user?.email || 'Google Account'}
             </p>
-            <div className="flex items-center gap-1.5 mt-1">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
-              <span className="text-[11px] text-zinc-500 dark:text-zinc-400">Google Account</span>
-            </div>
           </div>
         </div>
 
         <button
           type="button"
+          id="profile-sign-out-btn"
           onClick={onSignOut}
-          className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-zinc-100 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-xl transition-colors cursor-pointer shrink-0"
+          className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:text-zinc-950 dark:hover:text-zinc-100 bg-zinc-100 dark:bg-zinc-800/80 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-xl transition-colors cursor-pointer shrink-0 min-h-[40px]"
         >
-          <LogOut className="w-3.5 h-3.5" />
+          <LogOut className="w-3.5 h-3.5 shrink-0" />
           <span>Sign Out</span>
         </button>
-      </div>
+      </section>
 
-      {/* 1. Appearance Theme Settings */}
-      <section id="appearance-theme-section" className="p-5 glass-card rounded-2xl space-y-3">
-        <div>
-          <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
-            Appearance Theme
-          </h3>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">
-            Choose light, dark, or system mode
-          </p>
-        </div>
+      {/* 2. APPEARANCE */}
+      <section id="profile-appearance-section" className="p-4 sm:p-5 glass-card rounded-2xl space-y-2.5">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-400">
+          Appearance
+        </h3>
 
-        <div className="grid grid-cols-3 gap-2.5 pt-1">
+        <div className="grid grid-cols-3 gap-2">
           <button
             type="button"
             id="profile-theme-light"
             onClick={() => onThemeChange('light')}
-            className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+            className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-semibold border transition-all cursor-pointer min-h-[42px] ${
               theme === 'light'
-                ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-950 border-zinc-900 dark:border-zinc-100 shadow-sm'
+                ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-950 border-zinc-900 dark:border-zinc-100 shadow-xs'
                 : 'bg-zinc-100/70 dark:bg-zinc-800/50 text-zinc-700 dark:text-zinc-300 border-zinc-200/70 dark:border-white/5 hover:bg-zinc-200/70 dark:hover:bg-zinc-700/60'
             }`}
           >
-            <Sun className="w-4 h-4 text-amber-500 shrink-0" />
+            <Sun className="w-3.5 h-3.5 text-amber-500 shrink-0" />
             <span>Light</span>
           </button>
 
@@ -278,13 +267,13 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             type="button"
             id="profile-theme-dark"
             onClick={() => onThemeChange('dark')}
-            className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+            className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-semibold border transition-all cursor-pointer min-h-[42px] ${
               theme === 'dark'
-                ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-950 border-zinc-900 dark:border-zinc-100 shadow-sm'
+                ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-950 border-zinc-900 dark:border-zinc-100 shadow-xs'
                 : 'bg-zinc-100/70 dark:bg-zinc-800/50 text-zinc-700 dark:text-zinc-300 border-zinc-200/70 dark:border-white/5 hover:bg-zinc-200/70 dark:hover:bg-zinc-700/60'
             }`}
           >
-            <Moon className="w-4 h-4 text-indigo-400 shrink-0" />
+            <Moon className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
             <span>Dark</span>
           </button>
 
@@ -292,34 +281,29 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             type="button"
             id="profile-theme-system"
             onClick={() => onThemeChange('system')}
-            className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+            className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-semibold border transition-all cursor-pointer min-h-[42px] ${
               theme === 'system'
-                ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-950 border-zinc-900 dark:border-zinc-100 shadow-sm'
+                ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-950 border-zinc-900 dark:border-zinc-100 shadow-xs'
                 : 'bg-zinc-100/70 dark:bg-zinc-800/50 text-zinc-700 dark:text-zinc-300 border-zinc-200/70 dark:border-white/5 hover:bg-zinc-200/70 dark:hover:bg-zinc-700/60'
             }`}
           >
-            <Monitor className="w-4 h-4 text-zinc-400 shrink-0" />
+            <Monitor className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
             <span>System</span>
           </button>
         </div>
       </section>
 
-      {/* 2. Edit Profile Information */}
-      <section id="edit-profile-section" className="p-5 glass-card rounded-2xl space-y-4">
-        <div>
-          <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
-            Edit Profile
-          </h3>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">
-            Customize your personal details and body measurements
-          </p>
-        </div>
+      {/* 3. EDIT PROFILE */}
+      <section id="profile-edit-section" className="p-4 sm:p-5 glass-card rounded-2xl space-y-3">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-400">
+          Edit Profile
+        </h3>
 
-        <form onSubmit={handleSaveProfile} className="space-y-3.5">
+        <form onSubmit={handleSaveProfile} className="space-y-3">
           {/* Name */}
           <div>
             <label htmlFor="view-edit-name-input" className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
-              Display Name
+              Name
             </label>
             <input
               id="view-edit-name-input"
@@ -327,19 +311,19 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               value={displayNameInput}
               onChange={(e) => setDisplayNameInput(e.target.value)}
               placeholder="Your name"
-              className="w-full px-3.5 py-2 text-xs bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 border border-zinc-300 dark:border-zinc-700 rounded-xl focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-zinc-100"
+              className="w-full px-3 py-2 text-xs bg-white dark:bg-zinc-800/90 text-zinc-900 dark:text-zinc-100 border border-zinc-300 dark:border-zinc-700 rounded-xl focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-zinc-100"
             />
           </div>
 
-          {/* Date of Birth & Live Age */}
+          {/* Date of Birth & Live Calculated Age */}
           <div>
             <div className="flex items-center justify-between mb-1">
               <label htmlFor="view-edit-dob-input" className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
                 Date of Birth
               </label>
               {liveAge !== null && (
-                <span className="text-[11px] font-mono text-zinc-600 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded">
-                  {liveAge} years old
+                <span className="text-[11px] font-mono text-zinc-600 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded-md font-semibold">
+                  {liveAge} yrs old
                 </span>
               )}
             </div>
@@ -348,30 +332,30 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               type="date"
               value={dobInput}
               onChange={(e) => setDobInput(e.target.value)}
-              className="w-full px-3.5 py-2 text-xs font-mono bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 border border-zinc-300 dark:border-zinc-700 rounded-xl focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-zinc-100"
+              className="w-full px-3 py-2 text-xs font-mono bg-white dark:bg-zinc-800/90 text-zinc-900 dark:text-zinc-100 border border-zinc-300 dark:border-zinc-700 rounded-xl focus:outline-none focus:ring-1 focus:ring-zinc-900 dark:focus:ring-zinc-100"
             />
           </div>
 
           {/* Height & Weight */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-2.5">
             <div>
               <label htmlFor="view-edit-height-input" className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
                 Height
               </label>
-              <div className="flex rounded-xl border border-zinc-300 dark:border-zinc-700 overflow-hidden bg-white dark:bg-zinc-800 focus-within:ring-1 focus-within:ring-zinc-900 dark:focus-within:ring-zinc-100">
+              <div className="flex rounded-xl border border-zinc-300 dark:border-zinc-700 overflow-hidden bg-white dark:bg-zinc-800/90 focus-within:ring-1 focus-within:ring-zinc-900 dark:focus-within:ring-zinc-100">
                 <input
                   id="view-edit-height-input"
                   type="number"
                   step="any"
                   value={heightInput}
                   onChange={(e) => setHeightInput(e.target.value)}
-                  placeholder="e.g. 175"
+                  placeholder="175"
                   className="w-full px-3 py-2 text-xs bg-transparent text-zinc-900 dark:text-zinc-100 focus:outline-none"
                 />
                 <select
                   value={heightUnit}
                   onChange={(e) => setHeightUnit(e.target.value as 'cm' | 'in')}
-                  className="px-2.5 py-2 text-xs bg-zinc-100 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-200 border-l border-zinc-300 dark:border-zinc-700 focus:outline-none cursor-pointer"
+                  className="px-2 py-2 text-xs bg-zinc-100 dark:bg-zinc-700/80 text-zinc-700 dark:text-zinc-200 border-l border-zinc-300 dark:border-zinc-700 focus:outline-none cursor-pointer"
                 >
                   <option value="cm">cm</option>
                   <option value="in">in</option>
@@ -383,20 +367,20 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               <label htmlFor="view-edit-weight-input" className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
                 Weight
               </label>
-              <div className="flex rounded-xl border border-zinc-300 dark:border-zinc-700 overflow-hidden bg-white dark:bg-zinc-800 focus-within:ring-1 focus-within:ring-zinc-900 dark:focus-within:ring-zinc-100">
+              <div className="flex rounded-xl border border-zinc-300 dark:border-zinc-700 overflow-hidden bg-white dark:bg-zinc-800/90 focus-within:ring-1 focus-within:ring-zinc-900 dark:focus-within:ring-zinc-100">
                 <input
                   id="view-edit-weight-input"
                   type="number"
                   step="any"
                   value={weightInput}
                   onChange={(e) => setWeightInput(e.target.value)}
-                  placeholder="e.g. 70"
+                  placeholder="70"
                   className="w-full px-3 py-2 text-xs bg-transparent text-zinc-900 dark:text-zinc-100 focus:outline-none"
                 />
                 <select
                   value={weightUnit}
                   onChange={(e) => setWeightUnit(e.target.value as 'kg' | 'lbs')}
-                  className="px-2.5 py-2 text-xs bg-zinc-100 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-200 border-l border-zinc-300 dark:border-zinc-700 focus:outline-none cursor-pointer"
+                  className="px-2 py-2 text-xs bg-zinc-100 dark:bg-zinc-700/80 text-zinc-700 dark:text-zinc-200 border-l border-zinc-300 dark:border-zinc-700 focus:outline-none cursor-pointer"
                 >
                   <option value="kg">kg</option>
                   <option value="lbs">lbs</option>
@@ -412,18 +396,18 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           )}
 
           {profileSavedSuccess && (
-            <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-xl flex items-center gap-2 text-xs text-emerald-800 dark:text-emerald-300 font-medium">
+            <div className="p-2.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-xl flex items-center gap-2 text-xs text-emerald-800 dark:text-emerald-300 font-medium">
               <Check className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
               <span>Profile updated successfully!</span>
             </div>
           )}
 
-          <div className="pt-2 flex justify-end">
+          <div className="pt-1 flex justify-end">
             <button
               id="view-save-profile-btn"
               type="submit"
               disabled={isSavingProfile}
-              className="px-4 py-2 text-xs font-semibold text-white dark:text-zinc-900 bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-white rounded-xl transition-all shadow-sm active:scale-95 disabled:opacity-50 cursor-pointer"
+              className="px-4 py-2 text-xs font-semibold text-white dark:text-zinc-900 bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-white rounded-xl transition-all shadow-xs active:scale-95 disabled:opacity-50 cursor-pointer min-h-[38px]"
             >
               {isSavingProfile ? 'Saving...' : 'Save Profile'}
             </button>
@@ -431,26 +415,22 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         </form>
       </section>
 
-      {/* 3. Google Calendar Integration */}
-      <section id="google-calendar-section" className="p-5 glass-card rounded-2xl space-y-3">
-        <div className="flex items-start justify-between gap-2">
-          <div>
-            <div className="flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-zinc-700 dark:text-zinc-300" />
-              <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
-                Google Calendar Sync
-              </h3>
-            </div>
-            <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-              Sync scheduled daily habits directly as recurring events in your Google Calendar
-            </p>
+      {/* 4. GOOGLE CALENDAR */}
+      <section id="profile-google-calendar-section" className="p-4 sm:p-5 glass-card rounded-2xl space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Calendar className="w-4 h-4 text-zinc-700 dark:text-zinc-300 shrink-0" />
+            <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-400">
+              Google Calendar
+            </h3>
           </div>
 
           {user?.googleCalendarConnected ? (
             <button
               type="button"
+              id="profile-disconnect-calendar-btn"
               onClick={onDisconnectGoogleCalendar}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:text-red-600 dark:hover:text-red-400 bg-zinc-100 dark:bg-zinc-800 rounded-xl transition-colors cursor-pointer shrink-0"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:text-red-600 dark:hover:text-red-400 bg-zinc-100 dark:bg-zinc-800/80 rounded-xl transition-colors cursor-pointer shrink-0"
             >
               <Unlink className="w-3.5 h-3.5" />
               <span>Disconnect</span>
@@ -458,6 +438,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           ) : (
             <button
               type="button"
+              id="profile-connect-calendar-btn"
               onClick={async () => {
                 setIsConnectingCalendar(true);
                 setCalendarActionError(null);
@@ -470,7 +451,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                 }
               }}
               disabled={isConnectingCalendar}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white dark:text-zinc-900 bg-zinc-900 dark:bg-zinc-100 hover:bg-zinc-800 dark:hover:bg-white rounded-xl transition-colors cursor-pointer shrink-0"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white dark:text-zinc-900 bg-zinc-900 dark:bg-zinc-100 hover:bg-zinc-800 dark:hover:bg-white rounded-xl transition-colors cursor-pointer shrink-0 min-h-[36px]"
             >
               <Calendar className="w-3.5 h-3.5" />
               <span>{isConnectingCalendar ? 'Connecting...' : 'Connect Calendar'}</span>
@@ -479,32 +460,37 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         </div>
 
         {user?.googleCalendarConnected && (
-          <div className="p-3.5 bg-emerald-500/10 dark:bg-emerald-500/15 border border-emerald-500/30 rounded-xl space-y-2">
+          <div className="p-3 bg-emerald-500/10 dark:bg-emerald-500/15 border border-emerald-500/30 rounded-xl space-y-2">
             <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 min-w-0">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                <span className="text-xs font-bold text-emerald-900 dark:text-emerald-300">
+                <span className="text-xs font-semibold text-emerald-900 dark:text-emerald-300 truncate">
                   Connected to {user.googleCalendarEmail || user.email}
                 </span>
               </div>
               <button
                 type="button"
+                id="profile-sync-calendar-btn"
                 onClick={async () => {
                   const res = await onSyncHabitsToCalendar();
                   if (res) {
                     setCalendarSyncSuccessMessage(
-                      `Synced ${res.syncedHabitsCount} habits to your Google Calendar.`
+                      `Synced ${res.syncedHabitsCount} habits to your calendar.`
                     );
                     setTimeout(() => setCalendarSyncSuccessMessage(null), 4000);
                   }
                 }}
                 disabled={isSyncingCalendar}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-emerald-900 dark:text-emerald-200 bg-emerald-100 dark:bg-emerald-950/60 hover:bg-emerald-200 rounded-lg cursor-pointer transition-colors"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-emerald-950 dark:text-emerald-200 bg-emerald-100 dark:bg-emerald-950/60 hover:bg-emerald-200 dark:hover:bg-emerald-900 rounded-lg cursor-pointer transition-colors shrink-0"
               >
                 <RefreshCw className={`w-3 h-3 ${isSyncingCalendar ? 'animate-spin' : ''}`} />
                 <span>Sync Now</span>
               </button>
             </div>
+
+            <p className="text-[11px] text-zinc-600 dark:text-zinc-400">
+              Syncs your habit schedules with Google Calendar events.
+            </p>
 
             {calendarSyncSuccessMessage && (
               <p className="text-[11px] text-emerald-700 dark:text-emerald-300 font-medium">
@@ -521,106 +507,91 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         )}
       </section>
 
-      {/* 4. Data Export & App Settings */}
-      <section id="app-settings-section" className="p-5 glass-card rounded-2xl space-y-3">
-        <div className="flex items-start justify-between gap-2">
-          <div>
-            <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
-              Data Backup & Export
-            </h3>
-            <p className="text-xs text-zinc-500 dark:text-zinc-400">
-              Download your full habits, logs, and records in JSON format
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={handleExportData}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-zinc-800 dark:text-zinc-200 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 border border-zinc-200/80 dark:border-white/10 rounded-xl transition-colors cursor-pointer shrink-0"
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span>Export JSON</span>
-          </button>
-        </div>
-
-        {exportSuccess && (
-          <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
-            ✓ Data backup downloaded successfully!
-          </p>
-        )}
-      </section>
-
-      {/* 5. Account Management & Reset Actions */}
-      <section id="account-management-section" className="p-5 glass-card rounded-2xl space-y-4">
-        <div>
-          <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
-            Account Management
-          </h3>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">
-            Reset habits or delete your Daily Habits account
-          </p>
-        </div>
+      {/* 5. DATA & ACCOUNT */}
+      <section id="profile-data-account-section" className="p-4 sm:p-5 glass-card rounded-2xl space-y-3">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-400">
+          Data & Account
+        </h3>
 
         {accountActionError && (
-          <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-700 dark:text-red-400 rounded-xl text-xs">
+          <div className="p-2.5 bg-red-500/10 border border-red-500/20 text-red-700 dark:text-red-400 rounded-xl text-xs">
             {accountActionError}
           </div>
         )}
 
         {isClearSuccess && (
-          <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-400 rounded-xl text-xs font-medium">
-            ✓ All habit data has been cleared successfully.
+          <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-400 rounded-xl text-xs font-medium">
+            ✓ Daily Habits data has been cleared successfully.
           </div>
         )}
 
-        {/* Clear All Data */}
-        <div className="p-4 bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/30 rounded-xl flex items-center justify-between gap-3">
-          <div>
-            <h4 className="text-xs font-bold text-amber-950 dark:text-amber-200 flex items-center gap-1.5">
-              <AlertTriangle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
-              <span>Clear All Data</span>
-            </h4>
-            <p className="text-[11px] text-amber-800 dark:text-amber-300/90 mt-0.5">
-              Permanently remove habits, logs, and streaks. Your account and Google login will remain.
+        <div className="space-y-2">
+          {/* Option 1: Export Data */}
+          <div className="p-3 bg-zinc-100/70 dark:bg-zinc-800/50 border border-zinc-200/80 dark:border-white/5 rounded-xl flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <Download className="w-4 h-4 text-zinc-600 dark:text-zinc-400 shrink-0" />
+              <span className="text-xs font-semibold text-zinc-900 dark:text-zinc-100">
+                Export Data
+              </span>
+            </div>
+            <button
+              type="button"
+              id="profile-export-data-btn"
+              onClick={handleExportData}
+              className="px-3 py-1.5 text-xs font-semibold text-zinc-800 dark:text-zinc-200 bg-white dark:bg-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-600 border border-zinc-200 dark:border-zinc-600 rounded-lg transition-colors cursor-pointer shrink-0"
+            >
+              Export JSON
+            </button>
+          </div>
+          {exportSuccess && (
+            <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium pl-1">
+              ✓ Data backup downloaded successfully!
             </p>
+          )}
+
+          {/* Option 2: Clear All Data */}
+          <div className="p-3 bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/25 rounded-xl flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+              <span className="text-xs font-semibold text-amber-950 dark:text-amber-200">
+                Clear All Data
+              </span>
+            </div>
+            <button
+              type="button"
+              id="profile-clear-data-btn"
+              onClick={() => {
+                setAccountActionError(null);
+                setShowClearDataConfirm(true);
+              }}
+              disabled={isClearingData || isDeletingAccount}
+              className="px-3 py-1.5 text-xs font-semibold text-amber-900 dark:text-amber-200 bg-amber-100 dark:bg-amber-950/70 hover:bg-amber-200/80 dark:hover:bg-amber-900 border border-amber-300/80 dark:border-amber-700/80 rounded-lg transition-colors cursor-pointer shrink-0 disabled:opacity-50"
+            >
+              Clear Data
+            </button>
           </div>
 
-          <button
-            type="button"
-            onClick={() => {
-              setAccountActionError(null);
-              setShowClearDataConfirm(true);
-            }}
-            disabled={isClearingData || isDeletingAccount}
-            className="px-3.5 py-2 text-xs font-semibold text-amber-900 dark:text-amber-200 bg-amber-100 dark:bg-amber-950/60 hover:bg-amber-200/80 dark:hover:bg-amber-900 border border-amber-300 dark:border-amber-700 rounded-xl transition-colors cursor-pointer shrink-0 disabled:opacity-50"
-          >
-            Clear All Data
-          </button>
-        </div>
-
-        {/* Delete Account */}
-        <div className="p-4 bg-red-500/10 dark:bg-red-500/15 border border-red-500/30 rounded-xl flex items-center justify-between gap-3">
-          <div>
-            <h4 className="text-xs font-bold text-red-950 dark:text-red-200 flex items-center gap-1.5">
-              <ShieldAlert className="w-3.5 h-3.5 text-red-600 dark:text-red-400 shrink-0" />
-              <span>Delete Account</span>
-            </h4>
-            <p className="text-[11px] text-red-800 dark:text-red-300/90 mt-0.5">
-              Permanently delete your user profile, data, and Firebase account.
-            </p>
+          {/* Option 3: Delete Account */}
+          <div className="p-3 bg-red-500/10 dark:bg-red-500/15 border border-red-500/25 rounded-xl flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <Trash2 className="w-4 h-4 text-red-600 dark:text-red-400 shrink-0" />
+              <span className="text-xs font-semibold text-red-950 dark:text-red-200">
+                Delete Account
+              </span>
+            </div>
+            <button
+              type="button"
+              id="profile-delete-account-btn"
+              onClick={() => {
+                setAccountActionError(null);
+                setShowDeleteAccountConfirm(true);
+              }}
+              disabled={isClearingData || isDeletingAccount}
+              className="px-3 py-1.5 text-xs font-semibold text-red-700 dark:text-red-300 bg-red-100 dark:bg-red-950/70 hover:bg-red-200/80 dark:hover:bg-red-900 border border-red-300/80 dark:border-red-700/80 rounded-lg transition-colors cursor-pointer shrink-0 disabled:opacity-50"
+            >
+              Delete Account
+            </button>
           </div>
-
-          <button
-            type="button"
-            onClick={() => {
-              setAccountActionError(null);
-              setShowDeleteAccountConfirm(true);
-            }}
-            disabled={isClearingData || isDeletingAccount}
-            className="px-3.5 py-2 text-xs font-semibold text-red-700 dark:text-red-300 bg-red-100 dark:bg-red-950/60 hover:bg-red-200/80 dark:hover:bg-red-900 border border-red-300 dark:border-red-700 rounded-xl transition-colors cursor-pointer shrink-0 disabled:opacity-50"
-          >
-            Delete Account
-          </button>
         </div>
       </section>
 
@@ -629,7 +600,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 max-w-md w-full space-y-4 shadow-xl animate-scaleUp">
             <div className="flex items-center gap-2.5 text-amber-600 dark:text-amber-400">
-              <AlertTriangle className="w-5 h-5" />
+              <AlertTriangle className="w-5 h-5 shrink-0" />
               <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
                 Clear all data?
               </h3>
@@ -664,7 +635,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 max-w-md w-full space-y-4 shadow-xl animate-scaleUp">
             <div className="flex items-center gap-2.5 text-red-600 dark:text-red-400">
-              <ShieldAlert className="w-5 h-5" />
+              <Trash2 className="w-5 h-5 shrink-0" />
               <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
                 Delete account permanently?
               </h3>

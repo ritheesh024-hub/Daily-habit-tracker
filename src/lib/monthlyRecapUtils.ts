@@ -196,7 +196,7 @@ export function calculateMonthlyRecap(
   const insights: string[] = [];
 
   if (!hasEnoughData) {
-    insights.push('Not enough data yet.');
+    insights.push('Complete more habits to unlock insights.');
   } else {
     // 1. Consistency insight
     if (mostCompletedHabit && mostCompletedHabit.completedCount > 0) {
@@ -220,7 +220,12 @@ export function calculateMonthlyRecap(
       insights.push(`Your strongest day was ${dayName}.`);
     }
 
-    // 4. Perfect days highlight
+    // 4. Least consistent habit supportive insight
+    if (leastCompletedHabit && leastCompletedHabit.percentage < 75 && leastCompletedHabit.percentage < (mostCompletedHabit?.percentage || 100)) {
+      insights.push(`"${leastCompletedHabit.name}" could use a little more consistency this month.`);
+    }
+
+    // 5. Perfect days highlight
     if (perfectDays > 0) {
       insights.push(`You logged ${perfectDays} perfect ${perfectDays === 1 ? 'day' : 'days'} with 100% completion.`);
     }
