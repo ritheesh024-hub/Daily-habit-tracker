@@ -6,7 +6,11 @@
     <title>Daily Habits — Track • Improve • Achieve</title>
     <meta name="theme-color" content="#18181b" />
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
-    <link rel="apple-touch-icon" href="/icon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Daily Habits" />
     <link rel="manifest" href="/manifest.json" />
     <meta name="description" content="Daily Habits helps you track routines, build consistency and improve your everyday habits." />
     <meta property="og:title" content="Daily Habits — Track • Improve • Achieve" />
@@ -15,6 +19,23 @@
     <meta name="twitter:card" content="summary_large_image" />
     <script>
       (function () {
+        // Prevent benign [vite] websocket and development warning logs from triggering error overlays
+        var origError = console.error;
+        console.error = function () {
+          var first = arguments[0];
+          if (typeof first === 'string' && (first.indexOf('[vite]') !== -1 || first.indexOf('vite-plugin-pwa') !== -1)) {
+            return;
+          }
+          return origError.apply(console, arguments);
+        };
+        var origWarn = console.warn;
+        console.warn = function () {
+          var first = arguments[0];
+          if (typeof first === 'string' && (first.indexOf('[vite]') !== -1 || first.indexOf('vite-plugin-pwa') !== -1)) {
+            return;
+          }
+          return origWarn.apply(console, arguments);
+        };
         try {
           var activeUid = localStorage.getItem('dh_cache_active_uid');
           var saved = (activeUid && localStorage.getItem('dh_cache_theme_' + activeUid)) || localStorage.getItem('dh_theme_pref') || 'system';

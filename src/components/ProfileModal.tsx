@@ -25,7 +25,10 @@ import {
   ExternalLink,
   CheckCircle2,
   Unlink,
+  WifiOff,
+  Smartphone,
 } from 'lucide-react';
+import { PWAInstallButton } from './PWAInstallButton';
 import {
   HabitItem,
   UserProfile,
@@ -66,7 +69,7 @@ interface ProfileModalProps {
   ) => Promise<void>;
   onDeleteHabit: (habitId: string) => Promise<void>;
   onConnectGoogleCalendar: () => Promise<void>;
-  onDisconnectGoogleCalendar: () => Promise<void>;
+  onDisconnectGoogleCalendar: (removeEvents?: boolean) => Promise<void>;
   onSyncHabitsToCalendar: () => Promise<CalendarSyncResult | null>;
   isSyncingCalendar?: boolean;
   analytics: AnalyticsStats;
@@ -336,6 +339,10 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   };
 
   const handleConnectCalendar = async () => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      setCalendarActionError('Google Calendar synchronization requires an active internet connection.');
+      return;
+    }
     setIsConnectingCalendar(true);
     setCalendarActionError(null);
     setCalendarSyncSuccessMessage(null);
@@ -359,6 +366,10 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   };
 
   const handleTriggerSync = async () => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      setCalendarActionError('Google Calendar synchronization requires an active internet connection.');
+      return;
+    }
     setCalendarActionError(null);
     setCalendarSyncSuccessMessage(null);
     try {
@@ -531,7 +542,12 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
           <div className="p-4 sm:p-5 overflow-y-auto flex-1 space-y-4">
             {/* TAB 1: ANALYTICS & INSIGHTS */}
             {activeTab === 'analytics' && (
-              <AnalyticsView analytics={analytics} rawLogsMap={rawLogsMap} />
+              <AnalyticsView
+                analytics={analytics}
+                rawLogsMap={rawLogsMap}
+                habits={habits}
+                todayDate={todayDate || getLocalDateKey()}
+              />
             )}
 
             {/* TAB 2: MILESTONES & ACHIEVEMENTS */}
@@ -659,6 +675,13 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                   </div>
 
                   {/* Feedback Messages */}
+                  {typeof navigator !== 'undefined' && !navigator.onLine && (
+                    <div className="p-3 bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/25 rounded-xl text-xs text-amber-800 dark:text-amber-300 flex items-start gap-2">
+                      <WifiOff className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                      <span>Google Calendar requires network connection. Changes will sync when online.</span>
+                    </div>
+                  )}
+
                   {calendarActionError && (
                     <div className="p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800/80 rounded-xl text-xs text-red-700 dark:text-red-300 flex items-start gap-2">
                       <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
@@ -1021,6 +1044,23 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                     </button>
                   </div>
                 </form>
+
+                {/* Install App on Device Card */}
+                <div
+                  id="pwa-install-card"
+                  className="p-3.5 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700/80 rounded-xl flex items-center justify-between gap-3"
+                >
+                  <div>
+                    <h4 className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
+                      <Smartphone className="w-3.5 h-3.5 text-zinc-600 dark:text-zinc-400" />
+                      App & Offline Experience
+                    </h4>
+                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
+                      Install Daily Habits for fast homescreen access and full offline reliability.
+                    </p>
+                  </div>
+                  <PWAInstallButton />
+                </div>
 
                 {/* 6. Export Data Card */}
                 <div

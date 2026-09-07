@@ -39,14 +39,27 @@
     },
     "HabitSetting": {
       "title": "HabitSetting",
-      "description": "Configured habit with target, icon, order, and reminder schedule",
+      "description": "Configured habit with target, goal, category, priority, icon, schedule, and sync info",
       "type": "object",
       "properties": {
         "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_-]+$" },
         "name": { "type": "string", "minLength": 1, "maxLength": 100 },
         "target": { "type": "string", "maxLength": 100 },
+        "goal": { "type": "string", "maxLength": 100 },
+        "description": { "type": "string", "maxLength": 500 },
+        "category": { "type": "string", "maxLength": 50 },
+        "priority": { "type": "string", "maxLength": 20 },
+        "accent": { "type": "string", "maxLength": 30 },
         "icon": { "type": "string", "maxLength": 50 },
         "order": { "type": "number" },
+        "time": { "type": "string", "maxLength": 10 },
+        "frequency": { "type": "string", "maxLength": 50 },
+        "scheduleDays": { "type": "array" },
+        "archived": { "type": "boolean" },
+        "archivedAt": { "type": "string", "maxLength": 60 },
+        "googleCalendarEventId": { "type": "string", "maxLength": 256 },
+        "googleCalendarSynced": { "type": "boolean" },
+        "lastSyncedAt": { "type": "string", "maxLength": 60 },
         "reminderEnabled": { "type": "boolean" },
         "reminderTime": { "type": "string", "maxLength": 10 },
         "createdAt": { "type": "string", "maxLength": 60 },
@@ -97,6 +110,39 @@
         "suggestions": { "type": "array" }
       },
       "required": ["id", "userId", "date", "foods", "total"]
+    },
+    "HabitGoal": {
+      "title": "HabitGoal",
+      "description": "User personal habit targets and volume milestones",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "habitId": { "type": "string", "maxLength": 128 },
+        "habitName": { "type": "string", "maxLength": 100 },
+        "targetCount": { "type": "number" },
+        "periodType": { "type": "string", "maxLength": 30 },
+        "startDate": { "type": "string", "maxLength": 10 },
+        "endDate": { "type": "string", "maxLength": 10 },
+        "title": { "type": "string", "maxLength": 150 },
+        "createdAt": { "type": "string", "maxLength": 60 },
+        "updatedAt": { "type": "string", "maxLength": 60 },
+        "completedAt": { "type": "string", "maxLength": 60 },
+        "celebrated": { "type": "boolean" }
+      },
+      "required": ["id", "userId", "habitId", "targetCount", "periodType", "startDate", "endDate"]
+    },
+    "AchievementRecord": {
+      "title": "AchievementRecord",
+      "description": "Persisted record of an unlocked milestone or achievement",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "unlocked": { "type": "boolean" },
+        "unlockedAt": { "type": "string", "maxLength": 60 },
+        "updatedAt": { "type": "string", "maxLength": 60 }
+      },
+      "required": ["id", "unlocked", "unlockedAt"]
     }
   },
   "firestore": {
@@ -123,6 +169,14 @@
     "/users/{userId}/weightHistory/{entryId}": {
       "schema": "WeightHistoryEntry",
       "description": "User voluntary weight tracking history entries"
+    },
+    "/users/{userId}/goals/{goalId}": {
+      "schema": "HabitGoal",
+      "description": "User personal habit goal tracking records"
+    },
+    "/users/{userId}/achievements/{achievementId}": {
+      "schema": "AchievementRecord",
+      "description": "User milestone and achievement unlocked state"
     }
   }
 }

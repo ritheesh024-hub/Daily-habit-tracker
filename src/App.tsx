@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useEffect, useState, useRef, useMemo } from 'react';
+import { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import {
   onAuthStateChanged,
   signInWithPopup,
@@ -19,11 +19,14 @@ import {
   DailyLogData,
   DayHistorySummary,
   HabitItem,
+  HabitPriority,
   DEFAULT_HABITS,
   StreakStats,
   UserProfile,
   ThemeMode,
   CalendarSyncResult,
+  HabitGoal,
+  GoalWithProgress,
 } from './types';
 import { getTodayDateString, formatHeaderDate } from './lib/dateUtils';
 import {
@@ -57,6 +60,7 @@ import {
   dismissWeeklyWeightReminder,
   clearUserData,
   deleteUserAccount,
+  isHabitScheduledForDate,
 } from './lib/habitService';
 import {
   getCachedUserProfile,
@@ -70,6 +74,8 @@ import {
   getCachedMilestones,
   setCachedMilestones,
   getCachedWeightHistory,
+  getCachedGoals,
+  setCachedGoals,
   clearUserCache,
   clearActiveSession,
 } from './lib/cacheService';
@@ -79,14 +85,23 @@ import {
   persistUnlockedMilestones,
 } from './lib/milestoneService';
 import {
+  fetchUserGoals,
+  saveUserGoal,
+  deleteUserGoal,
+  markGoalCelebrated,
+  calculateAllGoalsProgress,
+} from './lib/goalService';
+import {
   connectGoogleCalendar,
   disconnectGoogleCalendar,
   syncHabitToGoogleCalendar,
   syncAllHabitsToGoogleCalendar,
   deleteHabitFromGoogleCalendar,
+  deleteAllDailyHabitCalendarEvents,
   getCachedCalendarToken,
 } from './lib/googleCalendarService';
 import { Header } from './components/Header';
+import { useNetworkSync } from './lib/useNetworkSync';
 import { ProgressBar } from './components/ProgressBar';
 import { StreakStatsCard } from './components/StreakStatsCard';
 import { HabitList } from './components/HabitList';
@@ -103,6 +118,9 @@ import { AnalyticsView } from './components/AnalyticsView';
 import { FutureView } from './components/FutureView';
 import { ProfileView } from './components/ProfileView';
 import { HabitModal } from './components/HabitModal';
+import { HabitDetailsModal } from './components/HabitDetailsModal';
+import { GoalModal } from './components/GoalModal';
+import { GoalCelebrationModal } from './components/GoalCelebrationModal';
 
 const DEFAULT_ANALYTICS: AnalyticsStats = {
   currentStreak: 0,
@@ -184,7 +202,7 @@ export function App() {
     return bundle?.analytics || DEFAULT_ANALYTICS;
   });
 
-  const [persistedMilestonesMap, setPersistedMilestonesMap] = useState<Record<string, { unlockedAt: string; metricValue?: number }>>(() => {
+  const [persistedMilestonesMap, setPersistedMilestonesMap] = useState<Record<string, string>>(() => {
     const cachedUser = getCachedUserProfile();
     return getCachedMilestones(cachedUser?.uid) || {};
   });
@@ -193,20 +211,26 @@ export function App() {
   const [activeTab, setActiveTab] = useState<MainNavTab>('task');
   const [isHabitModalOpen, setIsHabitModalOpen] = useState<boolean>(false);
   const [editingHabit, setEditingHabit] = useState<HabitItem | null>(null);
+  const [selectedHabitForDetails, setSelectedHabitForDetails] = useState<HabitItem | null>(null);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [profileModalTab, setProfileModalTab] = useState<TabType>('analytics');
   const [isSavingLog, setIsSavingLog] = useState(false);
   const [isSyncingCalendar, setIsSyncingCalendar] = useState(false);
 
+  // Personal Habit Goals State
+  const [goals, setGoals] = useState<HabitGoal[]>(() => {
+    const cachedUser = getCachedUserProfile();
+    return getCachedGoals(cachedUser?.uid) || [];
+  });
+  const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
+  const [editingGoal, setEditingGoal] = useState<HabitGoal | null>(null);
+  const [goalPresetHabitId, setGoalPresetHabitId] = useState<string | undefined>(undefined);
+  const [celebrationGoal, setCelebrationGoal] = useState<GoalWithProgress | null>(null);
+
   // User Weight History derived for Analytics
   const weightHistory = useMemo(() => {
     return currentUser?.uid ? getCachedWeightHistory(currentUser.uid) : [];
   }, [currentUser?.uid, currentUser?.weight, currentUser?.lastWeightCheckInDate]);
-
-  // Network offline tracker
-  const [isOnline, setIsOnline] = useState<boolean>(
-    typeof navigator !== 'undefined' ? navigator.onLine : true
-  );
 
   // Current Date Fetch reference
   const currentDateFetchRef = useRef<string>(selectedDate);
@@ -216,19 +240,37 @@ export function App() {
 
   const isToday = selectedDate === todayDate;
 
-  // Listen to network status changes
-  useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
+  // Background Synchronization & Offline Queue management
+  const handleSyncComplete = useCallback(async () => {
+    if (!currentUser?.uid) return;
+    try {
+      const refreshedHabits = await fetchUserHabitSettings(currentUser.uid);
+      setHabits(refreshedHabits);
+      const refreshedLog = await fetchDailyLog(currentUser.uid, selectedDate, refreshedHabits);
+      setDailyLog(refreshedLog);
+      const bundle = await fetchHabitHistoryAndStreaks(currentUser.uid, todayDate, refreshedHabits, true);
+      setHistory(bundle.history7Days);
+      setHistoryMap(bundle.historyMap);
+      setRawLogsMap(bundle.rawLogsMap);
+      setStreaks(bundle.streaks);
+      setAnalytics(bundle.analytics);
+    } catch (err) {
+      console.warn('Sync refresh notice:', err);
+    }
+  }, [currentUser?.uid, selectedDate, todayDate]);
 
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
+  const {
+    isOnline,
+    isSyncing: isBackgroundSyncing,
+    connectionStatus,
+    pendingCount,
+    offlineActionToast,
+    showOfflineFeedback,
+    syncNow,
+  } = useNetworkSync({
+    userId: currentUser?.uid || null,
+    onSyncComplete: handleSyncComplete,
+  });
 
   // Initialize theme on start & listen to system changes
   useEffect(() => {
@@ -473,6 +515,83 @@ export function App() {
     currentUser?.uid,
   ]);
 
+  // Sync persisted goals in background
+  useEffect(() => {
+    if (!currentUser?.uid) {
+      setGoals([]);
+      return;
+    }
+
+    fetchUserGoals(currentUser.uid)
+      .then((userGoals) => {
+        if (userGoals) {
+          setGoals(userGoals);
+        }
+      })
+      .catch((err) => {
+        console.warn('Background goals sync notice:', err);
+      });
+  }, [currentUser?.uid]);
+
+  // Calculate goals with dynamic progress and daysRemaining
+  const goalsWithProgress = useMemo(() => {
+    return calculateAllGoalsProgress(goals, rawLogsMap, todayDate);
+  }, [goals, rawLogsMap, todayDate]);
+
+  // Trigger celebration modal for newly completed goals
+  useEffect(() => {
+    if (!currentUser?.uid) return;
+    const newlyCompleted = goalsWithProgress.find(
+      (g) => g.status === 'completed' && !g.celebrated
+    );
+    if (newlyCompleted) {
+      setCelebrationGoal(newlyCompleted);
+      markGoalCelebrated(currentUser.uid, newlyCompleted.id);
+      setGoals((prev) =>
+        prev.map((g) => (g.id === newlyCompleted.id ? { ...g, celebrated: true } : g))
+      );
+    }
+  }, [goalsWithProgress, currentUser?.uid]);
+
+  // Goal CRUD handlers
+  const handleSaveGoal = useCallback(
+    async (goalData: HabitGoal) => {
+      if (!currentUser?.uid) return;
+      await saveUserGoal(currentUser.uid, goalData);
+      setGoals((prev) => {
+        const idx = prev.findIndex((g) => g.id === goalData.id);
+        if (idx >= 0) {
+          const updated = [...prev];
+          updated[idx] = goalData;
+          return updated;
+        }
+        return [goalData, ...prev];
+      });
+    },
+    [currentUser?.uid]
+  );
+
+  const handleDeleteGoal = useCallback(
+    async (goalId: string) => {
+      if (!currentUser?.uid) return;
+      await deleteUserGoal(currentUser.uid, goalId);
+      setGoals((prev) => prev.filter((g) => g.id !== goalId));
+    },
+    [currentUser?.uid]
+  );
+
+  const handleOpenNewGoal = useCallback((presetHabitId?: string) => {
+    setEditingGoal(null);
+    setGoalPresetHabitId(presetHabitId);
+    setIsGoalModalOpen(true);
+  }, []);
+
+  const handleEditGoal = useCallback((goal: HabitGoal) => {
+    setEditingGoal(goal);
+    setGoalPresetHabitId(goal.habitId);
+    setIsGoalModalOpen(true);
+  }, []);
+
   // Instant switch when selectedDate changes
   useEffect(() => {
     if (!currentUser?.uid) return;
@@ -623,18 +742,17 @@ export function App() {
   };
 
   // Complete Onboarding Flow
-  const handleOnboardingComplete = async (
-    profileData: {
-      displayName: string;
-      dateOfBirth?: string;
-      height?: number;
-      heightUnit?: 'cm' | 'in';
-      weight?: number;
-      weightUnit?: 'kg' | 'lbs';
-    },
-    chosenHabits: HabitItem[]
-  ) => {
+  const handleOnboardingComplete = async (data: {
+    displayName: string;
+    dateOfBirth?: string;
+    height?: number;
+    heightUnit: 'cm' | 'in';
+    weight?: number;
+    weightUnit: 'kg' | 'lbs';
+    habits: HabitItem[];
+  }) => {
     if (!currentUser?.uid) return;
+    const { habits: chosenHabits, ...profileData } = data;
     const updated = await saveOnboardingProfileAndHabits(currentUser.uid, profileData, chosenHabits);
     setCurrentUser(updated);
     setCachedUserProfile(updated);
@@ -904,6 +1022,10 @@ export function App() {
 
     setCachedDailyLog(currentUser.uid, targetDate, updatedLog);
 
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      showOfflineFeedback('Offline — will sync when connected');
+    }
+
     setIsSavingLog(true);
     try {
       await saveDailyLog(currentUser.uid, targetDate, updatedLog);
@@ -915,6 +1037,8 @@ export function App() {
         }
         setRawLogsMap((prev) => ({ ...prev, [targetDate]: baseLog }));
         setCachedDailyLog(currentUser.uid, targetDate, baseLog);
+      } else {
+        showOfflineFeedback('Offline — will sync when connected');
       }
     } finally {
       setIsSavingLog(false);
@@ -1047,8 +1171,42 @@ export function App() {
     }
   };
 
-  const handleDisconnectGoogleCalendar = async () => {
+  const handleDisconnectGoogleCalendar = async (removeEvents: boolean = false) => {
     if (!currentUser?.uid) return;
+
+    if (removeEvents) {
+      const token = getCachedCalendarToken();
+      if (token) {
+        try {
+          await deleteAllDailyHabitCalendarEvents(token, habits);
+        } catch (e) {
+          console.warn('Error deleting calendar events during disconnect:', e);
+        }
+      }
+      // Clear googleCalendarEventId and googleCalendarSynced on all habits
+      const cleanedHabits = habits.map((h) => ({
+        ...h,
+        googleCalendarEventId: undefined,
+        googleCalendarSynced: false,
+      }));
+      setHabits(cleanedHabits);
+      setCachedHabits(currentUser.uid, cleanedHabits);
+      for (const h of cleanedHabits) {
+        await saveHabitSetting(currentUser.uid, h);
+      }
+    } else {
+      // Retain existing events on Google Calendar, but mark future sync stopped
+      const updatedHabits = habits.map((h) => ({
+        ...h,
+        googleCalendarSynced: false,
+      }));
+      setHabits(updatedHabits);
+      setCachedHabits(currentUser.uid, updatedHabits);
+      for (const h of updatedHabits) {
+        await saveHabitSetting(currentUser.uid, h);
+      }
+    }
+
     disconnectGoogleCalendar();
     const updatedUser = await updateUserProfile(currentUser.uid, {
       googleCalendarConnected: false,
@@ -1061,6 +1219,16 @@ export function App() {
 
   const handleSyncHabitsToCalendar = async (): Promise<CalendarSyncResult | null> => {
     if (!currentUser?.uid) return null;
+
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      return {
+        success: false,
+        syncedCount: 0,
+        totalScheduled: habits.length,
+        updatedHabits: habits,
+        error: 'Google Calendar synchronization requires an active internet connection.',
+      };
+    }
 
     let token = getCachedCalendarToken();
     if (!token) {
@@ -1099,52 +1267,115 @@ export function App() {
     }
   };
 
-  // Save changes from HabitModal
+  // Save changes from HabitModal (non-blocking with async calendar sync)
   const handleSaveHabitFromProfile = async (
     data: {
       name: string;
       target: string;
       icon: string;
+      goal?: string;
+      description?: string;
+      category?: string;
+      priority?: HabitPriority;
+      accent?: string;
       time?: string;
       reminderEnabled?: boolean;
       reminderTime?: string;
       frequency?: string;
+      scheduleDays?: string[];
+      archived?: boolean;
     },
     editingHabit?: HabitItem | null
   ) => {
     if (!currentUser?.uid) return;
 
-    const scheduledTime = data.time || data.reminderTime;
+    const scheduledTime = (data.time || data.reminderTime || '').trim();
     let savedHabit: HabitItem;
 
     if (editingHabit) {
       savedHabit = {
         ...editingHabit,
         name: data.name,
-        target: data.target,
+        target: data.target || data.goal || '',
+        goal: data.goal || data.target || '',
+        description: data.description,
+        category: data.category,
+        priority: data.priority,
+        accent: data.accent || editingHabit.accent || 'indigo',
         icon: data.icon,
-        time: scheduledTime,
+        time: scheduledTime || undefined,
         reminderEnabled: !!scheduledTime,
         reminderTime: scheduledTime || '08:00',
         frequency: data.frequency || editingHabit.frequency || 'Every day',
+        scheduleDays: data.scheduleDays || editingHabit.scheduleDays,
+        archived: typeof data.archived === 'boolean' ? data.archived : editingHabit.archived,
+        archivedAt: data.archived ? (editingHabit.archivedAt || new Date().toISOString()) : undefined,
       };
+
+      const hadCalendarEvent = !!editingHabit.googleCalendarEventId;
+      const removedTime = hadCalendarEvent && !scheduledTime;
+
+      if (removedTime) {
+        savedHabit.googleCalendarEventId = undefined;
+        savedHabit.googleCalendarSynced = false;
+      }
 
       const nextHabits = habits.map((h) => (h.id === savedHabit.id ? savedHabit : h));
       setHabits(nextHabits);
       setCachedHabits(currentUser.uid, nextHabits);
       await saveHabitSetting(currentUser.uid, savedHabit);
+
+      if (selectedHabitForDetails?.id === savedHabit.id) {
+        setSelectedHabitForDetails(savedHabit);
+      }
+
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        showOfflineFeedback('Offline — will sync when connected');
+      }
+
+      // Asynchronous background Google Calendar sync (non-blocking)
+      if (currentUser.googleCalendarConnected) {
+        const token = getCachedCalendarToken();
+        if (token) {
+          (async () => {
+            try {
+              if (removedTime && editingHabit.googleCalendarEventId) {
+                await deleteHabitFromGoogleCalendar(editingHabit.googleCalendarEventId, token);
+              } else if (scheduledTime) {
+                const { habit: syncedHabit } = await syncHabitToGoogleCalendar(savedHabit, token);
+                setHabits((prev) => prev.map((h) => (h.id === syncedHabit.id ? syncedHabit : h)));
+                setCachedHabits(
+                  currentUser.uid,
+                  (getCachedHabits(currentUser.uid) || []).map((h) => (h.id === syncedHabit.id ? syncedHabit : h))
+                );
+                await saveHabitSetting(currentUser.uid, syncedHabit);
+              }
+            } catch (err) {
+              console.warn('Auto calendar sync error for habit update:', err);
+            }
+          })();
+        }
+      }
     } else {
       const newId = `custom_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
       savedHabit = {
         id: newId,
         name: data.name,
-        target: data.target,
+        target: data.target || data.goal || '',
+        goal: data.goal || data.target || '',
+        description: data.description,
+        category: data.category,
+        priority: data.priority,
+        accent: data.accent || 'indigo',
         icon: data.icon,
         order: habits.length,
-        time: scheduledTime,
+        time: scheduledTime || undefined,
         reminderEnabled: !!scheduledTime,
         reminderTime: scheduledTime || '08:00',
         frequency: data.frequency || 'Every day',
+        scheduleDays: data.scheduleDays,
+        archived: !!data.archived,
+        archivedAt: data.archived ? new Date().toISOString() : undefined,
         createdAt: new Date().toISOString(),
       };
 
@@ -1152,33 +1383,62 @@ export function App() {
       setHabits(nextHabits);
       setCachedHabits(currentUser.uid, nextHabits);
 
-      const activeIds = nextHabits.map((h) => h.id);
+      const activeIds = nextHabits.filter((h) => !h.archived).map((h) => h.id);
       const newCompletedCount = countCompletedInMap(dailyLog.completedHabits, activeIds);
       const updatedLog: DailyLogData = {
         ...dailyLog,
         completedCount: newCompletedCount,
-        totalActiveCount: nextHabits.length,
+        totalActiveCount: activeIds.length,
       };
       setDailyLog(updatedLog);
 
       await saveHabitSetting(currentUser.uid, savedHabit);
       await saveDailyLog(currentUser.uid, updatedLog);
-    }
 
-    // If Google Calendar is connected, automatically sync this habit to Google Calendar
-    if (currentUser.googleCalendarConnected && scheduledTime) {
-      const token = getCachedCalendarToken();
-      if (token) {
-        try {
-          const { habit: syncedHabit } = await syncHabitToGoogleCalendar(savedHabit, token);
-          const withSync = habits.map((h) => (h.id === syncedHabit.id ? syncedHabit : h));
-          setHabits(withSync);
-          setCachedHabits(currentUser.uid, withSync);
-          await saveHabitSetting(currentUser.uid, syncedHabit);
-        } catch (err) {
-          console.warn('Auto calendar sync error for habit:', err);
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        showOfflineFeedback('Offline — will sync when connected');
+      }
+
+      // Asynchronous background Google Calendar sync for new habit (non-blocking)
+      if (currentUser.googleCalendarConnected && scheduledTime) {
+        const token = getCachedCalendarToken();
+        if (token) {
+          (async () => {
+            try {
+              const { habit: syncedHabit } = await syncHabitToGoogleCalendar(savedHabit, token);
+              setHabits((prev) => prev.map((h) => (h.id === syncedHabit.id ? syncedHabit : h)));
+              setCachedHabits(
+                currentUser.uid,
+                (getCachedHabits(currentUser.uid) || []).map((h) => (h.id === syncedHabit.id ? syncedHabit : h))
+              );
+              await saveHabitSetting(currentUser.uid, syncedHabit);
+            } catch (err) {
+              console.warn('Auto calendar sync error for new habit:', err);
+            }
+          })();
         }
       }
+    }
+  };
+
+  // Toggle habit archived state
+  const handleArchiveToggle = async (habit: HabitItem) => {
+    if (!currentUser?.uid) return;
+    const nextArchived = !habit.archived;
+    const updatedHabit: HabitItem = {
+      ...habit,
+      archived: nextArchived,
+      archivedAt: nextArchived ? new Date().toISOString() : undefined,
+    };
+
+    const nextHabits = habits.map((h) => (h.id === habit.id ? updatedHabit : h));
+    setHabits(nextHabits);
+    setCachedHabits(currentUser.uid, nextHabits);
+
+    await saveHabitSetting(currentUser.uid, updatedHabit);
+
+    if (selectedHabitForDetails?.id === habit.id) {
+      setSelectedHabitForDetails(updatedHabit);
     }
   };
 
@@ -1188,10 +1448,17 @@ export function App() {
       name: string;
       target: string;
       icon: string;
+      goal?: string;
+      description?: string;
+      category?: string;
+      priority?: HabitPriority;
+      accent?: string;
       time?: string;
       reminderEnabled?: boolean;
       reminderTime?: string;
       frequency?: string;
+      scheduleDays?: string[];
+      archived?: boolean;
     },
     habitToUpdate?: HabitItem | null
   ) => {
@@ -1206,7 +1473,7 @@ export function App() {
     setEditingHabit(null);
   };
 
-  // Delete habit handler
+  // Delete habit handler (non-blocking calendar event deletion)
   const handleDeleteHabitFromProfile = async (habitId: string) => {
     if (!currentUser?.uid) return;
 
@@ -1224,18 +1491,24 @@ export function App() {
     };
     setDailyLog(updatedLog);
 
-    await deleteHabitSetting(currentUser.uid, habitId);
+    await deleteHabitSetting(currentUser.uid, habitId, habitToDelete?.googleCalendarEventId);
     await saveDailyLog(currentUser.uid, updatedLog);
 
-    // If habit had a synced Google Calendar event, remove it from calendar
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      showOfflineFeedback('Offline — will sync when connected');
+    }
+
+    // If habit had a synced Google Calendar event, remove it from calendar in background (non-blocking)
     if (currentUser.googleCalendarConnected && habitToDelete?.googleCalendarEventId) {
       const token = getCachedCalendarToken();
       if (token) {
-        try {
-          await deleteHabitFromGoogleCalendar(habitToDelete.googleCalendarEventId, token);
-        } catch (err) {
-          console.warn('Calendar event deletion notice:', err);
-        }
+        (async () => {
+          try {
+            await deleteHabitFromGoogleCalendar(habitToDelete.googleCalendarEventId!, token);
+          } catch (err) {
+            console.warn('Calendar event deletion notice:', err);
+          }
+        })();
       }
     }
   };
@@ -1279,9 +1552,21 @@ export function App() {
     );
   }
 
-  const activeIds = habits.map((h) => h.id);
+  const displayedHabits = useMemo(() => {
+    return habits.filter((h) => {
+      if (h.archived) {
+        return !!(dailyLog.completedHabits && dailyLog.completedHabits[h.id]);
+      }
+      return (
+        isHabitScheduledForDate(h, selectedDate) ||
+        !!(dailyLog.completedHabits && dailyLog.completedHabits[h.id])
+      );
+    });
+  }, [habits, selectedDate, dailyLog.completedHabits]);
+
+  const activeIds = displayedHabits.map((h) => h.id);
   const completedCount = countCompletedInMap(dailyLog.completedHabits, activeIds);
-  const totalCount = habits.length;
+  const totalCount = displayedHabits.length;
 
   return (
     <div className="min-h-screen relative bg-zinc-100/70 dark:bg-[#0d0d11] text-zinc-900 dark:text-zinc-100 flex flex-col font-sans antialiased selection:bg-zinc-200 dark:selection:bg-zinc-800 transition-colors overflow-x-hidden">
@@ -1297,7 +1582,10 @@ export function App() {
         user={currentUser}
         currentDate={selectedDate}
         onOpenProfile={() => setActiveTab('profile')}
-        isSyncing={isSavingLog}
+        isSyncing={isSavingLog || isBackgroundSyncing}
+        connectionStatus={connectionStatus}
+        pendingCount={pendingCount}
+        onSyncNow={syncNow}
       />
 
       {/* Offline state notice banner */}
@@ -1356,9 +1644,14 @@ export function App() {
               </div>
 
               <HabitList
-                habits={habits}
+                habits={displayedHabits}
                 completedHabits={dailyLog.completedHabits}
                 onToggleHabit={handleToggleHabit}
+                onOpenDetails={(habit) => setSelectedHabitForDetails(habit)}
+                onAddNewHabit={() => {
+                  setEditingHabit(null);
+                  setIsHabitModalOpen(true);
+                }}
               />
             </section>
 
@@ -1395,6 +1688,8 @@ export function App() {
               setIsHabitModalOpen(true);
             }}
             onDeleteHabit={handleDeleteHabitFromProfile}
+            onArchiveToggle={handleArchiveToggle}
+            onOpenDetails={(habit) => setSelectedHabitForDetails(habit)}
             isCalendarConnected={!!currentUser?.googleCalendarConnected}
           />
         )}
@@ -1409,6 +1704,9 @@ export function App() {
             userProfile={currentUser}
             weightHistory={weightHistory}
             onOpenWeightModal={() => setShowWeeklyWeightModal(true)}
+            goals={goalsWithProgress}
+            onOpenNewGoal={() => handleOpenNewGoal()}
+            onNavigateToFuture={() => setActiveTab('future')}
           />
         )}
 
@@ -1417,6 +1715,11 @@ export function App() {
           <FutureView
             milestones={milestones}
             streaks={streaks}
+            goals={goalsWithProgress}
+            onOpenNewGoal={() => handleOpenNewGoal()}
+            onEditGoal={handleEditGoal}
+            onDeleteGoal={handleDeleteGoal}
+            habits={habits}
           />
         )}
 
@@ -1455,6 +1758,49 @@ export function App() {
         isEditing={!!editingHabit}
       />
 
+      {/* Habit Details and Analytics Modal */}
+      <HabitDetailsModal
+        isOpen={!!selectedHabitForDetails}
+        onClose={() => setSelectedHabitForDetails(null)}
+        habit={selectedHabitForDetails}
+        rawLogsMap={rawLogsMap}
+        todayDate={todayDate}
+        onEdit={(habit) => {
+          setSelectedHabitForDetails(null);
+          setEditingHabit(habit);
+          setIsHabitModalOpen(true);
+        }}
+        onArchiveToggle={async (habit) => {
+          await handleArchiveToggle(habit);
+        }}
+        onDelete={async (habitId) => {
+          await handleDeleteHabitFromProfile(habitId);
+          setSelectedHabitForDetails(null);
+        }}
+        onSetGoal={(habit) => handleOpenNewGoal(habit.id)}
+      />
+
+      {/* Habit Goal Creation & Editing Modal */}
+      <GoalModal
+        isOpen={isGoalModalOpen}
+        onClose={() => {
+          setIsGoalModalOpen(false);
+          setEditingGoal(null);
+          setGoalPresetHabitId(undefined);
+        }}
+        habits={habits}
+        editingGoal={editingGoal}
+        userId={currentUser?.uid || ''}
+        presetHabitId={goalPresetHabitId}
+        onSave={handleSaveGoal}
+      />
+
+      {/* Goal Celebration Modal */}
+      <GoalCelebrationModal
+        goal={celebrationGoal}
+        onClose={() => setCelebrationGoal(null)}
+      />
+
       {/* Weekly Weight Check-in Voluntary Modal */}
       <WeeklyWeightModal
         isOpen={showWeeklyWeightModal}
@@ -1471,6 +1817,18 @@ export function App() {
         activeTab={activeTab}
         onSelectTab={setActiveTab}
       />
+
+      {/* Floating Offline Feedback Toast */}
+      {offlineActionToast && (
+        <div
+          id="offline-action-toast"
+          role="status"
+          className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full bg-zinc-900/90 dark:bg-zinc-100/95 text-white dark:text-zinc-900 text-xs font-medium shadow-lg backdrop-blur-md flex items-center gap-2 border border-white/10 dark:border-zinc-300"
+        >
+          <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+          <span>{offlineActionToast}</span>
+        </div>
+      )}
 
       {/* Subtle Footer */}
       <footer id="app-footer" className="py-3 border-t border-zinc-200/80 dark:border-zinc-800/80 text-center text-xs text-zinc-400 dark:text-zinc-500 font-mono">

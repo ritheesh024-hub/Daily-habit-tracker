@@ -60,6 +60,10 @@ import {
   clearActiveSession,
 } from './cacheService';
 import {
+  enqueueSyncOperation,
+  clearUserPendingSync,
+} from './syncQueueService';
+import {
   getCachedTheme,
   setCachedTheme,
   applyTheme,
@@ -245,11 +249,35 @@ export async function updateUserProfile(
     lastGoogleCalendarSync?: string;
   }
 ): Promise<UserProfile> {
+  if (!userId || typeof userId !== 'string' || !userId.trim()) {
+    throw new Error('User ID is required.');
+  }
+
   const cached = getCachedUserProfile(userId);
   const now = new Date().toISOString();
 
-  const cleanName = updates.displayName ? updates.displayName.trim() : updates.name ? updates.name.trim() : (cached?.displayName || 'User');
+  let rawName = updates.displayName ? updates.displayName.trim() : updates.name ? updates.name.trim() : (cached?.displayName || 'User');
+  const cleanName = rawName.slice(0, 80);
   const cleanDob = updates.dateOfBirth !== undefined ? (updates.dateOfBirth.trim() || undefined) : cached?.dateOfBirth;
+
+  // Validate numeric fields strictly to prevent malformed documents
+  let cleanHeight = cached?.height;
+  if (updates.height !== undefined) {
+    if (typeof updates.height === 'number' && !isNaN(updates.height) && isFinite(updates.height) && updates.height > 0 && updates.height <= 350) {
+      cleanHeight = updates.height;
+    } else if (updates.height === null) {
+      cleanHeight = undefined;
+    }
+  }
+
+  let cleanWeight = cached?.weight;
+  if (updates.weight !== undefined) {
+    if (typeof updates.weight === 'number' && !isNaN(updates.weight) && isFinite(updates.weight) && updates.weight > 0 && updates.weight <= 500) {
+      cleanWeight = updates.weight;
+    } else if (updates.weight === null) {
+      cleanWeight = undefined;
+    }
+  }
 
   const updatedProfile: UserProfile = {
     uid: userId,
@@ -258,9 +286,9 @@ export async function updateUserProfile(
     email: cached?.email || auth.currentUser?.email || null,
     photoURL: cached?.photoURL || auth.currentUser?.photoURL || null,
     dateOfBirth: cleanDob,
-    height: updates.height !== undefined ? updates.height : cached?.height,
+    height: cleanHeight,
     heightUnit: updates.heightUnit || cached?.heightUnit || 'cm',
-    weight: updates.weight !== undefined ? updates.weight : cached?.weight,
+    weight: cleanWeight,
     weightUnit: updates.weightUnit || cached?.weightUnit || 'kg',
     onboardingCompleted: updates.onboardingCompleted !== undefined ? updates.onboardingCompleted : (cached?.onboardingCompleted ?? true),
     lastWeightCheckInDate: cached?.lastWeightCheckInDate,
@@ -300,9 +328,9 @@ export async function updateUserProfile(
     dateOfBirth: cleanDob || null,
     updatedAt: now,
   };
-  if (updates.height !== undefined) firestoreUpdates.height = updates.height;
+  if (cleanHeight !== undefined) firestoreUpdates.height = cleanHeight;
   if (updates.heightUnit !== undefined) firestoreUpdates.heightUnit = updates.heightUnit;
-  if (updates.weight !== undefined) firestoreUpdates.weight = updates.weight;
+  if (cleanWeight !== undefined) firestoreUpdates.weight = cleanWeight;
   if (updates.weightUnit !== undefined) firestoreUpdates.weightUnit = updates.weightUnit;
   if (updates.onboardingCompleted !== undefined) firestoreUpdates.onboardingCompleted = updates.onboardingCompleted;
   if (updates.googleCalendarConnected !== undefined) firestoreUpdates.googleCalendarConnected = updates.googleCalendarConnected;
@@ -580,6 +608,8 @@ export async function clearUserData(userId: string): Promise<void> {
     'reminderSettings',
     'settings',
     'milestones',
+    'goals',
+    'achievements',
     'foodLogs',
     'weightHistory',
   ];
@@ -633,6 +663,7 @@ export async function clearUserData(userId: string): Promise<void> {
   }
 
   // 3. Purge user-specific local storage cache while preserving active session
+  clearUserPendingSync(userId);
   clearUserAppData(userId);
 }
 
@@ -683,6 +714,8 @@ export async function deleteUserAccount(currentUser: User): Promise<void> {
     'reminderSettings',
     'settings',
     'milestones',
+    'goals',
+    'achievements',
     'foodLogs',
     'weightHistory',
   ];
@@ -718,6 +751,7 @@ export async function deleteUserAccount(currentUser: User): Promise<void> {
   }
 
   // 5. Always purge all local storage cache for this user
+  clearUserPendingSync(userId);
   clearUserAppData(userId);
   clearUserCache(userId);
   clearActiveSession();
@@ -759,14 +793,24 @@ export async function fetchUserHabitSettings(userId: string): Promise<HabitItem[
         habits.push({
           id: docSnap.id,
           name: data.name || 'Untitled Habit',
-          target: data.target || '',
+          target: data.target || data.goal || '',
+          goal: data.goal || data.target || '',
+          description: data.description || '',
+          category: data.category || undefined,
+          priority: data.priority || undefined,
+          accent: data.accent || data.color || 'indigo',
+          color: data.color || data.accent || 'indigo',
           icon: data.icon || 'check',
           order: typeof data.order === 'number' ? data.order : habits.length,
-          time: data.time || data.reminderTime || '08:00',
+          time: data.time || data.reminderTime || '',
+          frequency: data.frequency || 'Every day',
+          scheduleDays: Array.isArray(data.scheduleDays) ? data.scheduleDays : undefined,
+          archived: !!data.archived,
+          archivedAt: data.archivedAt,
           googleCalendarEventId: data.googleCalendarEventId,
           googleCalendarSynced: data.googleCalendarSynced || false,
           lastSyncedAt: data.lastSyncedAt,
-          reminderEnabled: typeof data.reminderEnabled === 'boolean' ? data.reminderEnabled : true,
+          reminderEnabled: typeof data.reminderEnabled === 'boolean' ? data.reminderEnabled : !!data.time,
           reminderTime: data.reminderTime || data.time || '08:00',
           createdAt: data.createdAt,
           updatedAt: data.updatedAt,
@@ -829,43 +873,298 @@ export async function fetchUserHabitSettings(userId: string): Promise<HabitItem[
 
 /**
  * Saves or updates a single habit setting.
+ * Seamlessly caches locally, enqueuing for background sync if offline.
  */
 export async function saveHabitSetting(userId: string, habit: HabitItem): Promise<void> {
+  if (!userId || typeof userId !== 'string' || !userId.trim()) {
+    throw new Error('User ID is required.');
+  }
+  if (!habit || !habit.id || typeof habit.id !== 'string') {
+    throw new Error('Habit ID is required.');
+  }
+
+  const cleanName = (habit.name || '').trim().slice(0, 80);
+  if (!cleanName) {
+    throw new Error('Habit name cannot be empty.');
+  }
+  const cleanTarget = (habit.target || habit.goal || '').trim().slice(0, 60);
+  const cleanDesc = (habit.description || '').trim().slice(0, 400);
+
   const now = new Date().toISOString();
   const payload = {
     id: habit.id,
-    name: habit.name,
-    target: habit.target || '',
+    name: cleanName,
+    target: cleanTarget,
+    goal: cleanTarget,
+    description: cleanDesc,
+    category: habit.category || null,
+    priority: habit.priority || null,
+    accent: habit.accent || habit.color || 'indigo',
+    color: habit.color || habit.accent || 'indigo',
     icon: habit.icon || 'check',
-    order: typeof habit.order === 'number' ? habit.order : 0,
-    time: habit.time || habit.reminderTime || '08:00',
+    order: typeof habit.order === 'number' && !isNaN(habit.order) ? habit.order : 0,
+    time: habit.time || habit.reminderTime || '',
+    frequency: habit.frequency || 'Every day',
+    scheduleDays: Array.isArray(habit.scheduleDays) ? habit.scheduleDays : null,
+    archived: !!habit.archived,
+    archivedAt: habit.archived ? (habit.archivedAt || now) : null,
     googleCalendarEventId: habit.googleCalendarEventId || null,
     googleCalendarSynced: habit.googleCalendarSynced || false,
     lastSyncedAt: habit.lastSyncedAt || null,
-    reminderEnabled: typeof habit.reminderEnabled === 'boolean' ? habit.reminderEnabled : true,
+    reminderEnabled: typeof habit.reminderEnabled === 'boolean' ? habit.reminderEnabled : !!habit.time,
     reminderTime: habit.reminderTime || habit.time || '08:00',
     createdAt: habit.createdAt || now,
     updatedAt: now,
   };
 
+  // If offline, save into pending sync queue immediately
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    enqueueSyncOperation(userId, {
+      type: 'UPDATE_HABIT',
+      habit: payload,
+    });
+    return;
+  }
+
   try {
     const habitRef = doc(db, 'users', userId, 'habitSettings', habit.id);
     await setDoc(habitRef, payload, { merge: true });
   } catch (error) {
-    console.warn('Save habit setting notice:', error);
+    console.warn('Save habit setting network notice, enqueuing for background sync:', error);
+    enqueueSyncOperation(userId, {
+      type: 'UPDATE_HABIT',
+      habit: payload,
+    });
   }
 }
 
 /**
- * Deletes a habit from users/{userId}/habitSettings and users/{userId}/reminderSettings.
+ * Deletes a habit from users/{userId}/habitSettings.
+ * Seamlessly removes locally, enqueuing for background sync if offline.
  */
-export async function deleteHabitSetting(userId: string, habitId: string): Promise<void> {
+export async function deleteHabitSetting(
+  userId: string,
+  habitId: string,
+  googleCalendarEventId?: string
+): Promise<void> {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    enqueueSyncOperation(userId, {
+      type: 'DELETE_HABIT',
+      habitId,
+      googleCalendarEventId,
+    });
+    return;
+  }
+
   try {
     const habitRef = doc(db, 'users', userId, 'habitSettings', habitId);
     await deleteDoc(habitRef);
   } catch (error) {
-    console.warn('Delete habit setting notice:', error);
+    console.warn('Delete habit setting network notice, enqueuing for background sync:', error);
+    enqueueSyncOperation(userId, {
+      type: 'DELETE_HABIT',
+      habitId,
+      googleCalendarEventId,
+    });
   }
+}
+
+/**
+ * Checks if a habit is scheduled for a given date.
+ * If frequency is 'Every day' (or default) -> true
+ * If 'Weekdays' -> Mon-Fri -> true
+ * If 'Weekends' -> Sat-Sun -> true
+ * If 'Selected days' -> checks against scheduleDays array
+ */
+export function isHabitScheduledForDate(habit: HabitItem, dateInput: string): boolean {
+  if (habit.archived) return false;
+  const dateStr = getLocalDateKey(dateInput);
+  const freq = (habit.frequency || 'Every day').trim();
+
+  if (freq === 'Every day') return true;
+
+  // Split date components to avoid timezone offset shifts
+  const [yearStr, monthStr, dayStr] = dateStr.split('-');
+  const y = parseInt(yearStr, 10);
+  const m = parseInt(monthStr, 10);
+  const d = parseInt(dayStr, 10);
+  const dateObj = new Date(y, m - 1, d);
+  const dayIndex = dateObj.getDay(); // 0 = Sun, 1 = Mon, ..., 6 = Sat
+
+  if (freq === 'Weekdays') {
+    return dayIndex >= 1 && dayIndex <= 5;
+  }
+  if (freq === 'Weekends') {
+    return dayIndex === 0 || dayIndex === 6;
+  }
+  if (freq === 'Selected days') {
+    if (!habit.scheduleDays || habit.scheduleDays.length === 0) return true;
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const currentDayName = dayNames[dayIndex];
+    return habit.scheduleDays.some(
+      (sd) =>
+        sd.toLowerCase().startsWith(currentDayName.toLowerCase()) ||
+        currentDayName.toLowerCase().startsWith(sd.toLowerCase())
+    );
+  }
+
+  return true;
+}
+
+export interface HabitSpecificAnalytics {
+  currentStreak: number;
+  bestStreak: number;
+  totalCompletions: number;
+  completionRate: number;
+  weeklyTrend: { date: string; dayLabel: string; completed: boolean; rate: number }[];
+  monthlyTrend: { date: string; dayLabel: string; rate: number }[];
+}
+
+/**
+ * Calculates habit-specific analytics and trends from actual user logs.
+ * Returns weekly and monthly data suitable for smooth line graphs.
+ */
+export function calculateHabitSpecificStats(
+  habit: HabitItem,
+  rawLogsMap: Record<string, DailyLogData> = {},
+  todayDateInput?: string
+): HabitSpecificAnalytics {
+  const todayStr = getLocalDateKey(todayDateInput || getTodayDateString());
+  const [y, m, d] = todayStr.split('-').map(Number);
+  const todayDate = new Date(y, m - 1, d);
+
+  // 1. Current streak calculation for this habit specifically
+  let currentStreak = 0;
+  const isTodayCompleted = !!rawLogsMap[todayStr]?.completedHabits?.[habit.id];
+
+  // Start from today or yesterday
+  let checkDate = new Date(todayDate);
+  if (!isTodayCompleted) {
+    checkDate.setDate(checkDate.getDate() - 1);
+  }
+
+  for (let i = 0; i < 365; i++) {
+    const checkStr = getLocalDateKey(
+      `${checkDate.getFullYear()}-${String(checkDate.getMonth() + 1).padStart(2, '0')}-${String(checkDate.getDate()).padStart(2, '0')}`
+    );
+    const log = rawLogsMap[checkStr];
+    const isCompleted = !!log?.completedHabits?.[habit.id];
+
+    if (isCompleted) {
+      currentStreak++;
+      checkDate.setDate(checkDate.getDate() - 1);
+    } else {
+      break;
+    }
+  }
+
+  // 2. Best streak calculation across all logged dates
+  const sortedDates = Object.keys(rawLogsMap).sort();
+  let bestStreak = 0;
+  let tempStreak = 0;
+  let prevDateObj: Date | null = null;
+
+  for (const dateKey of sortedDates) {
+    const isCompleted = !!rawLogsMap[dateKey]?.completedHabits?.[habit.id];
+    if (isCompleted) {
+      const [dy, dm, dd] = dateKey.split('-').map(Number);
+      const curDateObj = new Date(dy, dm - 1, dd);
+
+      if (prevDateObj) {
+        const diffDays = Math.round((curDateObj.getTime() - prevDateObj.getTime()) / (1000 * 60 * 60 * 24));
+        if (diffDays === 1) {
+          tempStreak++;
+        } else {
+          tempStreak = 1;
+        }
+      } else {
+        tempStreak = 1;
+      }
+      prevDateObj = curDateObj;
+      if (tempStreak > bestStreak) {
+        bestStreak = tempStreak;
+      }
+    } else {
+      tempStreak = 0;
+      prevDateObj = null;
+    }
+  }
+  bestStreak = Math.max(bestStreak, currentStreak);
+
+  // 3. Weekly Trend (last 7 days including today)
+  const dayAbbrs = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const weeklyTrend: { date: string; dayLabel: string; completed: boolean; rate: number }[] = [];
+  let weeklyCompletions = 0;
+
+  for (let i = 6; i >= 0; i--) {
+    const day = new Date(todayDate);
+    day.setDate(day.getDate() - i);
+    const dateStr = getLocalDateKey(
+      `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`
+    );
+    const isCompleted = !!rawLogsMap[dateStr]?.completedHabits?.[habit.id];
+    if (isCompleted) weeklyCompletions++;
+    weeklyTrend.push({
+      date: dateStr,
+      dayLabel: dayAbbrs[day.getDay()],
+      completed: isCompleted,
+      rate: isCompleted ? 100 : 0,
+    });
+  }
+
+  // 4. Monthly Trend (last 30 days smoothed rolling completion percentage)
+  const monthlyTrend: { date: string; dayLabel: string; rate: number }[] = [];
+  let totalPast30Completions = 0;
+
+  for (let i = 29; i >= 0; i--) {
+    const day = new Date(todayDate);
+    day.setDate(day.getDate() - i);
+    const dateStr = getLocalDateKey(
+      `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`
+    );
+    const isCompleted = !!rawLogsMap[dateStr]?.completedHabits?.[habit.id];
+    if (isCompleted) totalPast30Completions++;
+
+    // Rolling 7-day average at this point
+    let rollingSum = 0;
+    for (let r = 0; r < 7; r++) {
+      const rDay = new Date(day);
+      rDay.setDate(rDay.getDate() - r);
+      const rDateStr = getLocalDateKey(
+        `${rDay.getFullYear()}-${String(rDay.getMonth() + 1).padStart(2, '0')}-${String(rDay.getDate()).padStart(2, '0')}`
+      );
+      if (rawLogsMap[rDateStr]?.completedHabits?.[habit.id]) {
+        rollingSum++;
+      }
+    }
+    const rollingRate = Math.round((rollingSum / 7) * 100);
+
+    monthlyTrend.push({
+      date: dateStr,
+      dayLabel: `${day.getMonth() + 1}/${day.getDate()}`,
+      rate: rollingRate,
+    });
+  }
+
+  // 5. Overall completion rate in the last 30 days
+  const completionRate = Math.round((totalPast30Completions / 30) * 100);
+
+  // Total all-time completions for this habit
+  let totalCompletions = 0;
+  for (const log of Object.values(rawLogsMap)) {
+    if (log?.completedHabits?.[habit.id]) {
+      totalCompletions++;
+    }
+  }
+
+  return {
+    currentStreak,
+    bestStreak,
+    totalCompletions,
+    completionRate,
+    weeklyTrend,
+    monthlyTrend,
+  };
 }
 
 /**
@@ -963,12 +1262,46 @@ export async function saveDailyLog(
     payload.note = log.note;
   }
 
+  // If offline, save into pending sync queue and return gracefully
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    for (const [habitId, completed] of Object.entries(log.completedHabits || {})) {
+      enqueueSyncOperation(userId, {
+        type: 'COMPLETE_HABIT',
+        habitId,
+        date,
+        completed,
+      });
+    }
+    if (typeof log.note === 'string') {
+      enqueueSyncOperation(userId, {
+        type: 'SAVE_NOTE',
+        date,
+        note: log.note,
+      });
+    }
+    return;
+  }
+
   try {
     const logDocRef = doc(db, 'users', userId, 'dailyLogs', date);
     await setDoc(logDocRef, payload, { merge: true });
   } catch (error) {
-    console.warn(`Save daily log notice for ${date}:`, error);
-    throw error;
+    console.warn(`Save daily log network notice for ${date}, queuing for sync:`, error);
+    for (const [habitId, completed] of Object.entries(log.completedHabits || {})) {
+      enqueueSyncOperation(userId, {
+        type: 'COMPLETE_HABIT',
+        habitId,
+        date,
+        completed,
+      });
+    }
+    if (typeof log.note === 'string') {
+      enqueueSyncOperation(userId, {
+        type: 'SAVE_NOTE',
+        date,
+        note: log.note,
+      });
+    }
   }
 }
 
@@ -997,7 +1330,15 @@ export async function saveDailyNote(
   // Local storage write immediately
   setCachedDailyLog(userId, date, updatedLog);
 
-  // Firestore background write with merge: true to avoid overwriting habit completions
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    enqueueSyncOperation(userId, {
+      type: 'SAVE_NOTE',
+      date,
+      note: trimmed,
+    });
+    return updatedLog;
+  }
+
   try {
     const logDocRef = doc(db, 'users', userId, 'dailyLogs', date);
     await setDoc(
@@ -1010,7 +1351,12 @@ export async function saveDailyNote(
       { merge: true }
     );
   } catch (error) {
-    console.warn(`Save daily note notice for ${date}:`, error);
+    console.warn(`Save daily note notice for ${date}, enqueuing for sync:`, error);
+    enqueueSyncOperation(userId, {
+      type: 'SAVE_NOTE',
+      date,
+      note: trimmed,
+    });
   }
 
   return updatedLog;
@@ -1037,6 +1383,15 @@ export async function clearDailyNote(
 
   setCachedDailyLog(userId, date, updatedLog);
 
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    enqueueSyncOperation(userId, {
+      type: 'SAVE_NOTE',
+      date,
+      note: '',
+    });
+    return updatedLog;
+  }
+
   try {
     const logDocRef = doc(db, 'users', userId, 'dailyLogs', date);
     await setDoc(
@@ -1049,7 +1404,12 @@ export async function clearDailyNote(
       { merge: true }
     );
   } catch (error) {
-    console.warn(`Clear daily note notice for ${date}:`, error);
+    console.warn(`Clear daily note notice for ${date}, enqueuing for sync:`, error);
+    enqueueSyncOperation(userId, {
+      type: 'SAVE_NOTE',
+      date,
+      note: '',
+    });
   }
 
   return updatedLog;

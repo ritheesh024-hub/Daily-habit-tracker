@@ -175,6 +175,29 @@ export function setCachedWeightHistory(userId: string, entries: WeightHistoryEnt
   }
 }
 
+export function getCachedGoals(userId?: string): any[] {
+  if (!userId) return [];
+  try {
+    const raw = localStorage.getItem(`${PREFIX}goals_${userId}`);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (e) {
+    console.warn(`Cache read error (goals for ${userId}):`, e);
+  }
+  return [];
+}
+
+export function setCachedGoals(userId: string, goals: any[]): void {
+  if (!userId) return;
+  try {
+    localStorage.setItem(`${PREFIX}goals_${userId}`, JSON.stringify(goals));
+  } catch (e) {
+    console.warn(`Cache write error (goals for ${userId}):`, e);
+  }
+}
+
 /**
  * Clears user habit records, logs, history, milestones, weight, and notes from cache
  * while preserving the user's active session and basic profile state.
@@ -184,6 +207,7 @@ export function clearUserAppData(userId: string): void {
   try {
     localStorage.removeItem(`${PREFIX}history_${userId}`);
     localStorage.removeItem(`${PREFIX}milestones_${userId}`);
+    localStorage.removeItem(`${PREFIX}goals_${userId}`);
     localStorage.removeItem(`${PREFIX}weight_${userId}`);
     localStorage.removeItem(`${PREFIX}streaks_${userId}`);
     localStorage.removeItem(`${PREFIX}analytics_${userId}`);
@@ -191,6 +215,7 @@ export function clearUserAppData(userId: string): void {
     localStorage.removeItem(`dh_weight_prompt_dismissed_until_${userId}`);
     localStorage.removeItem(`dh_gcal_token_${userId}`);
     localStorage.removeItem(`dh_gcal_email_${userId}`);
+    localStorage.removeItem(`dailyHabits_pendingSync_${userId}`);
 
     // Set habits to empty array
     localStorage.setItem(`${PREFIX}habits_${userId}`, JSON.stringify([]));
@@ -242,6 +267,7 @@ export function clearUserCache(userId: string): void {
     localStorage.removeItem(`${PREFIX}habits_${userId}`);
     localStorage.removeItem(`${PREFIX}history_${userId}`);
     localStorage.removeItem(`${PREFIX}milestones_${userId}`);
+    localStorage.removeItem(`${PREFIX}goals_${userId}`);
     localStorage.removeItem(`${PREFIX}theme_${userId}`);
     localStorage.removeItem(`${PREFIX}weight_${userId}`);
     localStorage.removeItem(`${PREFIX}streaks_${userId}`);

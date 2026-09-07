@@ -11,6 +11,9 @@ const CALENDAR_API_BASE = 'https://www.googleapis.com/calendar/v3';
 // In-memory OAuth access token cache
 let cachedAccessToken: string | null = null;
 
+// Concurrency lock to prevent simultaneous duplicate sync operations
+let isSyncInProgress = false;
+
 export function getCachedCalendarToken(): string | null {
   return cachedAccessToken;
 }
@@ -19,6 +22,9 @@ export function setCachedCalendarToken(token: string | null): void {
   cachedAccessToken = token;
 }
 
+/**
+ * Converts 24-hour time "HH:mm" to human-readable "h:mm AM/PM".
+ */
 export function formatTime12Hour(time24?: string): string {
   if (!time24) return '8:00 AM';
   const parts = time24.split(':');
@@ -32,6 +38,47 @@ export function formatTime12Hour(time24?: string): string {
   if (hour === 0) hour = 12;
 
   return `${hour}:${minute} ${ampm}`;
+}
+
+/**
+ * Formats a Date object as an ISO 8601 string with local timezone offset.
+ * Example: 2026-09-07T18:00:00-07:00
+ */
+export function formatLocalDateTimeWithOffset(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const year = date.getFullYear();
+  const month = pad(date.getMonth() + 1);
+  const day = pad(date.getDate());
+  const hours = pad(date.getHours());
+  const minutes = pad(date.getMinutes());
+  const seconds = pad(date.getSeconds());
+
+  const offsetMinutes = -date.getTimezoneOffset();
+  const sign = offsetMinutes >= 0 ? '+' : '-';
+  const absOffset = Math.abs(offsetMinutes);
+  const offsetHours = pad(Math.floor(absOffset / 60));
+  const offsetMins = pad(absOffset % 60);
+
+  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}${sign}${offsetHours}:${offsetMins}`;
+}
+
+/**
+ * Maps app habit frequency to standard RFC5545 RRULE recurrence rules.
+ * Supports Daily, Weekdays, Weekends, and 3x a week.
+ */
+export function getRRuleForFrequency(frequency?: string): string[] {
+  const norm = (frequency || 'Every day').toLowerCase().trim();
+  if (norm === 'weekdays') {
+    return ['RRULE:FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR'];
+  }
+  if (norm === 'weekends') {
+    return ['RRULE:FREQ=WEEKLY;BYDAY=SA,SU'];
+  }
+  if (norm.includes('3x') || norm === '3x a week') {
+    return ['RRULE:FREQ=WEEKLY;BYDAY=MO,WE,FR'];
+  }
+  // Default is daily
+  return ['RRULE:FREQ=DAILY'];
 }
 
 /**
@@ -92,7 +139,8 @@ export function disconnectGoogleCalendar(): void {
  */
 export async function fetchDailyHabitCalendarEvents(token: string): Promise<any[]> {
   try {
-    const url = `${CALENDAR_API_BASE}/calendars/primary/events?q=Daily+Habits&maxResults=100&singleEvents=false`;
+    // Search by both q and max results to locate existing Daily Habits events
+    const url = `${CALENDAR_API_BASE}/calendars/primary/events?q=Daily+Habit&maxResults=250&singleEvents=false`;
     const res = await fetch(url, {
       headers: {
         Authorization: `Bearer ${token}`,
@@ -102,7 +150,7 @@ export async function fetchDailyHabitCalendarEvents(token: string): Promise<any[
 
     if (res.status === 401) {
       cachedAccessToken = null;
-      throw new Error('OAuth token expired. Please reconnect Google Calendar.');
+      throw new Error('Google Calendar authorization expired. Please reconnect Google Calendar.');
     }
 
     if (!res.ok) {
@@ -111,7 +159,14 @@ export async function fetchDailyHabitCalendarEvents(token: string): Promise<any[
     }
 
     const data = await res.json();
-    return data.items || [];
+    const items: any[] = data.items || [];
+    
+    // Filter to events genuinely created by Daily Habits
+    return items.filter((ev) => {
+      const isDailyHabitsApp = ev.extendedProperties?.private?.app === 'daily-habits';
+      const isDailyHabitTitle = typeof ev.summary === 'string' && ev.summary.toLowerCase().startsWith('daily habit');
+      return isDailyHabitsApp || isDailyHabitTitle;
+    });
   } catch (err: any) {
     console.warn('Error querying Google Calendar events:', err);
     throw err;
@@ -119,83 +174,138 @@ export async function fetchDailyHabitCalendarEvents(token: string): Promise<any[
 }
 
 /**
- * Creates or updates a recurring daily Google Calendar event for a habit.
+ * Checks if a specific Google Calendar event exists and returns it, or null if deleted/not found.
+ */
+export async function getGoogleCalendarEvent(eventId: string, token: string): Promise<any | null> {
+  if (!eventId || !token) return null;
+  try {
+    const url = `${CALENDAR_API_BASE}/calendars/primary/events/${eventId}`;
+    const res = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    if (res.status === 404 || res.status === 410) {
+      return null;
+    }
+    if (res.status === 401) {
+      cachedAccessToken = null;
+      throw new Error('Google Calendar authorization expired. Please reconnect.');
+    }
+    if (res.ok) {
+      return await res.json();
+    }
+    return null;
+  } catch (err) {
+    console.warn(`Could not verify event ${eventId}:`, err);
+    return null;
+  }
+}
+
+/**
+ * Synchronizes a single habit with Google Calendar:
+ * - If habit has no scheduled time: removes any existing calendar event for this habit.
+ * - If habit has a scheduled time: creates or updates ONE recurring event with exact metadata.
+ * - Strict duplicate prevention: checks stored googleCalendarEventId first, then queries by private habitId tag.
  */
 export async function syncHabitToGoogleCalendar(
   habit: HabitItem,
   token: string,
   existingEvents?: any[]
 ): Promise<{ habit: HabitItem; eventId: string }> {
-  const scheduledTime = (typeof habit.time === 'string' && habit.time) || (typeof habit.reminderTime === 'string' && habit.reminderTime) || '08:00';
+  const scheduledTime = (typeof habit.time === 'string' && habit.time.trim()) || (typeof habit.reminderTime === 'string' && habit.reminderTime.trim());
+
+  // 1. Unscheduled habit handling: If no time, remove existing event if one was linked
+  if (!scheduledTime) {
+    if (habit.googleCalendarEventId) {
+      try {
+        await deleteHabitFromGoogleCalendar(habit.googleCalendarEventId, token);
+      } catch (err) {
+        console.warn('Notice removing unscheduled habit event:', err);
+      }
+    }
+    return {
+      habit: {
+        ...habit,
+        googleCalendarEventId: undefined,
+        googleCalendarSynced: false,
+        lastSyncedAt: new Date().toISOString(),
+      },
+      eventId: '',
+    };
+  }
+
+  // 2. Parse scheduled time and compute local start & end ISO strings
   const [hoursStr, minutesStr] = scheduledTime.split(':');
   const hours = parseInt(hoursStr || '8', 10);
   const minutes = parseInt(minutesStr || '0', 10);
 
-  const todayStr = getTodayDateString(); // YYYY-MM-DD
   const userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 
-  // Construct start & end ISO strings for today's recurrence base
-  const startDateTime = new Date();
-  const [y, m, d] = todayStr.split('-').map(Number);
-  startDateTime.setFullYear(y, m - 1, d);
-  startDateTime.setHours(hours, minutes, 0, 0);
+  // Construct start date for today in user's local timezone
+  const startDate = new Date();
+  startDate.setHours(hours, minutes, 0, 0);
 
-  const endDateTime = new Date(startDateTime.getTime() + 30 * 60 * 1000); // 30 minutes duration
+  // Duration: 30 minutes
+  const endDate = new Date(startDate.getTime() + 30 * 60 * 1000);
 
-  // Format ISO with local offset
-  const formatIsoLocal = (date: Date): string => {
-    const pad = (n: number) => String(n).padStart(2, '0');
-    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:00`;
-  };
+  const startIso = formatLocalDateTimeWithOffset(startDate);
+  const endIso = formatLocalDateTimeWithOffset(endDate);
 
-  const startIso = formatIsoLocal(startDateTime);
-  const endIso = formatIsoLocal(endDateTime);
+  // Recurrence rule based on frequency
+  const recurrence = getRRuleForFrequency(habit.frequency);
+
+  // Exact event title format required: "Daily Habit: <Name>"
+  const summary = `Daily Habit: ${habit.name}`;
 
   const eventPayload = {
-    summary: `Daily Habits: ${habit.name}`,
-    description: `Daily habit scheduled via Daily Habits app.\nTarget: ${habit.target || 'Daily Consistency'}\nScheduled Time: ${formatTime12Hour(scheduledTime)}`,
+    summary,
+    description: `Daily habit scheduled via Daily Habits.\nHabit: ${habit.name}\nTarget: ${habit.target || 'Daily Consistency'}\nFrequency: ${habit.frequency || 'Every day'}\nScheduled Time: ${formatTime12Hour(scheduledTime)}`,
     start: {
-      dateTime: `${startIso}`,
+      dateTime: startIso,
       timeZone: userTimeZone,
     },
     end: {
-      dateTime: `${endIso}`,
+      dateTime: endIso,
       timeZone: userTimeZone,
     },
-    recurrence: ['RRULE:FREQ=DAILY'],
+    recurrence,
     reminders: {
       useDefault: false,
       overrides: [
-        { method: 'popup', minutes: 0 },
         { method: 'popup', minutes: 10 },
       ],
     },
     extendedProperties: {
       private: {
         app: 'daily-habits',
+        source: 'Daily Habits',
         habitId: habit.id,
       },
     },
   };
 
-  // 1. Identify if an event already exists
-  let targetEventId = habit.googleCalendarEventId || null;
+  // 3. Strict Duplicate Prevention & Identification
+  let targetEventId: string | null = habit.googleCalendarEventId || null;
 
-  if (!targetEventId && existingEvents && existingEvents.length > 0) {
-    const matched = existingEvents.find(
-      (ev) =>
-        ev.extendedProperties?.private?.habitId === habit.id ||
-        (ev.summary && ev.summary.toLowerCase() === `daily habits: ${habit.name}`.toLowerCase())
-    );
-    if (matched && matched.id) {
-      targetEventId = matched.id;
+  // If no eventId stored on habit, check existing events passed or search for matched event
+  if (!targetEventId) {
+    if (existingEvents && existingEvents.length > 0) {
+      const matched = existingEvents.find(
+        (ev) =>
+          ev.extendedProperties?.private?.habitId === habit.id ||
+          (ev.summary && ev.summary.trim().toLowerCase() === summary.toLowerCase())
+      );
+      if (matched && matched.id) {
+        targetEventId = matched.id;
+      }
     }
   }
 
   let finalEventId = '';
 
+  // Try updating the existing event if we have an ID
   if (targetEventId) {
-    // Update existing event via PATCH
     const patchUrl = `${CALENDAR_API_BASE}/calendars/primary/events/${targetEventId}`;
     const patchRes = await fetch(patchUrl, {
       method: 'PATCH',
@@ -206,12 +316,13 @@ export async function syncHabitToGoogleCalendar(
       body: JSON.stringify(eventPayload),
     });
 
-    if (patchRes.status === 404) {
-      // Event was deleted in Google Calendar, create anew
-      targetEventId = null;
-    } else if (patchRes.ok) {
+    if (patchRes.ok) {
       const updatedData = await patchRes.json();
       finalEventId = updatedData.id;
+    } else if (patchRes.status === 404 || patchRes.status === 410) {
+      // Event no longer exists in Google Calendar (user deleted manually in Google Calendar)
+      // We will create a replacement event below
+      targetEventId = null;
     } else if (patchRes.status === 401) {
       cachedAccessToken = null;
       throw new Error('Google Calendar access token has expired. Please reconnect.');
@@ -221,8 +332,8 @@ export async function syncHabitToGoogleCalendar(
     }
   }
 
+  // If no valid existing event was found or updated, create a single new event
   if (!targetEventId) {
-    // Create new event via POST
     const createUrl = `${CALENDAR_API_BASE}/calendars/primary/events`;
     const createRes = await fetch(createUrl, {
       method: 'POST',
@@ -259,6 +370,7 @@ export async function syncHabitToGoogleCalendar(
 
 /**
  * Synchronizes all habits with a scheduled time to Google Calendar.
+ * Duplicate-free, non-blocking, with error resilience.
  */
 export async function syncAllHabitsToGoogleCalendar(
   habits: HabitItem[],
@@ -274,13 +386,28 @@ export async function syncAllHabitsToGoogleCalendar(
     };
   }
 
+  if (isSyncInProgress) {
+    console.warn('Sync already in progress, skipping overlapping call.');
+    return {
+      success: true,
+      syncedCount: 0,
+      totalScheduled: habits.filter((h) => !!(h.time || h.reminderTime)).length,
+      updatedHabits: habits,
+    };
+  }
+
+  isSyncInProgress = true;
+
   try {
-    // 1. Pre-fetch existing events tagged with Daily Habits
+    // 1. Fetch existing Daily Habits events to prevent creating duplicates if habit lacked eventId
     let existingEvents: any[] = [];
     try {
       existingEvents = await fetchDailyHabitCalendarEvents(token);
-    } catch (e) {
-      console.warn('Could not list existing calendar events, will proceed with individual sync:', e);
+    } catch (e: any) {
+      if (e?.message?.includes('expired') || e?.message?.includes('authorization')) {
+        throw e;
+      }
+      console.warn('Could not list existing calendar events; proceeding with individual checks:', e);
     }
 
     const scheduledHabits = habits.filter((h) => !!(h.time || h.reminderTime));
@@ -299,7 +426,7 @@ export async function syncAllHabitsToGoogleCalendar(
     let syncedCount = 0;
     const errors: string[] = [];
 
-    // Sync sequentially to avoid rate limiting
+    // Sync sequentially to adhere to Google Calendar rate limits
     for (const habit of scheduledHabits) {
       try {
         const { habit: syncedHabit } = await syncHabitToGoogleCalendar(habit, token, existingEvents);
@@ -308,7 +435,11 @@ export async function syncAllHabitsToGoogleCalendar(
       } catch (err: any) {
         console.error(`Failed to sync habit "${habit.name}":`, err);
         errors.push(`${habit.name}: ${err.message || 'Sync failed'}`);
-        updatedHabitsMap[habit.id] = habit;
+        // Keep habit with synced=false
+        updatedHabitsMap[habit.id] = {
+          ...habit,
+          googleCalendarSynced: false,
+        };
       }
     }
 
@@ -331,11 +462,14 @@ export async function syncAllHabitsToGoogleCalendar(
       updatedHabits: fallbackHabits,
       error: err.message || 'An error occurred while syncing with Google Calendar.',
     };
+  } finally {
+    isSyncInProgress = false;
   }
 }
 
 /**
  * Deletes a synchronized habit event from Google Calendar.
+ * Safe against 404/410 (already deleted).
  */
 export async function deleteHabitFromGoogleCalendar(
   eventId: string,
@@ -353,7 +487,7 @@ export async function deleteHabitFromGoogleCalendar(
     });
 
     if (res.status === 404 || res.status === 410) {
-      // Already deleted
+      // Event was already deleted
       return true;
     }
 
@@ -367,4 +501,54 @@ export async function deleteHabitFromGoogleCalendar(
     console.warn(`Error deleting calendar event ${eventId}:`, err);
     return false;
   }
+}
+
+/**
+ * Deletes ONLY calendar events created by Daily Habits when the user disconnects
+ * and selects the option to remove events. Never deletes unrelated user events.
+ */
+export async function deleteAllDailyHabitCalendarEvents(
+  token: string,
+  habits?: HabitItem[]
+): Promise<{ deletedCount: number }> {
+  if (!token) return { deletedCount: 0 };
+
+  const eventIdsToDelete = new Set<string>();
+
+  // 1. Gather all event IDs stored on current habits
+  if (habits && habits.length > 0) {
+    for (const h of habits) {
+      if (h.googleCalendarEventId) {
+        eventIdsToDelete.add(h.googleCalendarEventId);
+      }
+    }
+  }
+
+  // 2. Query calendar specifically for Daily Habits events
+  try {
+    const events = await fetchDailyHabitCalendarEvents(token);
+    for (const ev of events) {
+      if (
+        ev.id &&
+        (ev.extendedProperties?.private?.app === 'daily-habits' ||
+          (typeof ev.summary === 'string' && ev.summary.toLowerCase().startsWith('daily habit')))
+      ) {
+        eventIdsToDelete.add(ev.id);
+      }
+    }
+  } catch (e) {
+    console.warn('Notice querying events for bulk disconnect cleanup:', e);
+  }
+
+  let deletedCount = 0;
+  for (const eventId of eventIdsToDelete) {
+    try {
+      const ok = await deleteHabitFromGoogleCalendar(eventId, token);
+      if (ok) deletedCount++;
+    } catch (err) {
+      console.warn(`Could not delete event ${eventId} during disconnect:`, err);
+    }
+  }
+
+  return { deletedCount };
 }

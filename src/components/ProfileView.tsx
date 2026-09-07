@@ -12,9 +12,12 @@ import {
   Check,
   CheckCircle2,
   Unlink,
+  Lock,
+  ArrowRight,
 } from 'lucide-react';
 import { UserProfile, ThemeMode, HabitItem, DailyLogData, CalendarSyncResult } from '../types';
 import { calculateAge, isValidDateOfBirth, getLocalDateKey } from '../lib/dateUtils';
+import { getUserFriendlyErrorMessage } from '../lib/errorUtils';
 
 interface ProfileViewProps {
   user: UserProfile | null;
@@ -30,7 +33,7 @@ interface ProfileViewProps {
     lastGoogleCalendarSync?: string;
   }) => Promise<void>;
   onConnectGoogleCalendar: () => Promise<void>;
-  onDisconnectGoogleCalendar: () => Promise<void>;
+  onDisconnectGoogleCalendar: (removeEvents?: boolean) => Promise<void>;
   onSyncHabitsToCalendar: () => Promise<CalendarSyncResult | null>;
   isSyncingCalendar?: boolean;
   theme: ThemeMode;
@@ -77,11 +80,15 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   const [isClearingData, setIsClearingData] = useState(false);
   const [isClearSuccess, setIsClearSuccess] = useState(false);
   const [showDeleteAccountConfirm, setShowDeleteAccountConfirm] = useState(false);
+  const [deleteAccountStep, setDeleteAccountStep] = useState<1 | 2>(1);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [accountActionError, setAccountActionError] = useState<string | null>(null);
 
   // Calendar sync feedback
   const [isConnectingCalendar, setIsConnectingCalendar] = useState(false);
+  const [showDisconnectCalendarConfirm, setShowDisconnectCalendarConfirm] = useState(false);
+  const [removeEventsOnDisconnect, setRemoveEventsOnDisconnect] = useState(false);
+  const [isDisconnectingCalendar, setIsDisconnectingCalendar] = useState(false);
   const [calendarActionError, setCalendarActionError] = useState<string | null>(null);
   const [calendarSyncSuccessMessage, setCalendarSyncSuccessMessage] = useState<string | null>(null);
   const [exportSuccess, setExportSuccess] = useState(false);
@@ -108,29 +115,50 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
       setFormError('Display name cannot be empty.');
       return;
     }
+    if (trimmedName.length > 80) {
+      setFormError('Display name cannot exceed 80 characters.');
+      return;
+    }
 
     if (dobInput && !isValidDateOfBirth(dobInput)) {
       setFormError('Please select a valid past date of birth.');
       return;
     }
 
-    const numHeight = heightInput.trim() ? parseFloat(heightInput.trim()) : undefined;
-    const numWeight = weightInput.trim() ? parseFloat(weightInput.trim()) : undefined;
+    let numHeight: number | undefined = undefined;
+    if (heightInput.trim()) {
+      const parsed = parseFloat(heightInput.trim());
+      if (isNaN(parsed) || !isFinite(parsed) || parsed <= 0 || parsed > 350) {
+        setFormError('Please enter a realistic height (1 - 350 cm).');
+        return;
+      }
+      numHeight = parsed;
+    }
+
+    let numWeight: number | undefined = undefined;
+    if (weightInput.trim()) {
+      const parsed = parseFloat(weightInput.trim());
+      if (isNaN(parsed) || !isFinite(parsed) || parsed <= 0 || parsed > 500) {
+        setFormError('Please enter a realistic weight (1 - 500 kg).');
+        return;
+      }
+      numWeight = parsed;
+    }
 
     setIsSavingProfile(true);
     try {
       await onUpdateProfile({
         displayName: trimmedName,
         dateOfBirth: dobInput || undefined,
-        height: numHeight && numHeight > 0 ? numHeight : undefined,
+        height: numHeight,
         heightUnit,
-        weight: numWeight && numWeight > 0 ? numWeight : undefined,
+        weight: numWeight,
         weightUnit,
       });
       setProfileSavedSuccess(true);
       setTimeout(() => setProfileSavedSuccess(false), 3000);
-    } catch {
-      setFormError('Failed to update profile. Please try again.');
+    } catch (err) {
+      setFormError(getUserFriendlyErrorMessage(err));
     } finally {
       setIsSavingProfile(false);
     }
@@ -175,10 +203,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
       await onClearData();
       setIsClearSuccess(true);
       setShowClearDataConfirm(false);
-      setTimeout(() => setIsClearSuccess(false), 4000);
+      setTimeout(() => setIsClearSuccess(false), 5000);
     } catch (err: any) {
       console.error('Clear data error:', err);
-      setAccountActionError(err?.message || 'Failed to clear data. Please try again.');
+      setAccountActionError(getUserFriendlyErrorMessage(err));
     } finally {
       setIsClearingData(false);
     }
@@ -192,9 +220,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
       await onDeleteAccount();
     } catch (err: any) {
       console.error('Delete account error:', err);
-      setAccountActionError(
-        err?.message || 'Failed to delete account. You may need to sign in again first.'
-      );
+      setAccountActionError(getUserFriendlyErrorMessage(err));
       setIsDeletingAccount(false);
     }
   };
@@ -300,6 +326,30 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         </h3>
 
         <form onSubmit={handleSaveProfile} className="space-y-3">
+          {/* Authenticated Google Account / Gmail (Read-Only) */}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label htmlFor="view-edit-email-input" className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                Google Account / Gmail
+              </label>
+              <span className="inline-flex items-center gap-1 text-[10px] font-medium text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded-md">
+                <Lock className="w-3 h-3" />
+                Read-only
+              </span>
+            </div>
+            <input
+              id="view-edit-email-input"
+              type="email"
+              readOnly
+              disabled
+              value={user?.email || 'Authenticated via Google'}
+              className="w-full px-3 py-2 text-xs font-mono bg-zinc-100/80 dark:bg-zinc-800/60 text-zinc-500 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700/60 rounded-xl cursor-not-allowed select-all"
+            />
+            <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-1">
+              Your email is verified and secured by Google Authentication.
+            </p>
+          </div>
+
           {/* Name */}
           <div>
             <label htmlFor="view-edit-name-input" className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
@@ -429,8 +479,12 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             <button
               type="button"
               id="profile-disconnect-calendar-btn"
-              onClick={onDisconnectGoogleCalendar}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:text-red-600 dark:hover:text-red-400 bg-zinc-100 dark:bg-zinc-800/80 rounded-xl transition-colors cursor-pointer shrink-0"
+              onClick={() => {
+                setCalendarActionError(null);
+                setRemoveEventsOnDisconnect(false);
+                setShowDisconnectCalendarConfirm(true);
+              }}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:text-red-600 dark:hover:text-red-400 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800/80 dark:hover:bg-zinc-700/80 rounded-xl transition-colors cursor-pointer shrink-0 min-h-[36px]"
             >
               <Unlink className="w-3.5 h-3.5" />
               <span>Disconnect</span>
@@ -451,50 +505,67 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                 }
               }}
               disabled={isConnectingCalendar}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white dark:text-zinc-900 bg-zinc-900 dark:bg-zinc-100 hover:bg-zinc-800 dark:hover:bg-white rounded-xl transition-colors cursor-pointer shrink-0 min-h-[36px]"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-white dark:text-zinc-900 bg-zinc-900 dark:bg-zinc-100 hover:bg-zinc-800 dark:hover:bg-white rounded-xl transition-colors cursor-pointer shrink-0 min-h-[36px]"
             >
               <Calendar className="w-3.5 h-3.5" />
-              <span>{isConnectingCalendar ? 'Connecting...' : 'Connect Calendar'}</span>
+              <span>{isConnectingCalendar ? 'Connecting...' : 'Connect Google Calendar'}</span>
             </button>
           )}
         </div>
 
         {user?.googleCalendarConnected && (
-          <div className="p-3 bg-emerald-500/10 dark:bg-emerald-500/15 border border-emerald-500/30 rounded-xl space-y-2">
-            <div className="flex items-center justify-between gap-2">
+          <div className="p-3.5 bg-emerald-500/10 dark:bg-emerald-500/15 border border-emerald-500/30 rounded-xl space-y-2.5">
+            <div className="flex items-center justify-between gap-3 flex-wrap sm:flex-nowrap">
               <div className="flex items-center gap-2 min-w-0">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                <span className="text-xs font-semibold text-emerald-900 dark:text-emerald-300 truncate">
-                  Connected to {user.googleCalendarEmail || user.email}
-                </span>
+                <div className="min-w-0">
+                  <span className="text-xs font-bold text-emerald-950 dark:text-emerald-200 block truncate">
+                    ✓ Google Calendar Connected
+                  </span>
+                  {user.googleCalendarEmail && (
+                    <span className="text-[11px] text-emerald-800/80 dark:text-emerald-300/80 truncate block font-mono">
+                      {user.googleCalendarEmail}
+                    </span>
+                  )}
+                </div>
               </div>
+
               <button
                 type="button"
                 id="profile-sync-calendar-btn"
                 onClick={async () => {
-                  const res = await onSyncHabitsToCalendar();
-                  if (res) {
-                    setCalendarSyncSuccessMessage(
-                      `Synced ${res.syncedHabitsCount} habits to your calendar.`
-                    );
-                    setTimeout(() => setCalendarSyncSuccessMessage(null), 4000);
+                  setCalendarActionError(null);
+                  setCalendarSyncSuccessMessage(null);
+                  try {
+                    const res = await onSyncHabitsToCalendar();
+                    if (res) {
+                      if (res.success) {
+                        setCalendarSyncSuccessMessage('Habits synced with Google Calendar.');
+                      } else {
+                        setCalendarActionError(res.error || 'Failed to sync habits with Google Calendar.');
+                      }
+                      setTimeout(() => setCalendarSyncSuccessMessage(null), 5000);
+                    }
+                  } catch (err: any) {
+                    setCalendarActionError(err?.message || 'Failed to sync habits with Google Calendar.');
                   }
                 }}
                 disabled={isSyncingCalendar}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-emerald-950 dark:text-emerald-200 bg-emerald-100 dark:bg-emerald-950/60 hover:bg-emerald-200 dark:hover:bg-emerald-900 rounded-lg cursor-pointer transition-colors shrink-0"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-emerald-950 dark:text-emerald-200 bg-emerald-100 dark:bg-emerald-950/70 hover:bg-emerald-200 dark:hover:bg-emerald-900 border border-emerald-300/60 dark:border-emerald-700/60 rounded-xl cursor-pointer transition-colors shrink-0 min-h-[34px]"
               >
-                <RefreshCw className={`w-3 h-3 ${isSyncingCalendar ? 'animate-spin' : ''}`} />
-                <span>Sync Now</span>
+                <RefreshCw className={`w-3.5 h-3.5 ${isSyncingCalendar ? 'animate-spin' : ''}`} />
+                <span>{isSyncingCalendar ? 'Syncing...' : 'Sync Habits'}</span>
               </button>
             </div>
 
             <p className="text-[11px] text-zinc-600 dark:text-zinc-400">
-              Syncs your habit schedules with Google Calendar events.
+              Your scheduled habits synchronize automatically as recurring events on your primary Google Calendar.
             </p>
 
             {calendarSyncSuccessMessage && (
-              <p className="text-[11px] text-emerald-700 dark:text-emerald-300 font-medium">
-                {calendarSyncSuccessMessage}
+              <p className="text-xs text-emerald-700 dark:text-emerald-300 font-semibold flex items-center gap-1">
+                <Check className="w-3.5 h-3.5" />
+                <span>{calendarSyncSuccessMessage}</span>
               </p>
             )}
           </div>
@@ -521,7 +592,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
         {isClearSuccess && (
           <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-400 rounded-xl text-xs font-medium">
-            ✓ Daily Habits data has been cleared successfully.
+            ✓ Your data has been cleared.
           </div>
         )}
 
@@ -595,6 +666,76 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         </div>
       </section>
 
+      {/* Confirmation Modal: Disconnect Google Calendar */}
+      {showDisconnectCalendarConfirm && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 max-w-md w-full space-y-4 shadow-xl animate-scaleUp">
+            <div className="flex items-center gap-2.5 text-zinc-900 dark:text-zinc-100">
+              <Unlink className="w-5 h-5 text-amber-500 shrink-0" />
+              <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
+                Disconnect Google Calendar?
+              </h3>
+            </div>
+
+            <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
+              Your habits will continue working, but future Calendar synchronization will stop.
+            </p>
+
+            <div className="p-3 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700/60 rounded-xl space-y-1.5">
+              <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={removeEventsOnDisconnect}
+                  onChange={(e) => setRemoveEventsOnDisconnect(e.target.checked)}
+                  className="mt-0.5 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900 dark:border-zinc-600 dark:bg-zinc-700"
+                />
+                <div className="space-y-0.5">
+                  <span className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 block">
+                    Remove Daily Habits events from Google Calendar?
+                  </span>
+                  <span className="text-[11px] text-zinc-500 dark:text-zinc-400 block leading-tight">
+                    {removeEventsOnDisconnect
+                      ? 'Will remove ONLY events created by Daily Habits. Your habits will not be deleted.'
+                      : 'Existing Daily Habits events will remain on your Google Calendar.'}
+                  </span>
+                </div>
+              </label>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowDisconnectCalendarConfirm(false)}
+                disabled={isDisconnectingCalendar}
+                className="px-4 py-2 text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                id="confirm-disconnect-calendar-btn"
+                onClick={async () => {
+                  setIsDisconnectingCalendar(true);
+                  setCalendarActionError(null);
+                  try {
+                    await onDisconnectGoogleCalendar(removeEventsOnDisconnect);
+                    setShowDisconnectCalendarConfirm(false);
+                  } catch (err: any) {
+                    setCalendarActionError(err?.message || 'Failed to disconnect Google Calendar.');
+                  } finally {
+                    setIsDisconnectingCalendar(false);
+                  }
+                }}
+                disabled={isDisconnectingCalendar}
+                className="px-4 py-2 text-xs font-semibold text-white bg-zinc-900 dark:bg-zinc-100 dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-white rounded-xl transition-colors cursor-pointer disabled:opacity-50"
+              >
+                {isDisconnectingCalendar ? 'Disconnecting...' : 'Disconnect'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Confirmation Modal: Clear Data */}
       {showClearDataConfirm && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
@@ -602,11 +743,11 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             <div className="flex items-center gap-2.5 text-amber-600 dark:text-amber-400">
               <AlertTriangle className="w-5 h-5 shrink-0" />
               <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
-                Clear all data?
+                Clear all your Daily Habits data?
               </h3>
             </div>
             <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
-              This will permanently remove your habits, completion history, notes, milestones, streak history, and other Daily Habits data. Your account and Google login will remain.
+              This will remove all your habits, completion logs, notes, goals, and streak history. Your Daily Habits account and Google login will remain active.
             </p>
             <div className="flex items-center justify-end gap-2.5 pt-2">
               <button
@@ -630,37 +771,76 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         </div>
       )}
 
-      {/* Confirmation Modal: Delete Account */}
+      {/* Confirmation Modal: Delete Account (Two-Step Flow) */}
       {showDeleteAccountConfirm && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 max-w-md w-full space-y-4 shadow-xl animate-scaleUp">
-            <div className="flex items-center gap-2.5 text-red-600 dark:text-red-400">
-              <Trash2 className="w-5 h-5 shrink-0" />
-              <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
-                Delete account permanently?
-              </h3>
-            </div>
-            <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
-              This action cannot be undone. All your habits, completion history, notes, streaks, and profile data will be permanently wiped, and your Daily Habits account will be closed.
-            </p>
-            <div className="flex items-center justify-end gap-2.5 pt-2">
-              <button
-                type="button"
-                onClick={() => setShowDeleteAccountConfirm(false)}
-                disabled={isDeletingAccount}
-                className="px-4 py-2 text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleExecuteDeleteAccount}
-                disabled={isDeletingAccount}
-                className="px-4 py-2 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 rounded-xl transition-colors cursor-pointer"
-              >
-                {isDeletingAccount ? 'Deleting Account...' : 'Delete Account'}
-              </button>
-            </div>
+            {deleteAccountStep === 1 ? (
+              <>
+                <div className="flex items-center gap-2.5 text-red-600 dark:text-red-400">
+                  <AlertTriangle className="w-5 h-5 shrink-0" />
+                  <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
+                    Delete your account?
+                  </h3>
+                </div>
+                <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                  Are you sure you want to delete your Daily Habits account? This will initiate the account deletion process and permanently remove your records.
+                </p>
+                <div className="flex items-center justify-end gap-2.5 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowDeleteAccountConfirm(false);
+                      setDeleteAccountStep(1);
+                    }}
+                    className="px-4 py-2 text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDeleteAccountStep(2)}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 rounded-xl transition-colors cursor-pointer"
+                  >
+                    <span>Continue</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center gap-2.5 text-red-600 dark:text-red-400">
+                  <Trash2 className="w-5 h-5 shrink-0" />
+                  <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 leading-snug">
+                    This permanently deletes your Daily Habits account and associated data.
+                  </h3>
+                </div>
+                <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                  This action is permanent and cannot be undone. All your habits, completion logs, notes, streaks, and personal records will be permanently removed from Firestore and local caches. Your Google account itself will not be deleted.
+                </p>
+                <div className="flex items-center justify-end gap-2.5 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowDeleteAccountConfirm(false);
+                      setDeleteAccountStep(1);
+                    }}
+                    disabled={isDeletingAccount}
+                    className="px-4 py-2 text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleExecuteDeleteAccount}
+                    disabled={isDeletingAccount}
+                    className="px-4 py-2 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 rounded-xl transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    {isDeletingAccount ? 'Deleting Account...' : 'Delete Account'}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

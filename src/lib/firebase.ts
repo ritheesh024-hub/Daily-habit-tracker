@@ -1,6 +1,11 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import {
+  getFirestore,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+} from 'firebase/firestore';
 import { getAnalytics, isSupported } from 'firebase/analytics';
 import fallbackConfig from '../../firebase-applet-config.json';
 
@@ -47,10 +52,27 @@ if (typeof window !== 'undefined') {
   });
 }
 
-// Use standard getFirestore for reliable online database syncing and connection management
-export const db =
-  firestoreDatabaseId && firestoreDatabaseId !== '(default)'
-    ? getFirestore(app, firestoreDatabaseId)
-    : getFirestore(app);
+// Initialize Firestore with robust multi-tab persistent offline caching
+let firestoreDb;
+try {
+  firestoreDb = initializeFirestore(
+    app,
+    {
+      localCache: persistentLocalCache({
+        tabManager: persistentMultipleTabManager(),
+      }),
+    },
+    firestoreDatabaseId && firestoreDatabaseId !== '(default)' ? firestoreDatabaseId : undefined
+  );
+} catch {
+  // If already initialized or running in an environment without IndexedDB
+  firestoreDb =
+    firestoreDatabaseId && firestoreDatabaseId !== '(default)'
+      ? getFirestore(app, firestoreDatabaseId)
+      : getFirestore(app);
+}
+
+export const db = firestoreDb;
 
 export default app;
+

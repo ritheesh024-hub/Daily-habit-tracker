@@ -55,6 +55,16 @@ service cloud.firestore {
       match /weightHistory/{entryId} {
         allow read, write: if isOwner(userId);
       }
+
+      // Personal habit goals subcollection
+      match /goals/{goalId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      // Achievements unlock subcollection
+      match /achievements/{achievementId} {
+        allow read, write: if isOwner(userId);
+      }
     }
   }
 }

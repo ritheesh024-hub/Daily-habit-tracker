@@ -27,8 +27,10 @@ import {
   DailyLogData,
   UserProfile,
   WeightHistoryEntry,
+  GoalWithProgress,
 } from '../types';
 import { HabitIcon } from './HabitIcon';
+import { GoalCard } from './GoalCard';
 import {
   getMonthCalendarDays,
   formatMonthYear,
@@ -55,6 +57,9 @@ interface AnalyticsViewProps {
   userProfile?: UserProfile | null;
   weightHistory?: WeightHistoryEntry[];
   onOpenWeightModal?: () => void;
+  goals?: GoalWithProgress[];
+  onOpenNewGoal?: () => void;
+  onNavigateToFuture?: () => void;
 }
 
 /**
@@ -120,6 +125,9 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
   userProfile,
   weightHistory = [],
   onOpenWeightModal,
+  goals = [],
+  onOpenNewGoal,
+  onNavigateToFuture,
 }) => {
   const safeToday = todayDate ? getLocalDateKey(todayDate) : getTodayDateString();
   const [todayYear, todayMonth] = safeToday.split('-').map(Number);
@@ -734,6 +742,60 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
       </section>
 
       {/* ========================================================= */}
+      {/* ACTIVE HABIT GOALS OVERVIEW                               */}
+      {/* ========================================================= */}
+      {goals.length > 0 ? (
+        <section id="analytics-active-goals" className="space-y-3">
+          <div className="flex items-center justify-between px-1">
+            <div className="flex items-center gap-2">
+              <Target className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+              <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider">
+                Habit Goals
+              </h3>
+            </div>
+            {onNavigateToFuture && (
+              <button
+                type="button"
+                onClick={onNavigateToFuture}
+                className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1"
+              >
+                <span>View All & Manage</span>
+                <span>→</span>
+              </button>
+            )}
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {goals.slice(0, 4).map((goal) => (
+              <GoalCard key={goal.id} goal={goal} compact />
+            ))}
+          </div>
+        </section>
+      ) : onOpenNewGoal ? (
+        <div className="p-4 glass-card rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 border border-dashed border-indigo-300/60 dark:border-indigo-800/40 bg-indigo-50/20 dark:bg-indigo-950/10">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+              <Target className="w-4 h-4" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-zinc-900 dark:text-zinc-100">
+                Set a Personal Habit Target
+              </p>
+              <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                Aim for completion milestones this week or month to stay motivated.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onOpenNewGoal}
+            className="px-3.5 py-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-sm transition-colors shrink-0"
+          >
+            + Set Goal
+          </button>
+        </div>
+      ) : null}
+
+      {/* ========================================================= */}
       {/* 1. WEEKLY HABIT TREND (Smooth Connected Line Graph)      */}
       {/* ========================================================= */}
       <section
@@ -1059,22 +1121,22 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
               </span>
               {intelligence.mostConsistentHabit && (
                 <span className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                  {intelligence.mostConsistentHabit.completionRate}%
+                  {intelligence.mostConsistentHabit.percentage}%
                 </span>
               )}
             </div>
             {intelligence.mostConsistentHabit ? (
               <div className="flex items-center gap-2.5">
                 <HabitIcon
-                  iconName={intelligence.mostConsistentHabit.habit.icon}
+                  name={intelligence.mostConsistentHabit.icon}
                   className="w-7 h-7 p-1.5 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 shrink-0"
                 />
                 <div className="min-w-0 flex-1">
                   <h4 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 truncate">
-                    {intelligence.mostConsistentHabit.habit.title}
+                    {intelligence.mostConsistentHabit.name}
                   </h4>
                   <p className="text-[11px] text-zinc-500 dark:text-zinc-400 font-mono">
-                    {intelligence.mostConsistentHabit.totalCompletions} completions • {intelligence.mostConsistentHabit.currentStreak}d streak
+                    {intelligence.mostConsistentHabit.completedDays} completions
                   </p>
                 </div>
               </div>
@@ -1094,22 +1156,22 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
               </span>
               {intelligence.leastConsistentHabit && (
                 <span className="text-xs font-mono font-bold text-amber-600 dark:text-amber-400">
-                  {intelligence.leastConsistentHabit.completionRate}%
+                  {intelligence.leastConsistentHabit.percentage}%
                 </span>
               )}
             </div>
             {intelligence.leastConsistentHabit ? (
               <div className="flex items-center gap-2.5">
                 <HabitIcon
-                  iconName={intelligence.leastConsistentHabit.habit.icon}
+                  name={intelligence.leastConsistentHabit.icon}
                   className="w-7 h-7 p-1.5 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 shrink-0"
                 />
                 <div className="min-w-0 flex-1">
                   <h4 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 truncate">
-                    {intelligence.leastConsistentHabit.habit.title}
+                    {intelligence.leastConsistentHabit.name}
                   </h4>
                   <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
-                    {intelligence.leastConsistentHabit.habit.title} could use a little more consistency.
+                    {intelligence.leastConsistentHabit.name} could use a little more consistency.
                   </p>
                 </div>
               </div>
@@ -1128,10 +1190,10 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
             {intelligence.strongestDay ? (
               <div className="flex items-baseline justify-between">
                 <span className="text-base font-bold text-zinc-900 dark:text-zinc-100">
-                  {intelligence.strongestDay.dayName}
+                  {intelligence.strongestDay.name}
                 </span>
                 <span className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                  {intelligence.strongestDay.completionPercentage}% avg
+                  {intelligence.strongestDay.percentage}% avg
                 </span>
               </div>
             ) : (
@@ -1141,7 +1203,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
             )}
             <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
               {intelligence.strongestDay
-                ? `You perform best on ${intelligence.strongestDay.dayName}s.`
+                ? `You perform best on ${intelligence.strongestDay.name}s.`
                 : 'Keep logging to see your peak day.'}
             </p>
           </div>
@@ -1151,13 +1213,13 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
             <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 block">
               Room for Growth Day
             </span>
-            {intelligence.leastConsistentDay ? (
+            {intelligence.roomForImprovementDay ? (
               <div className="flex items-baseline justify-between">
                 <span className="text-base font-bold text-zinc-900 dark:text-zinc-100">
-                  {intelligence.leastConsistentDay.dayName}
+                  {intelligence.roomForImprovementDay.name}
                 </span>
                 <span className="text-xs font-mono font-bold text-zinc-600 dark:text-zinc-300">
-                  {intelligence.leastConsistentDay.completionPercentage}% avg
+                  {intelligence.roomForImprovementDay.percentage}% avg
                 </span>
               </div>
             ) : (
@@ -1166,8 +1228,8 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
               </p>
             )}
             <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
-              {intelligence.leastConsistentDay
-                ? `Plan ahead to boost your habits on ${intelligence.leastConsistentDay.dayName}s.`
+              {intelligence.roomForImprovementDay
+                ? `Plan ahead to boost your habits on ${intelligence.roomForImprovementDay.name}s.`
                 : 'Keep logging to discover optimization areas.'}
             </p>
           </div>

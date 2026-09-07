@@ -1,12 +1,17 @@
 import React from 'react';
-import { UserProfile } from '../types';
+import { UserProfile, ConnectionStatus } from '../types';
 import { formatHeaderFullDate } from '../lib/dateUtils';
+import { ConnectionStatusIndicator } from './ConnectionStatusIndicator';
+import { PWAInstallButton } from './PWAInstallButton';
 
 interface HeaderProps {
   user: UserProfile | null;
   currentDate: string;
   onOpenProfile: () => void;
   isSyncing?: boolean;
+  connectionStatus?: ConnectionStatus;
+  pendingCount?: number;
+  onSyncNow?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -14,13 +19,16 @@ export const Header: React.FC<HeaderProps> = ({
   currentDate,
   onOpenProfile,
   isSyncing = false,
+  connectionStatus = 'online',
+  pendingCount = 0,
+  onSyncNow,
 }) => {
   return (
     <header
       id="app-header"
       className="sticky top-0 z-40 w-full glass-surface border-b border-zinc-200/70 dark:border-white/10 py-2.5 sm:py-3 px-3.5 sm:px-6 transition-all duration-200 shadow-xs"
     >
-      <div className="max-w-2xl mx-auto flex items-center justify-between gap-4">
+      <div className="max-w-2xl mx-auto flex items-center justify-between gap-3">
         {/* Left: Logo, Project Name & Today's Date */}
         <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
           {/* Logo */}
@@ -72,13 +80,6 @@ export const Header: React.FC<HeaderProps> = ({
               <h1 id="app-title" className="text-sm sm:text-base font-semibold tracking-tight text-zinc-900 dark:text-zinc-100 leading-tight">
                 Daily Habits
               </h1>
-              {isSyncing && (
-                <span
-                  id="sync-status"
-                  className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse ring-2 ring-emerald-500/20"
-                  title="Saving changes..."
-                />
-              )}
             </div>
             <p id="header-date" className="text-[11px] sm:text-xs text-zinc-500 dark:text-zinc-400 font-normal leading-tight truncate">
               {formatHeaderFullDate(currentDate)}
@@ -86,15 +87,23 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        {/* Right: Authenticated User Profile Photo */}
-        <div className="flex items-center shrink-0">
+        {/* Right: Status Indicator, PWA Install & Authenticated User Profile Photo */}
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          <ConnectionStatusIndicator
+            status={isSyncing ? 'syncing' : connectionStatus}
+            pendingCount={pendingCount}
+            onSyncNow={onSyncNow}
+          />
+
+          <PWAInstallButton className="hidden sm:inline-flex" />
+
           <button
             id="user-profile-btn"
             type="button"
             onClick={onOpenProfile}
             aria-label="Open Profile and Settings"
             title="Open Profile and Settings"
-            className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full hover:opacity-90 active:scale-95 focus-visible:ring-2 focus-visible:ring-zinc-900 dark:focus-visible:ring-zinc-100 focus-visible:outline-none transition-all duration-150 cursor-pointer group"
+            className="min-w-[40px] min-h-[40px] sm:min-w-[44px] sm:min-h-[44px] flex items-center justify-center rounded-full hover:opacity-90 active:scale-95 focus-visible:ring-2 focus-visible:ring-zinc-900 dark:focus-visible:ring-zinc-100 focus-visible:outline-none transition-all duration-150 cursor-pointer group"
           >
             {user?.photoURL ? (
               <img
@@ -119,4 +128,5 @@ export const Header: React.FC<HeaderProps> = ({
     </header>
   );
 };
+
 
