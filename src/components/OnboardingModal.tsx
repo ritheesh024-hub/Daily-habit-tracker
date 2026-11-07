@@ -20,6 +20,7 @@ import { HabitModal } from './HabitModal';
 import { calculateAge, isValidDateOfBirth, getLocalDateKey } from '../lib/dateUtils';
 
 interface OnboardingModalProps {
+  isOpen?: boolean;
   user: UserProfile;
   onComplete: (data: {
     displayName: string;
@@ -31,13 +32,17 @@ interface OnboardingModalProps {
     habits: HabitItem[];
   }) => Promise<void>;
   isLoading?: boolean;
+  onSignOut?: () => void | Promise<void>;
 }
 
 export const OnboardingModal: React.FC<OnboardingModalProps> = ({
+  isOpen = true,
   user,
   onComplete,
   isLoading = false,
+  onSignOut,
 }) => {
+  if (!isOpen) return null;
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
 
   // Step 1: Profile State

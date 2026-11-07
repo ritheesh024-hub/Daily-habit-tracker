@@ -1,7 +1,7 @@
 import React from 'react';
-import { CheckSquare, PlusCircle, BarChart3, Sparkles, User } from 'lucide-react';
+import { CheckSquare, PlusCircle, BarChart3, Sparkles, User, Activity } from 'lucide-react';
 
-export type MainNavTab = 'task' | 'new_habit' | 'analytics' | 'future' | 'profile';
+export type MainNavTab = 'task' | 'daily_run' | 'new_habit' | 'analytics' | 'future' | 'profile';
 
 interface BottomNavProps {
   activeTab: MainNavTab;
@@ -16,6 +16,7 @@ interface NavItemConfig {
 
 const NAV_ITEMS: NavItemConfig[] = [
   { id: 'task', label: 'Task', icon: CheckSquare },
+  { id: 'daily_run', label: 'Daily Run', icon: Activity },
   { id: 'new_habit', label: 'New Habit', icon: PlusCircle },
   { id: 'analytics', label: 'Analytics', icon: BarChart3 },
   { id: 'future', label: 'Future', icon: Sparkles },
@@ -59,16 +60,26 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onSelectTab }) 
                 {isActive && (
                   <span
                     aria-hidden="true"
-                    className="absolute -top-1 -right-1 w-1.5 h-1.5 rounded-full bg-zinc-900 dark:bg-zinc-100"
+                    className={`absolute -top-1 -right-1 w-1.5 h-1.5 rounded-full ${
+                      item.id === 'daily_run'
+                        ? 'bg-orange-500'
+                        : 'bg-zinc-900 dark:bg-zinc-100'
+                    }`}
                   />
                 )}
               </div>
               <span
-                className={`text-[11px] sm:text-xs leading-none mt-1 tracking-tight truncate max-w-full ${
+                className={`text-[10px] sm:text-xs leading-none mt-1 tracking-tight truncate max-w-full ${
                   isActive ? 'font-semibold text-zinc-950 dark:text-zinc-100' : 'text-zinc-500 dark:text-zinc-400'
                 }`}
               >
-                {item.label}
+                {item.id === 'daily_run' ? (
+                  <>
+                    <span className="hidden sm:inline">Daily </span>Run
+                  </>
+                ) : (
+                  item.label
+                )}
               </span>
             </button>
           );

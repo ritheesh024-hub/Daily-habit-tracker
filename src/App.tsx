@@ -121,6 +121,7 @@ import { HabitModal } from './components/HabitModal';
 import { HabitDetailsModal } from './components/HabitDetailsModal';
 import { GoalModal } from './components/GoalModal';
 import { GoalCelebrationModal } from './components/GoalCelebrationModal';
+import { DailyRunPage } from './features/daily-run/pages/DailyRunPage';
 
 const DEFAULT_ANALYTICS: AnalyticsStats = {
   currentStreak: 0,
@@ -1673,6 +1674,14 @@ export function App() {
               onSelectDate={handleSelectDate}
             />
           </div>
+        )}
+
+        {/* MODULE: DAILY RUN (Strava-inspired Run Tracking) */}
+        {activeTab === 'daily_run' && (
+          <DailyRunPage
+            user={currentUser}
+            onNavigateToHabits={() => setActiveTab('task')}
+          />
         )}
 
         {/* MODULE 2: NEW HABIT (Manage Habits View) */}
