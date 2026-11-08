@@ -161,8 +161,8 @@ export const HabitRow: React.FC<HabitRowProps> = ({
             onClick={handleCheckboxClick}
             className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl border flex items-center justify-center transition-all duration-200 cursor-pointer active:scale-90 ${
               completed
-                ? 'bg-zinc-900 dark:bg-zinc-100 border-zinc-900 dark:border-zinc-100 text-white dark:text-zinc-900 shadow-xs'
-                : 'border-zinc-300/80 dark:border-zinc-700 bg-white/90 dark:bg-zinc-800/90 text-transparent hover:border-zinc-400 dark:hover:border-zinc-500 hover:scale-105'
+                ? 'bg-emerald-500 border-emerald-500 text-zinc-950 shadow-sm shadow-emerald-500/25'
+                : 'border-zinc-300/80 dark:border-zinc-700 bg-white/90 dark:bg-zinc-800/90 text-transparent hover:border-emerald-500/60 dark:hover:border-emerald-500/50 hover:scale-105'
             }`}
           >
             <Check

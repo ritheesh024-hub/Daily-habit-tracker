@@ -18,6 +18,7 @@ import {
 import { UserProfile, ThemeMode, HabitItem, DailyLogData, CalendarSyncResult } from '../types';
 import { calculateAge, isValidDateOfBirth, getLocalDateKey } from '../lib/dateUtils';
 import { getUserFriendlyErrorMessage } from '../lib/errorUtils';
+import { DailyHabitsLogo } from './DailyHabitsLogo';
 
 interface ProfileViewProps {
   user: UserProfile | null;
@@ -663,6 +664,26 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               Delete Account
             </button>
           </div>
+        </div>
+      </section>
+
+      {/* About Daily Habits Brand Card */}
+      <section className="glass-card rounded-2xl p-5 border border-zinc-200/80 dark:border-white/10 space-y-3">
+        <div className="flex items-center justify-between pb-3 border-b border-zinc-200/70 dark:border-white/10">
+          <DailyHabitsLogo size="sm" variant="full" showTagline={true} id="profile-about-brand" />
+          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+            PRO EDITION
+          </span>
+        </div>
+        <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
+          Daily Habits is your unified personal productivity and fitness workspace. Designed with zero bloat, client-first encryption, offline synchronization, and Cloud Firestore resilience.
+        </p>
+        <div className="flex items-center gap-3 text-[11px] font-mono text-zinc-400 dark:text-zinc-500 pt-1">
+          <span>Version 1.0.0</span>
+          <span>·</span>
+          <span>PWA Certified</span>
+          <span>·</span>
+          <span>Firestore Secured</span>
         </div>
       </section>
 

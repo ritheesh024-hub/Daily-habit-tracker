@@ -16,8 +16,9 @@ import {
 } from 'lucide-react';
 import { HabitItem, UserProfile, DEFAULT_HABITS } from '../types';
 import { HabitIcon } from './HabitIcon';
-import { HabitModal } from './HabitModal';
 import { calculateAge, isValidDateOfBirth, getLocalDateKey } from '../lib/dateUtils';
+import { HabitModal } from './HabitModal';
+import { DailyHabitsMark } from './DailyHabitsLogo';
 
 interface OnboardingModalProps {
   isOpen?: boolean;
@@ -212,11 +213,17 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
           {step === 1 && (
             <form onSubmit={handleNextFromStep1} className="space-y-4">
               <div className="mb-4">
+                <div className="flex items-center gap-2.5 mb-2.5">
+                  <DailyHabitsMark className="w-7 h-7" id="onboarding-step1-logo" />
+                  <span className="text-xs font-mono font-semibold uppercase text-emerald-600 dark:text-emerald-400">
+                    Welcome to Daily Habits
+                  </span>
+                </div>
                 <h2 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
-                  Welcome to Daily Habits
+                  Set Up Your Profile
                 </h2>
                 <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-                  Let’s set up your profile details. You can update these anytime.
+                  Let’s personalize your routine and fitness workspace. You can adjust these anytime.
                 </p>
               </div>
 
@@ -555,8 +562,8 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
           {step === 4 && (
             <div className="space-y-5">
               <div>
-                <div className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 mb-3 shadow-xs">
-                  <Sparkles className="w-5 h-5" />
+                <div className="mb-3">
+                  <DailyHabitsMark className="w-10 h-10" id="onboarding-step4-logo" />
                 </div>
                 <h2 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
                   You're all set, {displayName || 'Friend'}!

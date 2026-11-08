@@ -20,6 +20,7 @@ import {
   TrendingUp,
   Zap,
 } from 'lucide-react';
+import { DailyHabitsMark, DailyHabitsLogo } from './DailyHabitsLogo';
 
 interface LandingPageProps {
   onGetStarted: () => void;
@@ -65,15 +66,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 sm:h-16 flex items-center justify-between gap-4">
           {/* Logo & Brand */}
           <a href="#" className="flex items-center gap-2.5 sm:gap-3 group">
-            <div
-              id="landing-logo"
-              className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-zinc-900 border border-emerald-500/30 flex items-center justify-center shrink-0 shadow-2xs relative overflow-hidden group-hover:border-emerald-500/60 transition-colors"
-              aria-hidden="true"
-            >
-              <Check className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-emerald-400 stroke-[2.5]" />
+            <div id="landing-logo" className="shrink-0">
+              <DailyHabitsMark className="w-8 h-8 sm:w-9 sm:h-9" id="landing-header-mark" />
             </div>
             <div>
-              <span className="font-semibold text-sm sm:text-base tracking-tight text-white leading-tight">
+              <span className="font-bold text-sm sm:text-base tracking-tight text-white leading-tight">
                 Daily Habits
               </span>
             </div>
@@ -1080,12 +1077,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       {/* 9. Footer */}
       <footer className="py-8 px-4 sm:px-6 border-t border-white/10 bg-zinc-950 text-xs text-zinc-500">
         <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <div className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center text-[10px]">
-              ✓
-            </div>
-            <span className="font-semibold text-white">Daily Habits</span>
-            <span className="text-zinc-600 text-[11px]">v1.0</span>
+          <div className="flex items-center gap-2.5">
+            <DailyHabitsMark className="w-5 h-5" id="landing-footer-mark" />
+            <span className="font-bold text-white text-xs">Daily Habits</span>
+            <span className="text-zinc-600 text-[11px] font-mono">v1.0</span>
           </div>
 
           <div className="flex items-center gap-4 text-xs font-medium">

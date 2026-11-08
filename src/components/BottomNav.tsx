@@ -47,30 +47,26 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onSelectTab }) 
               onClick={() => onSelectTab(item.id)}
               className={`flex-1 min-w-0 min-h-[48px] py-1 px-1 sm:px-2 flex flex-col items-center justify-center rounded-xl transition-all duration-200 cursor-pointer select-none active:scale-95 group ${
                 isActive
-                  ? 'text-zinc-900 dark:text-zinc-50 font-semibold bg-zinc-200/60 dark:bg-zinc-800/70 shadow-xs'
-                  : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 font-medium hover:bg-zinc-100/50 dark:hover:bg-zinc-900/50'
+                  ? 'text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-500/10 dark:bg-emerald-500/15 border border-emerald-500/20 shadow-xs'
+                  : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 font-medium hover:bg-zinc-100/50 dark:hover:bg-zinc-900/50 border border-transparent'
               }`}
             >
               <div className="relative flex items-center justify-center">
                 <Icon
                   className={`w-5 h-5 transition-transform duration-200 ${
-                    isActive ? 'scale-110 text-zinc-900 dark:text-white' : 'group-hover:scale-105'
+                    isActive ? 'scale-110 text-emerald-600 dark:text-emerald-400' : 'group-hover:scale-105'
                   } ${isNewHabit && !isActive ? 'text-zinc-700 dark:text-zinc-300' : ''}`}
                 />
                 {isActive && (
                   <span
                     aria-hidden="true"
-                    className={`absolute -top-1 -right-1 w-1.5 h-1.5 rounded-full ${
-                      item.id === 'daily_run'
-                        ? 'bg-orange-500'
-                        : 'bg-zinc-900 dark:bg-zinc-100'
-                    }`}
+                    className="absolute -top-1 -right-1 w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_6px_#10b981]"
                   />
                 )}
               </div>
               <span
                 className={`text-[10px] sm:text-xs leading-none mt-1 tracking-tight truncate max-w-full ${
-                  isActive ? 'font-semibold text-zinc-950 dark:text-zinc-100' : 'text-zinc-500 dark:text-zinc-400'
+                  isActive ? 'font-bold text-emerald-600 dark:text-emerald-400' : 'text-zinc-500 dark:text-zinc-400'
                 }`}
               >
                 {item.id === 'daily_run' ? (

@@ -1,38 +1,95 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
   <defs>
-    <filter id="tick-blur" x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur stdDeviation="12" />
+    <!-- Background Gradient -->
+    <linearGradient id="dh-bg" x1="64" y1="48" x2="448" y2="464" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0F172A" />
+      <stop offset="50%" stop-color="#090D16" />
+      <stop offset="100%" stop-color="#04070D" />
+    </linearGradient>
+
+    <!-- Outer Border Glow Gradient -->
+    <linearGradient id="dh-border" x1="96" y1="64" x2="416" y2="448" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#34D399" stop-opacity="0.45" />
+      <stop offset="60%" stop-color="#10B981" stop-opacity="0.2" />
+      <stop offset="100%" stop-color="#06B6D4" stop-opacity="0.35" />
+    </linearGradient>
+
+    <!-- Primary Ribbon Gradient: Emerald to Cyan -->
+    <linearGradient id="dh-ribbon" x1="120" y1="360" x2="400" y2="140" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#059669" />
+      <stop offset="35%" stop-color="#10B981" />
+      <stop offset="70%" stop-color="#2DD4BF" />
+      <stop offset="100%" stop-color="#38BDF8" />
+    </linearGradient>
+
+    <!-- Glow Filter for Ambient Presence -->
+    <filter id="dh-glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="16" />
     </filter>
-    <radialGradient id="soft-illumination" cx="50%" cy="50%" r="50%">
-      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.16" />
-      <stop offset="60%" stop-color="#ffffff" stop-opacity="0.04" />
-      <stop offset="100%" stop-color="#ffffff" stop-opacity="0" />
-    </radialGradient>
   </defs>
 
-  <!-- Clean Circle Background -->
-  <circle cx="256" cy="256" r="256" fill="#18181b" />
-
-  <!-- Soft Central Illumination Light -->
-  <circle cx="256" cy="256" r="220" fill="url(#soft-illumination)" />
-
-  <!-- Subtle Soft Glow around Tick Mark -->
-  <path
-    d="M80 270L202 392L432 145"
-    stroke="#ffffff"
-    stroke-width="78"
-    stroke-linecap="round"
-    stroke-linejoin="round"
-    opacity="0.30"
-    filter="url(#tick-blur)"
+  <!-- Squircle Base Canvas -->
+  <rect
+    x="24"
+    y="24"
+    width="464"
+    height="464"
+    rx="124"
+    fill="url(#dh-bg)"
+  />
+  <rect
+    x="24"
+    y="24"
+    width="464"
+    height="464"
+    rx="124"
+    stroke="url(#dh-border)"
+    stroke-width="6"
   />
 
-  <!-- Prominent, Sharp & Bolder Zoomed Tick Mark -->
+  <!-- Subtle Radial Inner Atmosphere -->
+  <circle cx="256" cy="256" r="190" fill="#10B981" fill-opacity="0.06" />
+
+  <!-- Soft Ambient Glow Under Mark -->
+  <g filter="url(#dh-glow)" opacity="0.45">
+    <!-- Left Loop Arch -->
+    <path
+      d="M172 328 C128 328 104 290 104 246 C104 186 148 148 206 148 C258 148 296 182 308 232"
+      stroke="#10B981"
+      stroke-width="50"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+    <!-- Ascending Victory Check / Stride -->
+    <path
+      d="M148 262 L228 342 L408 162"
+      stroke="#38BDF8"
+      stroke-width="52"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+  </g>
+
+  <!-- Crisp Central Geometric Emblem: Interlocking Loop & Upward Stride Check -->
+  <!-- 1. The Daily Continuity Loop (Habit Cycle / Running Loop) -->
   <path
-    d="M80 270L202 392L432 145"
-    stroke="#ffffff"
-    stroke-width="58"
+    d="M184 324 C142 324 116 292 116 250 C116 196 156 160 212 160 C264 160 300 194 312 242"
+    stroke="url(#dh-ribbon)"
+    stroke-width="44"
     stroke-linecap="round"
     stroke-linejoin="round"
   />
+
+  <!-- 2. The Upward Momentum Check / Dynamic Stride (Progress & Achievement) -->
+  <path
+    d="M156 264 L228 336 L396 168"
+    stroke="url(#dh-ribbon)"
+    stroke-width="44"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+
+  <!-- Apex Accent Node (Precision Landmark / Habit Spark) -->
+  <circle cx="396" cy="168" r="14" fill="#E0F2FE" />
+  <circle cx="396" cy="168" r="8" fill="#38BDF8" />
 </svg>

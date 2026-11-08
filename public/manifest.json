@@ -1,14 +1,14 @@
 {
   "id": "/",
-  "name": "Daily Habits — Routine Tracker",
+  "name": "Daily Habits — Track • Improve • Achieve",
   "short_name": "Daily Habits",
   "description": "Daily Habits helps you track routines, build consistency and improve your everyday habits.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#fafafa",
-  "theme_color": "#18181b",
+  "background_color": "#07090D",
+  "theme_color": "#0B0F17",
   "icons": [
     {
       "src": "/pwa-192x192.png",
@@ -36,4 +36,3 @@
     }
   ]
 }
-

@@ -101,6 +101,7 @@ import {
   getCachedCalendarToken,
 } from './lib/googleCalendarService';
 import { Header } from './components/Header';
+import { DailyHabitsMark } from './components/DailyHabitsLogo';
 import { useNetworkSync } from './lib/useNetworkSync';
 import { ProgressBar } from './components/ProgressBar';
 import { StreakStatsCard } from './components/StreakStatsCard';
@@ -1838,8 +1839,9 @@ export function App() {
       )}
 
       {/* Subtle Footer */}
-      <footer id="app-footer" className="py-3 border-t border-zinc-200/80 dark:border-zinc-800/80 text-center text-xs text-zinc-400 dark:text-zinc-500 font-mono">
-        Track • Improve • Achieve
+      <footer id="app-footer" className="py-4 border-t border-zinc-200/80 dark:border-white/10 text-center text-xs text-zinc-400 dark:text-zinc-500 font-mono flex items-center justify-center gap-2">
+        <DailyHabitsMark className="w-3.5 h-3.5 opacity-60" id="app-footer-mark" />
+        <span>Daily Habits • Track • Improve • Achieve</span>
       </footer>
     </div>
   );

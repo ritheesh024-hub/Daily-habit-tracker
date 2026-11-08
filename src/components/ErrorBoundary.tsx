@@ -1,6 +1,8 @@
 import React, { ReactNode, ErrorInfo } from 'react';
 import { AlertTriangle, RotateCcw } from 'lucide-react';
 
+import { DailyHabitsMark } from './DailyHabitsLogo';
+
 interface ErrorBoundaryProps {
   children: ReactNode;
 }
@@ -38,9 +40,12 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 flex items-center justify-center p-4">
-          <div className="max-w-md w-full p-6 glass-card rounded-2xl border border-zinc-200/80 dark:border-white/10 text-center space-y-4 shadow-xl">
-            <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400 mx-auto flex items-center justify-center">
+        <div className="min-h-screen bg-[#07090D] text-zinc-100 flex items-center justify-center p-4">
+          <div className="max-w-md w-full p-6 bg-zinc-900/90 border border-white/10 rounded-2xl text-center space-y-4 shadow-2xl backdrop-blur-md">
+            <div className="flex items-center justify-center gap-2 mb-2">
+              <DailyHabitsMark className="w-9 h-9" id="error-boundary-logo" />
+            </div>
+            <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-400 mx-auto flex items-center justify-center">
               <AlertTriangle className="w-6 h-6" />
             </div>
             <div className="space-y-1">
