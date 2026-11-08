@@ -216,6 +216,7 @@ export function App() {
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [profileModalTab, setProfileModalTab] = useState<TabType>('analytics');
   const [isSavingLog, setIsSavingLog] = useState(false);
+  const [isSavingNote, setIsSavingNote] = useState(false);
   const [isSyncingCalendar, setIsSyncingCalendar] = useState(false);
 
   // Personal Habit Goals State
@@ -1050,9 +1051,6 @@ export function App() {
     handleToggleHabitForDate(selectedDate, habitId);
   };
 
-  // State & Handlers for Daily Note
-  const [isSavingNote, setIsSavingNote] = useState(false);
-
   const handleSaveDailyNote = async (targetDate: string, noteText: string) => {
     if (!currentUser?.uid) return;
     const dateKey = getLocalDateKey(targetDate);
@@ -1519,6 +1517,22 @@ export function App() {
     setSelectedDate(date);
   };
 
+  const displayedHabits = useMemo(() => {
+    return habits.filter((h) => {
+      if (h.archived) {
+        return !!(dailyLog.completedHabits && dailyLog.completedHabits[h.id]);
+      }
+      return (
+        isHabitScheduledForDate(h, selectedDate) ||
+        !!(dailyLog.completedHabits && dailyLog.completedHabits[h.id])
+      );
+    });
+  }, [habits, selectedDate, dailyLog.completedHabits]);
+
+  const activeIds = displayedHabits.map((h) => h.id);
+  const completedCount = countCompletedInMap(dailyLog.completedHabits, activeIds);
+  const totalCount = displayedHabits.length;
+
   // If not authenticated, show clean landing / login view
   if (!currentUser) {
     return (
@@ -1552,22 +1566,6 @@ export function App() {
       </div>
     );
   }
-
-  const displayedHabits = useMemo(() => {
-    return habits.filter((h) => {
-      if (h.archived) {
-        return !!(dailyLog.completedHabits && dailyLog.completedHabits[h.id]);
-      }
-      return (
-        isHabitScheduledForDate(h, selectedDate) ||
-        !!(dailyLog.completedHabits && dailyLog.completedHabits[h.id])
-      );
-    });
-  }, [habits, selectedDate, dailyLog.completedHabits]);
-
-  const activeIds = displayedHabits.map((h) => h.id);
-  const completedCount = countCompletedInMap(dailyLog.completedHabits, activeIds);
-  const totalCount = displayedHabits.length;
 
   return (
     <div className="min-h-screen relative bg-zinc-100/70 dark:bg-[#0d0d11] text-zinc-900 dark:text-zinc-100 flex flex-col font-sans antialiased selection:bg-zinc-200 dark:selection:bg-zinc-800 transition-colors overflow-x-hidden">
@@ -1676,7 +1674,7 @@ export function App() {
           </div>
         )}
 
-        {/* MODULE: DAILY RUN (Strava-inspired Run Tracking) */}
+        {/* MODULE: DAILY RUN (Outdoor Run Tracking) */}
         {activeTab === 'daily_run' && (
           <DailyRunPage
             user={currentUser}

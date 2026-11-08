@@ -9,8 +9,10 @@ import {
   RunSession,
   GPSFilterConfig,
   DEFAULT_GPS_FILTER_CONFIG,
+  PersistedActiveSession,
 } from '../types';
 import { gpsTrackerService } from '../services/gpsTrackerService';
+import { runIndexedDB } from '../services/runIndexedDB';
 import { validateGPSCoordinate } from '../utils/geoUtils';
 import {
   calculateAveragePace,
@@ -75,17 +77,106 @@ export function useRunSession(options: UseRunSessionOptions = {}) {
   const [endTime, setEndTime] = useState<string | null>(null);
   const [title, setTitle] = useState<string>(() => getDefaultRunTitle());
 
-  // Refs for current values inside GPS callbacks to avoid stale closures
+  // Recoverable Session state (if unfinished run found in IndexedDB)
+  const [recoverableSession, setRecoverableSession] = useState<PersistedActiveSession | null>(null);
+
+  // Refs for current values inside GPS callbacks and timers to avoid stale closures
+  const currentRunIdRef = useRef<string>('');
   const statusRef = useRef<RunStatus>('idle');
   statusRef.current = status;
 
   const gpsStatusRef = useRef<GPSStatus>('acquiring');
   gpsStatusRef.current = gpsStatus;
 
+  const startTimeRef = useRef<string | null>(null);
+  startTimeRef.current = startTime;
+
+  const titleRef = useRef<string>(title);
+  titleRef.current = title;
+
+  const segmentsRef = useRef<RouteSegment[]>([]);
+  segmentsRef.current = segments;
+
+  const startPositionRef = useRef<GPSCoordinate | null>(null);
+  startPositionRef.current = startPosition;
+
+  const currentPositionRef = useRef<GPSCoordinate | null>(null);
+  currentPositionRef.current = currentPosition;
+
+  const metricsRef = useRef<RunMetrics>(metrics);
+  metricsRef.current = metrics;
+
   const lastValidPointRef = useRef<GPSCoordinate | null>(null);
   const currentSegmentIdRef = useRef<string>('seg_0');
+  const lastPersistTimeRef = useRef<number>(0);
 
-  // Interval timer for UI duration updates and periodic statistical recalculations
+  // Persists active session state to IndexedDB for seamless recovery across reloads
+  const persistActiveSession = useCallback(
+    (overrideStatus?: RunStatus) => {
+      const activeStatus = overrideStatus || statusRef.current;
+      if (activeStatus !== 'running' && activeStatus !== 'paused') {
+        return;
+      }
+
+      const now = Date.now();
+      const currentSegmentElapsed = activeSegmentStartTimeRef.current
+        ? now - activeSegmentStartTimeRef.current
+        : 0;
+      const totalElapsedMs = accumulatedActiveMsRef.current + currentSegmentElapsed;
+      const currentSecs = Math.floor(totalElapsedMs / 1000);
+
+      const persisted: PersistedActiveSession = {
+        runId: currentRunIdRef.current || `run_${now}`,
+        userId,
+        title: titleRef.current,
+        status: activeStatus,
+        startTime: startTimeRef.current,
+        endTime: null,
+        durationSeconds: currentSecs,
+        accumulatedActiveMs: accumulatedActiveMsRef.current,
+        activeSegmentStartTime: activeSegmentStartTimeRef.current,
+        totalDistanceMeters: totalDistanceMetersRef.current,
+        metrics: {
+          ...metricsRef.current,
+          distanceKm: totalDistanceMetersRef.current / 1000,
+          durationSeconds: currentSecs,
+        },
+        segments: segmentsRef.current,
+        startPosition: startPositionRef.current,
+        currentPosition: currentPositionRef.current,
+        lastSavedAt: now,
+      };
+
+      runIndexedDB.saveActiveSession(persisted).catch((err) => {
+        console.warn('Failed to persist active session:', err);
+      });
+      lastPersistTimeRef.current = now;
+    },
+    [userId]
+  );
+
+  // Check for unfinished active session in IndexedDB on initial mount
+  useEffect(() => {
+    if (statusRef.current !== 'idle') return;
+
+    let isMounted = true;
+    runIndexedDB.getActiveSession(userId).then((saved) => {
+      if (!isMounted || !saved) return;
+      if (saved.status === 'running' || saved.status === 'paused') {
+        if (saved.durationSeconds > 0 || saved.totalDistanceMeters > 0 || (saved.segments && saved.segments.length > 0)) {
+          setRecoverableSession(saved);
+        } else {
+          runIndexedDB.clearActiveSession(userId);
+        }
+      }
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [userId]);
+
+  // Interval timer for UI duration updates, periodic stats calculation, and active session persistence
   useEffect(() => {
     let intervalId: number | null = null;
 
@@ -131,6 +222,11 @@ export function useRunSession(options: UseRunSessionOptions = {}) {
           caloriesBurned: calorieResult.calories,
           caloriesExplanation: calorieResult.explanation,
         }));
+
+        // Periodically persist active session every 5 seconds
+        if (now - lastPersistTimeRef.current >= 5000) {
+          persistActiveSession('running');
+        }
       }, 1000);
     }
 
@@ -139,7 +235,7 @@ export function useRunSession(options: UseRunSessionOptions = {}) {
         clearInterval(intervalId);
       }
     };
-  }, [status, userWeightKg]);
+  }, [status, userWeightKg, persistActiveSession]);
 
   // Handle incoming GPS Coordinate
   const handleGPSPosition = useCallback(
@@ -284,6 +380,10 @@ export function useRunSession(options: UseRunSessionOptions = {}) {
     }
 
     const now = new Date();
+    const newRunId = `run_${now.getTime()}`;
+    currentRunIdRef.current = newRunId;
+    setRecoverableSession(null);
+
     setStartTime(now.toISOString());
     setEndTime(null);
     setTitle(getDefaultRunTitle(now));
@@ -341,8 +441,9 @@ export function useRunSession(options: UseRunSessionOptions = {}) {
       }));
 
       setStatus('paused');
+      persistActiveSession('paused');
     }
-  }, [status]);
+  }, [status, persistActiveSession]);
 
   // RESUME RUN ACTION
   const resumeRun = useCallback(() => {
@@ -359,8 +460,9 @@ export function useRunSession(options: UseRunSessionOptions = {}) {
       setSegments((prev) => [...prev, { id: newSegId, points: [] }]);
 
       setStatus('running');
+      persistActiveSession('running');
     }
-  }, [status]);
+  }, [status, persistActiveSession]);
 
   // FINISH RUN ACTION
   const finishRun = useCallback(() => {
@@ -393,12 +495,17 @@ export function useRunSession(options: UseRunSessionOptions = {}) {
       isStationary: false,
     }));
 
+    // Clear active session from IndexedDB now that run has concluded
+    runIndexedDB.clearActiveSession(userId);
+
     setStatus('finished');
-  }, [userWeightKg]);
+  }, [userWeightKg, userId]);
 
   // RESET / DISCARD
   const resetRun = useCallback(() => {
     gpsTrackerService.stopTracking();
+    runIndexedDB.clearActiveSession(userId);
+
     setStatus('idle');
     setGpsStatus('acquiring');
     gpsStatusRef.current = 'acquiring';
@@ -416,6 +523,7 @@ export function useRunSession(options: UseRunSessionOptions = {}) {
     setStartTime(null);
     setEndTime(null);
     setTitle(getDefaultRunTitle());
+    currentRunIdRef.current = '';
 
     const calorieResult = estimateRunCalories(0, userWeightKg);
     setMetrics({
@@ -430,11 +538,50 @@ export function useRunSession(options: UseRunSessionOptions = {}) {
       isStationary: false,
       elevationGainMeters: null,
     });
-  }, [userWeightKg]);
+  }, [userWeightKg, userId]);
 
   const discardRun = useCallback(() => {
     resetRun();
   }, [resetRun]);
+
+  // RECOVER UNFINISHED SESSION (from IndexedDB)
+  const recoverSession = useCallback(() => {
+    if (!recoverableSession) return;
+
+    currentRunIdRef.current = recoverableSession.runId;
+    setStartTime(recoverableSession.startTime);
+    setTitle(recoverableSession.title || getDefaultRunTitle());
+    setDurationSeconds(recoverableSession.durationSeconds);
+    setTotalDistanceMeters(recoverableSession.totalDistanceMeters);
+    totalDistanceMetersRef.current = recoverableSession.totalDistanceMeters;
+    accumulatedActiveMsRef.current =
+      recoverableSession.accumulatedActiveMs || recoverableSession.durationSeconds * 1000;
+    setSegments(recoverableSession.segments || []);
+    setStartPosition(recoverableSession.startPosition);
+    setCurrentPosition(recoverableSession.currentPosition);
+    setMetrics(recoverableSession.metrics);
+
+    if (recoverableSession.status === 'running') {
+      const now = Date.now();
+      activeSegmentStartTimeRef.current = now;
+      const newSegId = `seg_${now}`;
+      currentSegmentIdRef.current = newSegId;
+      setSegments((prev) => [...prev, { id: newSegId, points: [] }]);
+      setStatus('running');
+      setGpsStatus('acquiring');
+      gpsTrackerService.startTracking(handleGPSPosition, handleGPSError);
+    } else {
+      activeSegmentStartTimeRef.current = null;
+      setStatus('paused');
+    }
+
+    setRecoverableSession(null);
+  }, [recoverableSession, handleGPSPosition, handleGPSError]);
+
+  const discardRecoverableSession = useCallback(() => {
+    runIndexedDB.clearActiveSession(userId);
+    setRecoverableSession(null);
+  }, [userId]);
 
   // Clean up GPS watcher on unmount to prevent leaks and duplicate subscriptions
   useEffect(() => {
@@ -447,7 +594,7 @@ export function useRunSession(options: UseRunSessionOptions = {}) {
   const completedSession: RunSession | null =
     status === 'finished'
       ? {
-          id: `run_${Date.now()}`,
+          id: currentRunIdRef.current || `run_${Date.now()}`,
           userId,
           title,
           status: 'finished',
@@ -480,6 +627,10 @@ export function useRunSession(options: UseRunSessionOptions = {}) {
     startTime,
     endTime,
     completedSession,
+    // Session Recovery
+    recoverableSession,
+    recoverSession,
+    discardRecoverableSession,
     // Actions
     startRun,
     pauseRun,

@@ -143,6 +143,50 @@
         "updatedAt": { "type": "string", "maxLength": 60 }
       },
       "required": ["id", "unlocked", "unlockedAt"]
+    },
+    "CompletedRun": {
+      "title": "CompletedRun",
+      "description": "User completed running sessions with GPS route, duration, distance, pace, speed, and calories",
+      "type": "object",
+      "properties": {
+        "runId": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 150 },
+        "distanceMeters": { "type": "number" },
+        "durationSeconds": { "type": "number" },
+        "averagePaceSecondsPerKm": { "type": "number" },
+        "averageSpeedKmh": { "type": "number" },
+        "caloriesEstimate": { "type": "number" },
+        "caloriesExplanation": { "type": "string", "maxLength": 200 },
+        "notes": { "type": "string", "maxLength": 1000 },
+        "routeCoordinates": { "type": "array" },
+        "routePointCount": { "type": "number" },
+        "startedAt": { "type": "string", "maxLength": 60 },
+        "endedAt": { "type": "string", "maxLength": 60 },
+        "createdAt": { "type": "string", "maxLength": 60 },
+        "updatedAt": { "type": "string", "maxLength": 60 },
+        "status": { "type": "string", "maxLength": 20 }
+      },
+      "required": ["runId", "userId", "distanceMeters", "durationSeconds", "startedAt", "endedAt", "status"]
+    },
+    "SavedRoute": {
+      "title": "SavedRoute",
+      "description": "User favourite loop route saved for running guidance and route discovery",
+      "type": "object",
+      "properties": {
+        "routeId": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "routeName": { "type": "string", "maxLength": 150 },
+        "startLocation": { "type": "object" },
+        "waypoints": { "type": "array" },
+        "routeCoordinates": { "type": "array" },
+        "distanceMeters": { "type": "number" },
+        "elevationGainMeters": { "type": "number" },
+        "createdAt": { "type": "string", "maxLength": 60 },
+        "updatedAt": { "type": "string", "maxLength": 60 },
+        "targetDistanceKm": { "type": "number" }
+      },
+      "required": ["routeId", "userId", "routeName", "startLocation", "distanceMeters", "createdAt", "updatedAt"]
     }
   },
   "firestore": {
@@ -177,6 +221,14 @@
     "/users/{userId}/achievements/{achievementId}": {
       "schema": "AchievementRecord",
       "description": "User milestone and achievement unlocked state"
+    },
+    "/users/{userId}/runs/{runId}": {
+      "schema": "CompletedRun",
+      "description": "User completed daily run records with GPS telemetry and performance metrics"
+    },
+    "/users/{userId}/savedRoutes/{routeId}": {
+      "schema": "SavedRoute",
+      "description": "User favourite and custom loop running routes"
     }
   }
 }

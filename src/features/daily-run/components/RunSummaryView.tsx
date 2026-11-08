@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { RunSession, RouteSegment, GPSCoordinate } from '../types';
 import { RunMap } from './RunMap';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import {
   formatRunDistance,
   formatRunDuration,
@@ -27,10 +28,13 @@ interface RunSummaryViewProps {
   segments?: RouteSegment[];
   startPosition?: GPSCoordinate | null;
   currentPosition?: GPSCoordinate | null;
-  onSaveAndClose: (title: string, notes: string) => void;
+  isSaving?: boolean;
+  saveError?: string | null;
+  onSaveAndClose: (title: string, notes: string) => Promise<void> | void;
   onStartAnother: () => void;
   onDiscard: () => void;
   onReturnToTracker?: () => void;
+  onClearSaveError?: () => void;
 }
 
 export const RunSummaryView: React.FC<RunSummaryViewProps> = ({
@@ -39,14 +43,18 @@ export const RunSummaryView: React.FC<RunSummaryViewProps> = ({
   segments = [],
   startPosition = null,
   currentPosition = null,
+  isSaving = false,
+  saveError = null,
   onSaveAndClose,
   onStartAnother,
   onDiscard,
   onReturnToTracker,
+  onClearSaveError,
 }) => {
   const [title, setTitle] = useState(session?.title || 'Morning Run');
   const [notes, setNotes] = useState(session?.notes || '');
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
+  const isOnline = useOnlineStatus();
 
   const distance = session?.metrics?.distanceKm ?? 0;
   const duration = durationSeconds || (session?.metrics?.durationSeconds ?? 0);
@@ -246,16 +254,47 @@ export const RunSummaryView: React.FC<RunSummaryViewProps> = ({
         />
       </div>
 
+      {/* Save Error Alert with Retry */}
+      {saveError && (
+        <div
+          role="alert"
+          className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-800 dark:text-rose-200 text-xs sm:text-sm flex items-center justify-between gap-3 animate-fadeIn"
+        >
+          <div className="flex items-center gap-2 min-w-0">
+            <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
+            <span className="truncate">{saveError}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => onSaveAndClose(title, notes)}
+            disabled={isSaving}
+            className="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs transition-colors shrink-0 cursor-pointer disabled:opacity-50"
+          >
+            Retry Save
+          </button>
+        </div>
+      )}
+
       {/* Action Buttons */}
       <div className="space-y-2.5 pt-1">
         <button
           id="btn-save-summary"
           type="button"
+          disabled={isSaving}
           onClick={() => onSaveAndClose(title, notes)}
-          className="w-full min-h-[52px] sm:min-h-[56px] px-6 py-3.5 rounded-2xl bg-zinc-900 hover:bg-zinc-800 active:bg-black dark:bg-zinc-100 dark:hover:bg-white dark:active:bg-zinc-200 text-white dark:text-zinc-900 font-bold text-sm sm:text-base tracking-wide shadow-md flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-[0.98]"
+          className="w-full min-h-[52px] sm:min-h-[56px] px-6 py-3.5 rounded-2xl bg-zinc-900 hover:bg-zinc-800 active:bg-black dark:bg-zinc-100 dark:hover:bg-white dark:active:bg-zinc-200 text-white dark:text-zinc-900 font-bold text-sm sm:text-base tracking-wide shadow-md flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
         >
-          <CheckCircle2 className="w-5 h-5" />
-          <span>Save Run & Complete</span>
+          {isSaving ? (
+            <>
+              <div className="w-4 h-4 border-2 border-white dark:border-zinc-900 border-t-transparent rounded-full animate-spin" />
+              <span>{isOnline ? 'Saving to Cloud...' : 'Saving Locally...'}</span>
+            </>
+          ) : (
+            <>
+              <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+              <span>{isOnline ? 'Save Run to Cloud' : 'Save Run Locally (Auto-Syncs Online)'}</span>
+            </>
+          )}
         </button>
 
         <div className="grid grid-cols-2 gap-3">

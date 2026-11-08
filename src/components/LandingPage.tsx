@@ -1,22 +1,24 @@
 import React from 'react';
+import { motion, type Variants } from 'motion/react';
 import {
   Flame,
   BarChart3,
-  Bell,
-  BookOpen,
-  Trophy,
-  Download,
+  CheckCircle2,
+  Utensils,
+  WifiOff,
+  Compass,
+  Activity,
   ArrowRight,
   ShieldCheck,
-  CheckCircle2,
-  Calendar,
-  Sparkles,
-  Zap,
-  Target,
+  Download,
   Check,
-  Smartphone,
-  ChevronRight,
+  Lock,
+  Trophy,
+  MapPin,
+  Clock,
+  Sparkles,
   TrendingUp,
+  Zap,
 } from 'lucide-react';
 
 interface LandingPageProps {
@@ -26,6 +28,27 @@ interface LandingPageProps {
   notification?: string | null;
 }
 
+// Subtle motion variants for gentle reveals
+const fadeInUp: Variants = {
+  hidden: { opacity: 0, y: 16 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] },
+  },
+};
+
+const staggerContainer: Variants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.08,
+      delayChildren: 0.05,
+    },
+  },
+};
+
 export const LandingPage: React.FC<LandingPageProps> = ({
   onGetStarted,
   isLoading,
@@ -33,70 +56,45 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   notification,
 }) => {
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 font-sans antialiased selection:bg-zinc-200 dark:selection:bg-zinc-800 transition-colors">
+    <div className="min-h-screen bg-[#07090d] text-zinc-100 font-sans antialiased selection:bg-emerald-950 selection:text-emerald-200 transition-colors overflow-x-hidden">
       {/* 1. Header / Navigation */}
       <header
         id="landing-header"
-        className="sticky top-0 z-50 glass-surface border-b border-zinc-200/70 dark:border-white/10 transition-colors shadow-xs"
+        className="sticky top-0 z-50 bg-zinc-950/85 backdrop-blur-md border-b border-white/10 transition-colors shadow-xs"
       >
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 sm:h-16 flex items-center justify-between gap-4">
           {/* Logo & Brand */}
-          <div className="flex items-center gap-2.5 sm:gap-3">
+          <a href="#" className="flex items-center gap-2.5 sm:gap-3 group">
             <div
               id="landing-logo"
-              className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-zinc-900 dark:bg-zinc-800 border border-zinc-800/80 dark:border-zinc-700/80 flex items-center justify-center shrink-0 shadow-2xs relative overflow-hidden"
+              className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-zinc-900 border border-emerald-500/30 flex items-center justify-center shrink-0 shadow-2xs relative overflow-hidden group-hover:border-emerald-500/60 transition-colors"
               aria-hidden="true"
             >
-              <svg className="w-5 h-5 sm:w-5.5 sm:h-5.5 text-white" viewBox="0 0 512 512" fill="none">
-                <defs>
-                  <filter id="landing-tick-glow" x="-20%" y="-20%" width="140%" height="140%">
-                    <feGaussianBlur stdDeviation="12" />
-                  </filter>
-                  <radialGradient id="landing-inner-glow" cx="50%" cy="50%" r="50%">
-                    <stop offset="0%" stopColor="#ffffff" stopOpacity="0.18" />
-                    <stop offset="60%" stopColor="#ffffff" stopOpacity="0.04" />
-                    <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
-                  </radialGradient>
-                </defs>
-                <circle cx="256" cy="256" r="220" fill="url(#landing-inner-glow)" />
-                <path
-                  d="M80 270L202 392L432 145"
-                  stroke="#ffffff"
-                  strokeWidth="78"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  opacity="0.32"
-                  filter="url(#landing-tick-glow)"
-                />
-                <path
-                  d="M80 270L202 392L432 145"
-                  stroke="#ffffff"
-                  strokeWidth="58"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
+              <Check className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-emerald-400 stroke-[2.5]" />
             </div>
             <div>
-              <span className="font-semibold text-sm sm:text-base tracking-tight text-zinc-900 dark:text-zinc-100 leading-tight">
+              <span className="font-semibold text-sm sm:text-base tracking-tight text-white leading-tight">
                 Daily Habits
               </span>
             </div>
-          </div>
+          </a>
 
           {/* Desktop Nav Links */}
-          <nav className="hidden md:flex items-center gap-6 text-xs sm:text-sm font-medium text-zinc-600 dark:text-zinc-400">
-            <a href="#why" className="hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">
-              Why Daily Habits
-            </a>
-            <a href="#features" className="hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">
+          <nav className="hidden md:flex items-center gap-6 text-xs sm:text-sm font-medium text-zinc-400">
+            <a href="#features" className="hover:text-white transition-colors">
               Features
             </a>
-            <a href="#how-it-works" className="hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">
+            <a href="#daily-run-showcase" className="hover:text-white transition-colors">
+              Daily Run
+            </a>
+            <a href="#daily-routes-showcase" className="hover:text-white transition-colors">
+              Daily Routes
+            </a>
+            <a href="#how-it-works" className="hover:text-white transition-colors">
               How it works
             </a>
-            <a href="#preview" className="hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">
-              Preview
+            <a href="#privacy" className="hover:text-white transition-colors">
+              Privacy
             </a>
           </nav>
 
@@ -106,7 +104,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               type="button"
               onClick={onGetStarted}
               disabled={isLoading}
-              className="text-xs sm:text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-zinc-100 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer"
+              className="text-xs sm:text-sm font-medium text-zinc-300 hover:text-white px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer"
             >
               Sign in
             </button>
@@ -114,7 +112,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               type="button"
               onClick={onGetStarted}
               disabled={isLoading}
-              className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs sm:text-sm font-medium text-white dark:text-zinc-900 bg-zinc-900 dark:bg-zinc-100 hover:bg-black dark:hover:bg-white rounded-xl transition-all shadow-2xs active:scale-95 cursor-pointer"
+              className="hidden sm:inline-flex items-center gap-1.5 px-4 py-2 text-xs sm:text-sm font-semibold text-zinc-950 bg-emerald-400 hover:bg-emerald-300 rounded-xl transition-all shadow-sm active:scale-95 cursor-pointer"
             >
               <span>Get Started</span>
               <ArrowRight className="w-3.5 h-3.5" />
@@ -123,72 +121,93 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         </div>
       </header>
 
-      {/* 2. Hero Section */}
-      <section className="relative pt-8 sm:pt-14 pb-14 sm:pb-20 px-4 sm:px-6 overflow-hidden">
-        {/* Subtle Ambient Background Gradients */}
+      {/* 2. Hero Section: Typography & Layout Driven */}
+      <section className="relative pt-12 sm:pt-20 pb-16 sm:pb-24 px-4 sm:px-6 overflow-hidden">
+        {/* Subtle Ambient CSS Gradient Background */}
         <div
           aria-hidden="true"
-          className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-4xl h-[420px] bg-gradient-to-b from-zinc-200/40 dark:from-zinc-800/30 to-transparent blur-3xl pointer-events-none -z-10 opacity-70 dark:opacity-40 animate-soft-glow"
+          className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-5xl h-[520px] bg-gradient-to-b from-emerald-500/10 via-zinc-900/30 to-transparent blur-3xl pointer-events-none -z-10"
         />
 
-        <div className="max-w-4xl mx-auto text-center flex flex-col items-center">
-          {/* Brand Eyebrow Pill */}
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700/80 text-[11px] sm:text-xs font-mono font-medium text-zinc-600 dark:text-zinc-300 mb-5 sm:mb-6 shadow-2xs">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-            <span>Track • Improve • Achieve</span>
-          </div>
+        <div className="max-w-5xl mx-auto text-center flex flex-col items-center">
+          {/* Eyebrow Tag */}
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4 }}
+            className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-zinc-900/90 border border-zinc-800 text-[11px] sm:text-xs font-mono font-medium text-zinc-300 mb-6 shadow-xs"
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#10b981]" />
+            <span>Habits · Running · Routes · Nutrition</span>
+          </motion.div>
 
           {/* Main Headline */}
-          <h1
+          <motion.h1
             id="landing-hero-headline"
-            className="text-3xl sm:text-5xl md:text-6xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 leading-[1.15] max-w-3xl"
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.08 }}
+            className="text-3xl sm:text-5xl md:text-6xl font-bold tracking-tight text-white leading-[1.12] max-w-3xl"
           >
-            Build better days,
+            Build Better Habits.
             <br />
-            <span className="text-zinc-500 dark:text-zinc-400 font-medium">
-              one habit at a time.
-            </span>
-          </h1>
+            <span className="text-emerald-400">Track Every Run.</span>{' '}
+            <span className="text-zinc-400 font-medium">Improve Every Day.</span>
+          </motion.h1>
 
           {/* Supporting Text */}
-          <p className="text-sm sm:text-base md:text-lg text-zinc-600 dark:text-zinc-400 mt-4 sm:mt-5 max-w-xl leading-relaxed">
-            Track your routines, stay consistent, and see your progress every day with a clean, distraction-free tracker.
-          </p>
+          <motion.p
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.16 }}
+            className="text-sm sm:text-base md:text-lg text-zinc-400 mt-5 max-w-xl leading-relaxed"
+          >
+            Your personal space to build consistent habits, track your daily progress, analyze your food and discover running routes — all in one unified application.
+          </motion.p>
 
           {/* Status / Success Notification */}
           {notification && (
-            <div
+            <motion.div
               id="landing-status-notification"
-              className="w-full max-w-md mt-5 p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-xs text-emerald-900 dark:text-emerald-200 flex items-center gap-2.5 text-left shadow-xs"
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="w-full max-w-md mt-5 p-3.5 rounded-xl bg-emerald-950/40 border border-emerald-800 text-xs text-emerald-200 flex items-center gap-2.5 text-left shadow-xs"
             >
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
               <span className="font-semibold leading-relaxed">{notification}</span>
-            </div>
+            </motion.div>
           )}
 
-          {/* Auth Error Banner (if any) */}
+          {/* Auth Error Banner */}
           {error && (
-            <div
+            <motion.div
               id="landing-auth-error"
-              className="w-full max-w-md mt-4 p-3 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-xs text-red-800 dark:text-red-300 flex items-center gap-2 text-left"
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="w-full max-w-md mt-4 p-3 rounded-xl bg-red-950/40 border border-red-800 text-xs text-red-300 flex items-center gap-2 text-left"
             >
-              <span className="font-bold text-red-600 dark:text-red-400 shrink-0">⚠️</span>
+              <span className="font-bold text-red-400 shrink-0">⚠️</span>
               <span className="leading-relaxed">{error}</span>
-            </div>
+            </motion.div>
           )}
 
           {/* Hero CTAs */}
-          <div className="mt-6 sm:mt-8 w-full max-w-xs flex flex-col items-center gap-3">
+          <motion.div
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.24 }}
+            className="mt-8 w-full max-w-sm flex flex-col sm:flex-row items-center justify-center gap-3 z-20"
+          >
             <button
               id="landing-primary-cta"
               type="button"
               disabled={isLoading}
               onClick={onGetStarted}
-              className="w-full min-h-[48px] inline-flex items-center justify-center gap-2.5 px-6 py-3 bg-zinc-900 hover:bg-black dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 font-semibold text-sm sm:text-base rounded-xl transition-all shadow-md hover:shadow-lg active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer group"
+              className="w-full sm:w-auto min-h-[48px] inline-flex items-center justify-center gap-2.5 px-6 py-3 bg-emerald-400 hover:bg-emerald-300 text-zinc-950 font-bold text-sm sm:text-base rounded-xl transition-all shadow-md hover:shadow-lg active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer group"
             >
               {isLoading ? (
                 <span className="flex items-center gap-2">
-                  <svg className="animate-spin h-4 w-4 text-white dark:text-zinc-900" viewBox="0 0 24 24" fill="none">
+                  <svg className="animate-spin h-4 w-4 text-zinc-950" viewBox="0 0 24 24" fill="none">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
                   </svg>
@@ -214,407 +233,834 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                       d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3.1 0-5.8-2.3-6.7-5.3L1.6 16c1.9 3.8 5.8 7 10.4 7z"
                     />
                   </svg>
-                  <span>Get Started with Google</span>
-                  <ArrowRight className="w-4 h-4 text-zinc-400 dark:text-zinc-600 group-hover:translate-x-0.5 transition-transform" />
+                  <span>Get Started</span>
+                  <ArrowRight className="w-4 h-4 text-zinc-950 group-hover:translate-x-0.5 transition-transform" />
                 </>
               )}
             </button>
 
-            {/* Secondary Action */}
-            <button
-              type="button"
-              onClick={onGetStarted}
-              disabled={isLoading}
-              className="text-xs text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 transition-colors py-1 cursor-pointer"
+            <a
+              href="#features"
+              className="w-full sm:w-auto min-h-[48px] inline-flex items-center justify-center px-5 py-3 bg-zinc-900/90 border border-white/10 hover:border-white/20 rounded-xl text-xs sm:text-sm font-semibold text-zinc-300 hover:text-white transition-colors shadow-2xs"
             >
-              Already have an account? <span className="underline font-medium">Sign in</span>
-            </button>
-          </div>
+              Explore Features
+            </a>
+          </motion.div>
 
-          {/* 3. Hero Visual & Subtle 3D Floating Dashboard Preview */}
-          <div className="mt-10 sm:mt-14 w-full max-w-xl perspective-1000">
-            <div className="animate-subtle-float relative glass-card rounded-2xl p-4 sm:p-6 shadow-2xl transition-all text-left">
-              {/* Top Bar of Floating Preview */}
-              <div className="flex items-center justify-between pb-3.5 border-b border-zinc-200/70 dark:border-white/10 text-xs">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-7 h-7 rounded-xl bg-zinc-900 dark:bg-zinc-100 flex items-center justify-center text-white dark:text-zinc-900 shadow-xs">
-                    <Check className="w-4 h-4 stroke-[3]" />
+          {/* Clean Typography-Driven Product Console (Zero Images, Zero 3D) */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.32 }}
+            className="w-full max-w-4xl mt-12 sm:mt-16 text-left"
+          >
+            <div className="rounded-2xl bg-zinc-900/80 border border-white/10 p-5 sm:p-7 shadow-2xl backdrop-blur-sm">
+              {/* Console Top Bar */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-5 border-b border-white/10 gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex gap-1.5">
+                    <span className="w-3 h-3 rounded-full bg-zinc-700/80" />
+                    <span className="w-3 h-3 rounded-full bg-zinc-700/80" />
+                    <span className="w-3 h-3 rounded-full bg-zinc-700/80" />
+                  </div>
+                  <span className="text-xs font-mono text-zinc-400">daily-habits.app · live preview</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-[11px] font-mono font-medium text-emerald-400">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    Synchronized · Cloud Firestore
+                  </span>
+                </div>
+              </div>
+
+              {/* 4 Pillars Summary Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-5">
+                {/* 1. Habit Tracker Pillar */}
+                <div className="p-4 rounded-xl bg-zinc-950/70 border border-white/5 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="w-7 h-7 rounded-lg bg-emerald-500/15 text-emerald-400 flex items-center justify-center">
+                      <CheckCircle2 className="w-4 h-4" />
+                    </div>
+                    <span className="text-[10px] font-mono text-emerald-400 font-bold">100% TODAY</span>
+                  </div>
+                  <h4 className="text-xs font-bold text-white pt-1">Habit Consistency</h4>
+                  <p className="text-[11px] text-zinc-400 leading-snug">
+                    Morning Run, Reading, Hydration logged with daily notes.
+                  </p>
+                  <div className="text-[10px] font-mono text-zinc-500 pt-1">
+                    Streak: <span className="text-zinc-300 font-bold">7 consecutive days</span>
+                  </div>
+                </div>
+
+                {/* 2. Daily Run Pillar */}
+                <div className="p-4 rounded-xl bg-zinc-950/70 border border-white/5 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="w-7 h-7 rounded-lg bg-orange-500/15 text-orange-400 flex items-center justify-center">
+                      <Activity className="w-4 h-4" />
+                    </div>
+                    <span className="text-[10px] font-mono text-orange-400 font-bold">1 Hz GPS</span>
+                  </div>
+                  <h4 className="text-xs font-bold text-white pt-1">Outdoor Run</h4>
+                  <p className="text-[11px] text-zinc-400 leading-snug">
+                    5.02 km · 26:14 · 5:13 /km with weight-based calories.
+                  </p>
+                  <div className="text-[10px] font-mono text-zinc-500 pt-1">
+                    Personal Record: <span className="text-zinc-300 font-bold">Fastest 5K</span>
+                  </div>
+                </div>
+
+                {/* 3. Daily Routes Pillar */}
+                <div className="p-4 rounded-xl bg-zinc-950/70 border border-white/5 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="w-7 h-7 rounded-lg bg-indigo-500/15 text-indigo-400 flex items-center justify-center">
+                      <Compass className="w-4 h-4" />
+                    </div>
+                    <span className="text-[10px] font-mono text-indigo-400 font-bold">LOOP ENGINE</span>
+                  </div>
+                  <h4 className="text-xs font-bold text-white pt-1">Route Discovery</h4>
+                  <p className="text-[11px] text-zinc-400 leading-snug">
+                    5k circular loop from home through local parks & trails.
+                  </p>
+                  <div className="text-[10px] font-mono text-zinc-500 pt-1">
+                    Guidance: <span className="text-zinc-300 font-bold">Off-route alert</span>
+                  </div>
+                </div>
+
+                {/* 4. Food AI Pillar */}
+                <div className="p-4 rounded-xl bg-zinc-950/70 border border-white/5 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="w-7 h-7 rounded-lg bg-purple-500/15 text-purple-400 flex items-center justify-center">
+                      <Utensils className="w-4 h-4" />
+                    </div>
+                    <span className="text-[10px] font-mono text-purple-400 font-bold">VISION AI</span>
+                  </div>
+                  <h4 className="text-xs font-bold text-white pt-1">Food Analysis</h4>
+                  <p className="text-[11px] text-zinc-400 leading-snug">
+                    Instant calorie, protein, carb, and fiber estimates.
+                  </p>
+                  <div className="text-[10px] font-mono text-zinc-500 pt-1">
+                    Nutrients: <span className="text-zinc-300 font-bold">42g Protein logged</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* 3. Section: Features Section (7 Core Capabilities with Clean Text Cards) */}
+      <section id="features" className="py-14 sm:py-20 px-4 sm:px-6 border-t border-white/10 bg-zinc-950">
+        <div className="max-w-5xl mx-auto">
+          <motion.div
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: '-60px' }}
+            variants={fadeInUp}
+            className="text-center max-w-xl mx-auto mb-10 sm:mb-14"
+          >
+            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-400 font-mono">
+              Complete Health & Routine Suite
+            </span>
+            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-white mt-1">
+              Everything in one unified space
+            </h2>
+            <p className="text-xs sm:text-sm text-zinc-400 mt-2">
+              Integrated routine management, real-time GPS outdoor running, loop discovery, and nutrition analytics.
+            </p>
+          </motion.div>
+
+          <motion.div
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: '-60px' }}
+            variants={staggerContainer}
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5"
+          >
+            {/* 1. Smart Habit Tracking */}
+            <motion.div
+              variants={fadeInUp}
+              whileHover={{ y: -3, transition: { duration: 0.2 } }}
+              className="rounded-2xl p-6 bg-zinc-900/90 border border-white/10 hover:border-emerald-500/30 shadow-md flex flex-col justify-between transition-colors group"
+            >
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 flex items-center justify-center shrink-0">
+                    <CheckCircle2 className="w-5 h-5" />
+                  </div>
+                  <span className="text-[10px] font-mono uppercase text-zinc-400 font-semibold px-2 py-0.5 rounded bg-zinc-800/80 border border-white/5">
+                    Habit Suite
+                  </span>
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white group-hover:text-emerald-300 transition-colors">
+                    1. Smart Habit Tracking
+                  </h3>
+                  <p className="text-xs sm:text-sm text-zinc-400 mt-2 leading-relaxed">
+                    Organize, customize, and check off your daily routines with clean priorities, custom icons, and smart reminder schedules.
+                  </p>
+                </div>
+              </div>
+
+              <div className="pt-5 mt-5 border-t border-white/5 space-y-1.5 text-xs text-zinc-400">
+                <div className="flex items-center gap-2">
+                  <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span>Flexible daily & custom frequencies</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span>Color tags and priority markers</span>
+                </div>
+              </div>
+            </motion.div>
+
+            {/* 2. Daily Progress & Streaks */}
+            <motion.div
+              variants={fadeInUp}
+              whileHover={{ y: -3, transition: { duration: 0.2 } }}
+              className="rounded-2xl p-6 bg-zinc-900/90 border border-white/10 hover:border-amber-500/30 shadow-md flex flex-col justify-between transition-colors group"
+            >
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="w-9 h-9 rounded-xl bg-amber-500/15 text-amber-400 border border-amber-500/20 flex items-center justify-center shrink-0">
+                    <Flame className="w-5 h-5 fill-amber-500/30 text-amber-400" />
+                  </div>
+                  <span className="text-[10px] font-mono uppercase text-zinc-400 font-semibold px-2 py-0.5 rounded bg-zinc-800/80 border border-white/5">
+                    Momentum
+                  </span>
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white group-hover:text-amber-300 transition-colors">
+                    2. Daily Progress & Streaks
+                  </h3>
+                  <p className="text-xs sm:text-sm text-zinc-400 mt-2 leading-relaxed">
+                    Build unstoppable momentum with automated streak calculations, milestone badges (3, 7, 30, 100 days), and daily notes.
+                  </p>
+                </div>
+              </div>
+
+              <div className="pt-5 mt-5 border-t border-white/5 space-y-1.5 text-xs text-zinc-400">
+                <div className="flex items-center gap-2">
+                  <Check className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                  <span>Automatic streak preservation</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Check className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                  <span>Achievement milestone celebration</span>
+                </div>
+              </div>
+            </motion.div>
+
+            {/* 3. AI Food Analysis */}
+            <motion.div
+              variants={fadeInUp}
+              whileHover={{ y: -3, transition: { duration: 0.2 } }}
+              className="rounded-2xl p-6 bg-zinc-900/90 border border-white/10 hover:border-purple-500/30 shadow-md flex flex-col justify-between transition-colors group"
+            >
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="w-9 h-9 rounded-xl bg-purple-500/15 text-purple-400 border border-purple-500/20 flex items-center justify-center shrink-0">
+                    <Utensils className="w-5 h-5" />
+                  </div>
+                  <span className="text-[10px] font-mono uppercase text-zinc-400 font-semibold px-2 py-0.5 rounded bg-zinc-800/80 border border-white/5">
+                    Nutrition AI
+                  </span>
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white group-hover:text-purple-300 transition-colors">
+                    3. AI Food Analysis
+                  </h3>
+                  <p className="text-xs sm:text-sm text-zinc-400 mt-2 leading-relaxed">
+                    Analyze meal photos with Gemini vision models for instant estimated calories, protein, carbs, fat, and fiber with nutritional tips.
+                  </p>
+                </div>
+              </div>
+
+              <div className="pt-5 mt-5 border-t border-white/5 space-y-1.5 text-xs text-zinc-400">
+                <div className="flex items-center gap-2">
+                  <Check className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                  <span>Instant macronutrient breakdown</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Check className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                  <span>Dietary balance & guidance tips</span>
+                </div>
+              </div>
+            </motion.div>
+
+            {/* 4. Daily Run GPS Tracker */}
+            <motion.div
+              variants={fadeInUp}
+              whileHover={{ y: -3, transition: { duration: 0.2 } }}
+              className="rounded-2xl p-6 bg-zinc-900/90 border border-white/10 hover:border-orange-500/30 shadow-md flex flex-col justify-between transition-colors group"
+            >
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="w-9 h-9 rounded-xl bg-orange-500/15 text-orange-400 border border-orange-500/20 flex items-center justify-center shrink-0">
+                    <Activity className="w-5 h-5" />
+                  </div>
+                  <span className="text-[10px] font-mono uppercase text-zinc-400 font-semibold px-2 py-0.5 rounded bg-zinc-800/80 border border-white/5">
+                    Outdoor GPS
+                  </span>
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white group-hover:text-orange-300 transition-colors">
+                    4. Daily Run GPS Tracker
+                  </h3>
+                  <p className="text-xs sm:text-sm text-zinc-400 mt-2 leading-relaxed">
+                    Outdoor workout tracking with real-time GPS coordinates, interactive Leaflet route drawing, rolling pace, speed, and calories.
+                  </p>
+                </div>
+              </div>
+
+              <div className="pt-5 mt-5 border-t border-white/5 space-y-1.5 text-xs text-zinc-400">
+                <div className="flex items-center gap-2">
+                  <Check className="w-3.5 h-3.5 text-orange-400 shrink-0" />
+                  <span>1 Hz live GPS with stationary noise filtering</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Check className="w-3.5 h-3.5 text-orange-400 shrink-0" />
+                  <span>Weight-based MET calorie calculations</span>
+                </div>
+              </div>
+            </motion.div>
+
+            {/* 5. Running History & Analytics */}
+            <motion.div
+              variants={fadeInUp}
+              whileHover={{ y: -3, transition: { duration: 0.2 } }}
+              className="rounded-2xl p-6 bg-zinc-900/90 border border-white/10 hover:border-blue-500/30 shadow-md flex flex-col justify-between transition-colors group"
+            >
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="w-9 h-9 rounded-xl bg-blue-500/15 text-blue-400 border border-blue-500/20 flex items-center justify-center shrink-0">
+                    <BarChart3 className="w-5 h-5" />
+                  </div>
+                  <span className="text-[10px] font-mono uppercase text-zinc-400 font-semibold px-2 py-0.5 rounded bg-zinc-800/80 border border-white/5">
+                    Analytics
+                  </span>
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white group-hover:text-blue-300 transition-colors">
+                    5. Running History & Analytics
+                  </h3>
+                  <p className="text-xs sm:text-sm text-zinc-400 mt-2 leading-relaxed">
+                    In-depth running dashboard with volume trend charts, monthly running calendar, personal records (longest run, fastest pace), and time filters.
+                  </p>
+                </div>
+              </div>
+
+              <div className="pt-5 mt-5 border-t border-white/5 space-y-1.5 text-xs text-zinc-400">
+                <div className="flex items-center gap-2">
+                  <Check className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                  <span>Weekly volume and pace distribution</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Check className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                  <span>All-time PRs for pace and distance</span>
+                </div>
+              </div>
+            </motion.div>
+
+            {/* 6. Offline Run Support */}
+            <motion.div
+              variants={fadeInUp}
+              whileHover={{ y: -3, transition: { duration: 0.2 } }}
+              className="rounded-2xl p-6 bg-zinc-900/90 border border-white/10 hover:border-emerald-500/30 shadow-md flex flex-col justify-between transition-colors group"
+            >
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 flex items-center justify-center shrink-0">
+                    <WifiOff className="w-5 h-5" />
+                  </div>
+                  <span className="text-[10px] font-mono uppercase text-zinc-400 font-semibold px-2 py-0.5 rounded bg-zinc-800/80 border border-white/5">
+                    Offline First
+                  </span>
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white group-hover:text-emerald-300 transition-colors">
+                    6. Offline Run Support
+                  </h3>
+                  <p className="text-xs sm:text-sm text-zinc-400 mt-2 leading-relaxed">
+                    Keep recording GPS coordinates even without internet connectivity. Unfinished runs recover automatically and sync seamlessly to the cloud.
+                  </p>
+                </div>
+              </div>
+
+              <div className="pt-5 mt-5 border-t border-white/5 space-y-1.5 text-xs text-zinc-400">
+                <div className="flex items-center gap-2">
+                  <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span>Local IndexedDB zero-data caching</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span>Automatic crash and refresh recovery</span>
+                </div>
+              </div>
+            </motion.div>
+
+            {/* 7. Daily Route Discovery (Prominent Wide Card) */}
+            <motion.div
+              variants={fadeInUp}
+              whileHover={{ y: -3, transition: { duration: 0.2 } }}
+              className="rounded-2xl p-6 sm:p-7 bg-zinc-900/90 border border-white/10 hover:border-indigo-500/30 shadow-md sm:col-span-2 lg:col-span-3 transition-colors group"
+            >
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div className="space-y-3 max-w-2xl">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-indigo-500/15 text-indigo-400 border border-indigo-500/20 flex items-center justify-center shrink-0">
+                      <Compass className="w-5 h-5" />
+                    </div>
+                    <span className="text-[10px] font-mono uppercase text-indigo-400 font-semibold px-2 py-0.5 rounded bg-indigo-500/10 border border-indigo-500/20">
+                      Closed Loop Engine
+                    </span>
+                  </div>
+                  <h3 className="text-lg font-bold text-white group-hover:text-indigo-300 transition-colors">
+                    7. Daily Route Discovery & Loop Planner
+                  </h3>
+                  <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed">
+                    Intelligent route discovery planning pedestrian loop routes (2k, 3k, 5k, 8k, 10k) from home or GPS location, routing through local parks and recreational landmarks with elevation profiles and live off-route deviation guidance.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 shrink-0 text-xs text-zinc-300 border-t md:border-t-0 md:border-l border-white/10 pt-4 md:pt-0 md:pl-6">
+                  <div className="flex items-center gap-2">
+                    <Check className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                    <span>2k–10k circular loops</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Check className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                    <span>Park & green path discovery</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Check className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                    <span>Real-time off-route guidance</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Check className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                    <span>Saved home & GPS starting points</span>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* 4. Daily Run Showcase: Pure CSS & Typography Telemetry Card */}
+      <section id="daily-run-showcase" className="py-16 sm:py-24 px-4 sm:px-6 border-t border-white/10 bg-[#090c10]">
+        <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12 items-center">
+          <motion.div
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: '-60px' }}
+            variants={fadeInUp}
+            className="space-y-4"
+          >
+            <span className="text-[11px] font-bold uppercase tracking-wider text-orange-400 font-mono">
+              Live Outdoor Tracking
+            </span>
+            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
+              Daily Run: Real-time GPS & Athletic Telemetry
+            </h2>
+            <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed">
+              Experience clean, distraction-free running tracking directly in your browser. Record your real outdoor routes on an interactive OpenStreetMap canvas with accurate Haversine distance, active duration, rolling pace, and estimated calories burned based on your verified body weight.
+            </p>
+
+            <ul className="space-y-2.5 text-xs text-zinc-300">
+              <li className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-orange-400 shrink-0" />
+                <span>Live GPS route polyline with stationary noise filtering</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-orange-400 shrink-0" />
+                <span>Instant pause and resume without straight-line GPS gaps</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-orange-400 shrink-0" />
+                <span>Personal records for longest distance, fastest pace, and best duration</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-orange-400 shrink-0" />
+                <span>Monthly calendar and weekly volume analytics charts</span>
+              </li>
+            </ul>
+          </motion.div>
+
+          {/* Clean Typography-Driven Workout Telemetry Card (Zero Images, Zero 3D) */}
+          <motion.div
+            initial={{ opacity: 0, x: 16 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true, margin: '-60px' }}
+            transition={{ duration: 0.6 }}
+            className="rounded-3xl p-5 sm:p-6 bg-zinc-900 border border-white/10 shadow-xl space-y-4"
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+              <div className="flex items-center gap-2">
+                <Activity className="w-4 h-4 text-orange-400" />
+                <span className="text-xs font-bold text-white">Morning 5K Outdoor Run</span>
+              </div>
+              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-orange-500/10 border border-orange-500/20 text-[10px] font-mono text-orange-400">
+                <span className="w-1.5 h-1.5 rounded-full bg-orange-400 animate-pulse" />
+                GPS LOCKED · ±4m
+              </span>
+            </div>
+
+            {/* Key Metrics Grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <div className="p-3 rounded-xl bg-zinc-950/80 border border-white/5 text-center">
+                <span className="text-[10px] text-zinc-400 block font-mono">Distance</span>
+                <span className="text-xl font-bold font-mono text-white">5.02 km</span>
+              </div>
+              <div className="p-3 rounded-xl bg-zinc-950/80 border border-white/5 text-center">
+                <span className="text-[10px] text-zinc-400 block font-mono">Duration</span>
+                <span className="text-xl font-bold font-mono text-white">00:26:14</span>
+              </div>
+              <div className="p-3 rounded-xl bg-zinc-950/80 border border-white/5 text-center">
+                <span className="text-[10px] text-zinc-400 block font-mono">Rolling Pace</span>
+                <span className="text-xl font-bold font-mono text-orange-400">5:13 /km</span>
+              </div>
+              <div className="p-3 rounded-xl bg-zinc-950/80 border border-white/5 text-center">
+                <span className="text-[10px] text-zinc-400 block font-mono">Avg Speed</span>
+                <span className="text-lg font-bold font-mono text-white">11.5 km/h</span>
+              </div>
+              <div className="p-3 rounded-xl bg-zinc-950/80 border border-white/5 text-center">
+                <span className="text-[10px] text-zinc-400 block font-mono">Energy</span>
+                <span className="text-lg font-bold font-mono text-white">~348 kcal</span>
+              </div>
+              <div className="p-3 rounded-xl bg-zinc-950/80 border border-white/5 text-center">
+                <span className="text-[10px] text-zinc-400 block font-mono">Elevation</span>
+                <span className="text-lg font-bold font-mono text-emerald-400">+24 m</span>
+              </div>
+            </div>
+
+            {/* Structured Kilometer Splits Breakdown (Pure CSS & Typography) */}
+            <div className="p-3.5 rounded-xl bg-zinc-950/80 border border-white/5 space-y-2">
+              <div className="text-[11px] font-mono font-semibold text-zinc-400 flex items-center justify-between">
+                <span>KILOMETER SPLITS</span>
+                <span>PACE / ELEV</span>
+              </div>
+              <div className="space-y-1.5 text-xs font-mono">
+                <div className="flex items-center justify-between text-zinc-300">
+                  <span>KM 1</span>
+                  <div className="w-32 bg-zinc-800 h-1.5 rounded-full overflow-hidden mx-2 hidden sm:block">
+                    <div className="bg-orange-400 h-full w-[85%]" />
+                  </div>
+                  <span>5:22 /km · +4m</span>
+                </div>
+                <div className="flex items-center justify-between text-zinc-300">
+                  <span>KM 2</span>
+                  <div className="w-32 bg-zinc-800 h-1.5 rounded-full overflow-hidden mx-2 hidden sm:block">
+                    <div className="bg-orange-400 h-full w-[88%]" />
+                  </div>
+                  <span>5:18 /km · +8m</span>
+                </div>
+                <div className="flex items-center justify-between text-zinc-300">
+                  <span>KM 3</span>
+                  <div className="w-32 bg-zinc-800 h-1.5 rounded-full overflow-hidden mx-2 hidden sm:block">
+                    <div className="bg-orange-400 h-full w-[91%]" />
+                  </div>
+                  <span>5:11 /km · +2m</span>
+                </div>
+                <div className="flex items-center justify-between text-zinc-300">
+                  <span>KM 4</span>
+                  <div className="w-32 bg-zinc-800 h-1.5 rounded-full overflow-hidden mx-2 hidden sm:block">
+                    <div className="bg-orange-400 h-full w-[94%]" />
+                  </div>
+                  <span>5:08 /km · -6m</span>
+                </div>
+                <div className="flex items-center justify-between text-emerald-400 font-bold">
+                  <span>KM 5.02</span>
+                  <div className="w-32 bg-zinc-800 h-1.5 rounded-full overflow-hidden mx-2 hidden sm:block">
+                    <div className="bg-emerald-400 h-full w-[98%]" />
+                  </div>
+                  <span>5:04 /km · +16m</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Personal Record Indicator */}
+            <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-between text-xs font-medium text-amber-200">
+              <span className="flex items-center gap-2">
+                <Trophy className="w-4 h-4 text-amber-400" />
+                <span>Personal Record: Fastest 5K Pace</span>
+              </span>
+              <span className="font-mono font-bold text-amber-400">5:13 /km</span>
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* 5. Daily Routes Showcase: Pure CSS & Typography Route Planning Card */}
+      <section id="daily-routes-showcase" className="py-16 sm:py-24 px-4 sm:px-6 border-t border-white/10 bg-zinc-950">
+        <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12 items-center">
+          {/* Loop Route Planning Card (Zero Images, Zero 3D) */}
+          <motion.div
+            initial={{ opacity: 0, x: -16 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true, margin: '-60px' }}
+            transition={{ duration: 0.6 }}
+            className="order-2 md:order-1 rounded-3xl p-5 sm:p-6 bg-zinc-900 border border-white/10 shadow-xl space-y-4"
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+              <div className="flex items-center gap-2">
+                <Compass className="w-4 h-4 text-indigo-400" />
+                <span className="text-xs font-bold text-white">Suggested Circular Loop</span>
+              </div>
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                LOOP VERIFIED
+              </span>
+            </div>
+
+            {/* Route Title & Telemetry Header */}
+            <div className="space-y-1.5 p-4 rounded-2xl bg-zinc-950/80 border border-white/5">
+              <h4 className="text-base font-bold text-white">
+                Queen's Park & Waterfront Trail Loop
+              </h4>
+              <div className="flex items-center gap-3 text-xs text-zinc-400 font-mono flex-wrap">
+                <span className="font-bold text-white">5.18 km distance</span>
+                <span aria-hidden="true">·</span>
+                <span>~27 min est</span>
+                <span aria-hidden="true">·</span>
+                <span className="text-emerald-400">+28m gain</span>
+              </div>
+            </div>
+
+            {/* Discovered Landmarks Timeline (Pure Typography & Badges) */}
+            <div className="p-4 rounded-2xl bg-zinc-950/80 border border-white/5 space-y-3">
+              <div className="text-[11px] font-mono font-semibold text-zinc-400 uppercase">
+                Route Waypoints & Discovered Landmarks
+              </div>
+              <div className="space-y-2.5 text-xs text-zinc-300">
+                <div className="flex items-start gap-2.5">
+                  <div className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 mt-0.5 text-[10px] font-bold">
+                    01
                   </div>
                   <div>
-                    <span className="font-bold text-zinc-900 dark:text-zinc-100 text-xs tracking-tight">Today's Habits</span>
-                    <span className="text-[10px] text-zinc-500 dark:text-zinc-400 block font-mono">4 of 5 completed</span>
+                    <span className="font-semibold text-white">Start / Finish Point</span>
+                    <span className="text-zinc-500 text-[11px] block">Saved Home location or current GPS fix</span>
                   </div>
                 </div>
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-[11px] font-bold shadow-2xs">
-                  <Flame className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
-                  <span>5-Day Streak</span>
-                </div>
-              </div>
 
-              {/* Progress Bar in Preview */}
-              <div className="mt-3.5 bg-zinc-100/60 dark:bg-zinc-800/40 p-3 rounded-xl border border-zinc-200/60 dark:border-white/5 backdrop-blur-xs">
-                <div className="flex items-center justify-between text-[11px] font-semibold text-zinc-600 dark:text-zinc-400 mb-1.5">
-                  <span>Daily Completion</span>
-                  <span className="font-mono font-bold text-zinc-900 dark:text-zinc-100">80%</span>
-                </div>
-                <div className="w-full h-2 bg-zinc-200/80 dark:bg-zinc-700/80 rounded-full overflow-hidden p-0.5 border border-zinc-300/30 dark:border-white/5">
-                  <div className="h-full bg-emerald-500 rounded-full w-[80%] transition-all shadow-xs" />
-                </div>
-              </div>
-
-              {/* Realistic Habit Items List */}
-              <div className="mt-3.5 space-y-2">
-                <div className="flex items-center justify-between p-2.5 rounded-xl glass-tile border-zinc-200/60 dark:border-white/5">
-                  <div className="flex items-center gap-2.5 text-xs text-zinc-800 dark:text-zinc-200">
-                    <div className="w-4 h-4 rounded-md bg-emerald-500 text-white flex items-center justify-center shadow-xs">
-                      <Check className="w-3 h-3 stroke-[3]" />
-                    </div>
-                    <span className="line-through text-zinc-400 dark:text-zinc-500 font-medium">Drink 2.5L Water</span>
+                <div className="flex items-start gap-2.5">
+                  <div className="w-5 h-5 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center shrink-0 mt-0.5 text-[10px] font-bold">
+                    02
                   </div>
-                  <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono">08:30 AM</span>
-                </div>
-
-                <div className="flex items-center justify-between p-2.5 rounded-xl glass-tile border-zinc-200/60 dark:border-white/5">
-                  <div className="flex items-center gap-2.5 text-xs text-zinc-800 dark:text-zinc-200">
-                    <div className="w-4 h-4 rounded-md bg-emerald-500 text-white flex items-center justify-center shadow-xs">
-                      <Check className="w-3 h-3 stroke-[3]" />
-                    </div>
-                    <span className="line-through text-zinc-400 dark:text-zinc-500 font-medium">Morning Workout</span>
+                  <div>
+                    <span className="font-semibold text-white">Queen's Park West Promenade</span>
+                    <span className="text-zinc-500 text-[11px] block">Traffic-free pedestrian trail · 1.6 km</span>
                   </div>
-                  <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono">09:15 AM</span>
                 </div>
 
-                <div className="flex items-center justify-between p-2.5 rounded-xl glass-tile border-zinc-200/60 dark:border-white/5">
-                  <div className="flex items-center gap-2.5 text-xs text-zinc-800 dark:text-zinc-200">
-                    <div className="w-4 h-4 rounded-md bg-emerald-500 text-white flex items-center justify-center shadow-xs">
-                      <Check className="w-3 h-3 stroke-[3]" />
-                    </div>
-                    <span className="line-through text-zinc-400 dark:text-zinc-500 font-medium">Read 20 Pages</span>
+                <div className="flex items-start gap-2.5">
+                  <div className="w-5 h-5 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center shrink-0 mt-0.5 text-[10px] font-bold">
+                    03
                   </div>
-                  <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono">01:45 PM</span>
-                </div>
-
-                <div className="flex items-center justify-between p-2.5 rounded-xl glass-card border-zinc-300/80 dark:border-white/15 shadow-sm">
-                  <div className="flex items-center gap-2.5 text-xs font-semibold text-zinc-900 dark:text-zinc-100">
-                    <div className="w-4 h-4 rounded-md border border-zinc-300 dark:border-zinc-600 bg-white/80 dark:bg-zinc-800/80 flex items-center justify-center" />
-                    <span>Evening Mindfulness (10 mins)</span>
+                  <div>
+                    <span className="font-semibold text-white">Waterfront Esplanade Path</span>
+                    <span className="text-zinc-500 text-[11px] block">Scenic riverway sidewalk · 2.1 km</span>
                   </div>
-                  <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider font-mono">Pending</span>
                 </div>
-              </div>
 
-              {/* Floating Context Badges */}
-              <div className="absolute -top-3 -right-2 sm:-right-4 px-3 py-1 rounded-full bg-zinc-950/90 dark:bg-zinc-100/95 backdrop-blur-md text-white dark:text-zinc-950 text-[10px] font-bold shadow-xl border border-white/20 dark:border-zinc-900/10 flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-amber-400 dark:text-amber-600" />
-                <span>Instant Cloud Sync</span>
+                <div className="flex items-start gap-2.5">
+                  <div className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 mt-0.5 text-[10px] font-bold">
+                    04
+                  </div>
+                  <div>
+                    <span className="font-semibold text-white">Complete Loop Return</span>
+                    <span className="text-zinc-500 text-[11px] block">Seamless circular return to start</span>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
-      </section>
 
-      {/* 4. Section: Why Daily Habits */}
-      <section id="why" className="py-12 sm:py-16 px-4 sm:px-6 border-t border-zinc-200/70 dark:border-white/10 bg-zinc-100/30 dark:bg-zinc-900/20">
-        <div className="max-w-5xl mx-auto">
-          <div className="text-center max-w-2xl mx-auto mb-10 sm:mb-12">
-            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
-              Everything you need to stay consistent.
-            </h2>
-            <p className="text-sm sm:text-base text-zinc-600 dark:text-zinc-400 mt-2.5">
-              Built on the core principles of habit formation: organized tracking, insightful feedback, and visible momentum.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
-            {/* Card 1: Track */}
-            <div className="p-5 sm:p-6 rounded-2xl glass-card shadow-lg hover:border-zinc-400/50 dark:hover:border-white/20 transition-all">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 flex items-center justify-center mb-4 shadow-xs">
-                <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+            {/* Path Surface Breakdown Bar */}
+            <div className="p-3 rounded-xl bg-zinc-950/80 border border-white/5 space-y-1.5 text-xs">
+              <div className="flex justify-between text-[11px] font-mono text-zinc-400">
+                <span>SURFACE: 82% PAVED · 18% TRAIL</span>
+                <span>CROSSINGS: 2</span>
               </div>
-              <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
-                Track
-              </h3>
-              <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 mt-2 leading-relaxed">
-                Keep your daily habits organized and see what you've completed with a clear, distraction-free single-screen checklist.
-              </p>
+              <div className="w-full bg-zinc-800 h-2 rounded-full overflow-hidden flex">
+                <div className="bg-indigo-400 h-full w-[82%]" title="Paved Sidewalk" />
+                <div className="bg-emerald-400 h-full w-[18%]" title="Park Trail" />
+              </div>
             </div>
 
-            {/* Card 2: Improve */}
-            <div className="p-5 sm:p-6 rounded-2xl glass-card shadow-lg hover:border-zinc-400/50 dark:hover:border-white/20 transition-all">
-              <div className="w-10 h-10 rounded-xl bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30 flex items-center justify-center mb-4 shadow-xs">
-                <TrendingUp className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-              </div>
-              <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
-                Improve
-              </h3>
-              <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 mt-2 leading-relaxed">
-                Understand your routine, log daily reflections, and identify trends in your weekly consistency and metrics.
-              </p>
+            {/* Guidance Status */}
+            <div className="p-3 rounded-xl bg-emerald-950/30 border border-emerald-500/20 text-xs text-emerald-200 flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                <span>Live off-route deviation guidance enabled</span>
+              </span>
+              <span className="text-[10px] font-mono text-emerald-400 font-bold">ACTIVE</span>
             </div>
+          </motion.div>
 
-            {/* Card 3: Achieve */}
-            <div className="p-5 sm:p-6 rounded-2xl glass-card shadow-lg hover:border-zinc-400/50 dark:hover:border-white/20 transition-all">
-              <div className="w-10 h-10 rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 flex items-center justify-center mb-4 shadow-xs">
-                <Trophy className="w-5 h-5 text-amber-500" />
-              </div>
-              <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
-                Achieve
-              </h3>
-              <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 mt-2 leading-relaxed">
-                Build real momentum through automatic streak calculations, milestone unlocks, and measurable health records.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 5. Section: Feature Showcase */}
-      <section id="features" className="py-12 sm:py-16 px-4 sm:px-6 border-t border-zinc-200/70 dark:border-white/10">
-        <div className="max-w-5xl mx-auto">
-          <div className="text-center max-w-xl mx-auto mb-10 sm:mb-12">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 font-mono">
-              Core Capabilities
+          <motion.div
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: '-60px' }}
+            variants={fadeInUp}
+            className="order-1 md:order-2 space-y-4"
+          >
+            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-400 font-mono">
+              Loop Route Discovery
             </span>
-            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 mt-1">
-              Engineered for consistency
+            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
+              Daily Routes: Intelligent Loop Route Planner
             </h2>
-          </div>
+            <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed">
+              Never get bored of your regular route. Pick your current GPS position or saved home location, choose your target distance (2k, 3k, 5k, 8k, or 10k), and discover scenic circular routes that start and finish at your doorstep.
+            </p>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4">
-            {/* 1. Smart Streaks */}
-            <div className="p-5 rounded-2xl glass-card transition-all hover:border-zinc-400/50 dark:hover:border-white/20 shadow-sm">
-              <div className="flex items-center gap-2.5 mb-2.5">
-                <div className="w-8 h-8 rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 flex items-center justify-center shrink-0 shadow-2xs">
-                  <Flame className="w-4 h-4 fill-amber-500 text-amber-500" />
-                </div>
-                <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Smart Streaks</h3>
-              </div>
-              <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
-                Track consistency automatically with current and all-time best streak counts calculated dynamically from your history.
-              </p>
-            </div>
-
-            {/* 2. Progress Analytics */}
-            <div className="p-5 rounded-2xl glass-card transition-all hover:border-zinc-400/50 dark:hover:border-white/20 shadow-sm">
-              <div className="flex items-center gap-2.5 mb-2.5">
-                <div className="w-8 h-8 rounded-xl bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30 flex items-center justify-center shrink-0 shadow-2xs">
-                  <BarChart3 className="w-4 h-4" />
-                </div>
-                <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Progress Analytics</h3>
-              </div>
-              <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
-                Understand your daily, weekly, and monthly performance with completion rate breakdowns and activity trends.
-              </p>
-            </div>
-
-            {/* 3. Smart Reminders */}
-            <div className="p-5 rounded-2xl glass-card transition-all hover:border-zinc-400/50 dark:hover:border-white/20 shadow-sm">
-              <div className="flex items-center gap-2.5 mb-2.5">
-                <div className="w-8 h-8 rounded-xl bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border border-indigo-500/30 flex items-center justify-center shrink-0 shadow-2xs">
-                  <Bell className="w-4 h-4" />
-                </div>
-                <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Smart Reminders</h3>
-              </div>
-              <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
-                Get intelligent browser notifications about your remaining unfinished habits at your chosen schedule.
-              </p>
-            </div>
-
-            {/* 4. Daily Notes */}
-            <div className="p-5 rounded-2xl glass-card transition-all hover:border-zinc-400/50 dark:hover:border-white/20 shadow-sm">
-              <div className="flex items-center gap-2.5 mb-2.5">
-                <div className="w-8 h-8 rounded-xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 flex items-center justify-center shrink-0 shadow-2xs">
-                  <BookOpen className="w-4 h-4" />
-                </div>
-                <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Daily Notes</h3>
-              </div>
-              <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
-                Capture quick reflections, daily wins, or context alongside each day's checklist for a complete personal journal.
-              </p>
-            </div>
-
-            {/* 5. Milestones */}
-            <div className="p-5 rounded-2xl glass-card transition-all hover:border-zinc-400/50 dark:hover:border-white/20 shadow-sm">
-              <div className="flex items-center gap-2.5 mb-2.5">
-                <div className="w-8 h-8 rounded-xl bg-purple-500/15 text-purple-600 dark:text-purple-400 border border-purple-500/30 flex items-center justify-center shrink-0 shadow-2xs">
-                  <Trophy className="w-4 h-4" />
-                </div>
-                <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Milestones</h3>
-              </div>
-              <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
-                Celebrate your consistency as you hit 3-day, 7-day, 30-day, and 100-day streaks with commemorative milestone badges.
-              </p>
-            </div>
-
-            {/* 6. Data Export & Ownership */}
-            <div className="p-5 rounded-2xl glass-card transition-all hover:border-zinc-400/50 dark:hover:border-white/20 shadow-sm">
-              <div className="flex items-center gap-2.5 mb-2.5">
-                <div className="w-8 h-8 rounded-xl bg-orange-500/15 text-orange-600 dark:text-orange-400 border border-orange-500/30 flex items-center justify-center shrink-0 shadow-2xs">
-                  <Download className="w-4 h-4" />
-                </div>
-                <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Data Export & Backup</h3>
-              </div>
-              <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
-                Export your full habit logs, history, milestones, and notes anytime in clean, open JSON format.
-              </p>
-            </div>
-          </div>
+            <ul className="space-y-2.5 text-xs text-zinc-300">
+              <li className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>Pedestrian-safe paths following actual sidewalks and park trails</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>Discovers nearby public parks, lakes, running tracks, and recreation grounds</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>Save favourite routes to your account with offline caching</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>Live route guidance with off-route alerts and loop completion indicators</span>
+              </li>
+            </ul>
+          </motion.div>
         </div>
       </section>
 
       {/* 6. Section: How It Works */}
-      <section id="how-it-works" className="py-12 sm:py-16 px-4 sm:px-6 border-t border-zinc-200/70 dark:border-white/10 bg-zinc-100/30 dark:bg-zinc-900/20">
+      <section id="how-it-works" className="py-14 sm:py-20 px-4 sm:px-6 border-t border-white/10 bg-[#090c10]">
         <div className="max-w-4xl mx-auto">
-          <div className="text-center max-w-xl mx-auto mb-10 sm:mb-12">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 font-mono">
-              Simple Workflow
+          <motion.div
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: '-60px' }}
+            variants={fadeInUp}
+            className="text-center max-w-xl mx-auto mb-10 sm:mb-14"
+          >
+            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-400 font-mono">
+              Simple 5-Step Process
             </span>
-            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 mt-1">
-              How it works
+            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-white mt-1">
+              How Daily Habits works
             </h2>
-          </div>
+          </motion.div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative">
+          <motion.div
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: '-60px' }}
+            variants={staggerContainer}
+            className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3.5 relative text-left"
+          >
             {/* Step 1 */}
-            <div className="flex flex-col items-start p-6 rounded-2xl glass-card shadow-lg">
-              <span className="text-xs font-mono font-bold text-zinc-400 dark:text-zinc-500 mb-2">
-                01
-              </span>
-              <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
-                Create your routine
-              </h3>
-              <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 mt-1.5 leading-relaxed">
-                Choose the habits that matter to you or select from curated daily templates.
+            <motion.div variants={fadeInUp} whileHover={{ y: -2 }} className="p-4 rounded-2xl bg-zinc-900 border border-white/10">
+              <span className="text-xs font-mono font-bold text-emerald-400 mb-1.5 block">01</span>
+              <h3 className="text-xs font-bold text-white">Sign in securely</h3>
+              <p className="text-[11px] text-zinc-400 mt-1 leading-relaxed">
+                One-tap sign-in with your Google account. Your records stay isolated to your UID.
               </p>
-            </div>
+            </motion.div>
 
             {/* Step 2 */}
-            <div className="flex flex-col items-start p-6 rounded-2xl glass-card shadow-lg">
-              <span className="text-xs font-mono font-bold text-zinc-400 dark:text-zinc-500 mb-2">
-                02
-              </span>
-              <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
-                Track every day
-              </h3>
-              <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 mt-1.5 leading-relaxed">
-                Mark habits as you complete them and add optional daily reflections and notes.
+            <motion.div variants={fadeInUp} whileHover={{ y: -2 }} className="p-4 rounded-2xl bg-zinc-900 border border-white/10">
+              <span className="text-xs font-mono font-bold text-emerald-400 mb-1.5 block">02</span>
+              <h3 className="text-xs font-bold text-white">Set daily habits</h3>
+              <p className="text-[11px] text-zinc-400 mt-1 leading-relaxed">
+                Customize habits, priorities, and smart schedules for daily consistency.
               </p>
-            </div>
+            </motion.div>
 
             {/* Step 3 */}
-            <div className="flex flex-col items-start p-6 rounded-2xl glass-card shadow-lg">
-              <span className="text-xs font-mono font-bold text-zinc-400 dark:text-zinc-500 mb-2">
-                03
-              </span>
-              <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
-                Improve over time
-              </h3>
-              <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 mt-1.5 leading-relaxed">
-                Use your completion percentages, streak charts, and milestone progress to build long-term consistency.
+            <motion.div variants={fadeInUp} whileHover={{ y: -2 }} className="p-4 rounded-2xl bg-zinc-900 border border-white/10">
+              <span className="text-xs font-mono font-bold text-emerald-400 mb-1.5 block">03</span>
+              <h3 className="text-xs font-bold text-white">Track activities</h3>
+              <p className="text-[11px] text-zinc-400 mt-1 leading-relaxed">
+                Check off routines, scan meals with AI, and track outdoor runs with live GPS.
               </p>
-            </div>
-          </div>
+            </motion.div>
+
+            {/* Step 4 */}
+            <motion.div variants={fadeInUp} whileHover={{ y: -2 }} className="p-4 rounded-2xl bg-zinc-900 border border-white/10">
+              <span className="text-xs font-mono font-bold text-emerald-400 mb-1.5 block">04</span>
+              <h3 className="text-xs font-bold text-white">Discover routes</h3>
+              <p className="text-[11px] text-zinc-400 mt-1 leading-relaxed">
+                Generate 2k–10k pedestrian loop routes starting and returning to your doorstep.
+              </p>
+            </motion.div>
+
+            {/* Step 5 */}
+            <motion.div variants={fadeInUp} whileHover={{ y: -2 }} className="p-4 rounded-2xl bg-zinc-900 border border-white/10">
+              <span className="text-xs font-mono font-bold text-emerald-400 mb-1.5 block">05</span>
+              <h3 className="text-xs font-bold text-white">Review progress</h3>
+              <p className="text-[11px] text-zinc-400 mt-1 leading-relaxed">
+                Inspect streak milestones, weekly volume trends, and personal records.
+              </p>
+            </motion.div>
+          </motion.div>
         </div>
       </section>
 
-      {/* 7. Section: Product Preview */}
-      <section id="preview" className="py-12 sm:py-16 px-4 sm:px-6 border-t border-zinc-200/70 dark:border-white/10">
-        <div className="max-w-4xl mx-auto text-center">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 font-mono">
-            Designed for Daily Clarity
-          </span>
-          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 mt-1">
-            Your day. At a glance.
+      {/* 7. Privacy & Data Security Section */}
+      <section id="privacy" className="py-14 sm:py-20 px-4 sm:px-6 border-t border-white/10 bg-zinc-950">
+        <motion.div
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: '-60px' }}
+          variants={fadeInUp}
+          className="max-w-4xl mx-auto text-center space-y-4"
+        >
+          <div className="w-10 h-10 rounded-xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 flex items-center justify-center mx-auto shadow-xs">
+            <Lock className="w-5 h-5" />
+          </div>
+
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
+            Privacy & Strict User Data Isolation
           </h2>
-          <p className="text-sm sm:text-base text-zinc-600 dark:text-zinc-400 mt-2 max-w-lg mx-auto">
-            A single, focused view that displays your daily checklist, streaks, and progress without cluttered sidebars or complex menus.
+
+          <p className="text-xs sm:text-sm text-zinc-400 max-w-2xl mx-auto leading-relaxed">
+            Your personal habits, profile information, meal records, run telemetry, and saved routes belong exclusively to you. Every document is scoped under your private authenticated user identifier and strictly guarded by Cloud Firestore security rules. GPS location data is only captured when you explicitly start a run workout, and is never shared, sold, or monitored in the background.
           </p>
 
-          {/* Product Preview Mockup Container */}
-          <div className="mt-8 sm:mt-10 max-w-2xl mx-auto rounded-2xl glass-card p-5 sm:p-7 shadow-2xl text-left">
-            {/* Header snippet */}
-            <div className="flex items-center justify-between pb-3.5 border-b border-zinc-200/70 dark:border-white/10">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-full bg-zinc-900 dark:bg-zinc-100 flex items-center justify-center text-white dark:text-zinc-900 text-xs shadow-xs font-bold">
-                  ✓
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-zinc-900 dark:text-zinc-100">Daily Habits</h4>
-                  <p className="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono">Wednesday, August 31</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 font-semibold font-mono">
-                  Cloud Active
-                </span>
-              </div>
-            </div>
-
-            {/* Streak & Stats Row */}
-            <div className="grid grid-cols-3 gap-2 mt-4 text-center">
-              <div className="p-3 rounded-xl glass-tile">
-                <span className="text-[10px] text-zinc-500 dark:text-zinc-400 block font-medium">Streak</span>
-                <span className="text-base font-bold text-zinc-900 dark:text-zinc-100 font-mono">5 days</span>
-              </div>
-              <div className="p-3 rounded-xl glass-tile">
-                <span className="text-[10px] text-zinc-500 dark:text-zinc-400 block font-medium">Completed</span>
-                <span className="text-base font-bold text-emerald-600 dark:text-emerald-400 font-mono">4 / 5</span>
-              </div>
-              <div className="p-3 rounded-xl glass-tile">
-                <span className="text-[10px] text-zinc-500 dark:text-zinc-400 block font-medium">Best Record</span>
-                <span className="text-base font-bold text-zinc-900 dark:text-zinc-100 font-mono">14 days</span>
-              </div>
-            </div>
-
-            {/* Checklist sample */}
-            <div className="mt-4 space-y-2">
-              <div className="flex items-center justify-between p-3 rounded-xl glass-tile text-xs">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-4 h-4 rounded-md bg-emerald-500 text-white flex items-center justify-center text-[10px] shadow-2xs font-bold">
-                    ✓
-                  </div>
-                  <span className="line-through text-zinc-400 dark:text-zinc-500 font-medium">Morning Hydration (500ml)</span>
-                </div>
-                <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono">Done</span>
-              </div>
-
-              <div className="flex items-center justify-between p-3 rounded-xl glass-tile text-xs">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-4 h-4 rounded-md bg-emerald-500 text-white flex items-center justify-center text-[10px] shadow-2xs font-bold">
-                    ✓
-                  </div>
-                  <span className="line-through text-zinc-400 dark:text-zinc-500 font-medium">30 Min Strength Training</span>
-                </div>
-                <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono">Done</span>
-              </div>
-
-              <div className="flex items-center justify-between p-3 rounded-xl glass-tile text-xs">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-4 h-4 rounded-md bg-emerald-500 text-white flex items-center justify-center text-[10px] shadow-2xs font-bold">
-                    ✓
-                  </div>
-                  <span className="line-through text-zinc-400 dark:text-zinc-500 font-medium">Deep Work Session (90 min)</span>
-                </div>
-                <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono">Done</span>
-              </div>
-            </div>
+          <div className="pt-2 flex items-center justify-center gap-4 text-xs font-medium text-zinc-400">
+            <span className="flex items-center gap-1.5">
+              <ShieldCheck className="w-4 h-4 text-emerald-400" />
+              <span>Firebase ABAC Protected</span>
+            </span>
+            <span aria-hidden="true">·</span>
+            <span className="flex items-center gap-1.5">
+              <Download className="w-4 h-4 text-emerald-400" />
+              <span>1-Tap Full Data Export</span>
+            </span>
           </div>
-        </div>
+        </motion.div>
       </section>
 
-      {/* 8. Section: Final CTA */}
-      <section className="py-14 sm:py-20 px-4 sm:px-6 border-t border-zinc-200/70 dark:border-white/10 bg-zinc-100/30 dark:bg-zinc-900/30">
-        <div className="max-w-xl mx-auto text-center flex flex-col items-center">
-          <div className="w-12 h-12 rounded-2xl bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 flex items-center justify-center mb-4 shadow-md font-bold">
+      {/* 8. Final CTA */}
+      <section className="py-16 sm:py-24 px-4 sm:px-6 border-t border-white/10 bg-[#090c10]">
+        <motion.div
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: '-60px' }}
+          variants={fadeInUp}
+          className="max-w-xl mx-auto text-center flex flex-col items-center"
+        >
+          <div className="w-12 h-12 rounded-2xl bg-emerald-400 text-zinc-950 flex items-center justify-center mb-4 shadow-md font-bold">
             <Check className="w-6 h-6 stroke-[3]" />
           </div>
 
-          <h2 className="text-2xl sm:text-4xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
+          <h2 className="text-2xl sm:text-4xl font-bold tracking-tight text-white">
             Start building better days.
           </h2>
 
-          <p className="text-xs sm:text-sm md:text-base text-zinc-600 dark:text-zinc-400 mt-2.5 max-w-md">
-            Track your habits. Improve your routine. Achieve your goals.
+          <p className="text-xs sm:text-sm md:text-base text-zinc-400 mt-2.5 max-w-md">
+            Build consistent habits. Track your outdoor runs. Discover local loop routes.
           </p>
 
           <div className="mt-6 w-full max-w-xs">
@@ -622,32 +1068,40 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               type="button"
               disabled={isLoading}
               onClick={onGetStarted}
-              className="w-full min-h-[48px] inline-flex items-center justify-center gap-2.5 px-6 py-3 bg-zinc-900 hover:bg-black dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 font-bold text-sm sm:text-base rounded-xl transition-all shadow-lg active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer group"
+              className="w-full min-h-[48px] inline-flex items-center justify-center gap-2.5 px-6 py-3 bg-emerald-400 hover:bg-emerald-300 text-zinc-950 font-bold text-sm sm:text-base rounded-xl transition-all shadow-lg active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer group"
             >
               <span>Get Started</span>
-              <ArrowRight className="w-4 h-4 text-zinc-400 dark:text-zinc-600 group-hover:translate-x-0.5 transition-transform" />
+              <ArrowRight className="w-4 h-4 text-zinc-950 group-hover:translate-x-0.5 transition-transform" />
             </button>
           </div>
-        </div>
+        </motion.div>
       </section>
 
-      {/* 9. Minimal Footer */}
-      <footer className="py-8 px-4 sm:px-6 border-t border-zinc-200 dark:border-zinc-850 bg-white dark:bg-zinc-950 text-center text-xs text-zinc-500 dark:text-zinc-400">
-        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
+      {/* 9. Footer */}
+      <footer className="py-8 px-4 sm:px-6 border-t border-white/10 bg-zinc-950 text-xs text-zinc-500">
+        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <div className="w-5 h-5 rounded-full bg-zinc-900 dark:bg-zinc-800 flex items-center justify-center text-white text-[10px]">
+            <div className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center text-[10px]">
               ✓
             </div>
-            <span className="font-semibold text-zinc-900 dark:text-zinc-100">Daily Habits</span>
+            <span className="font-semibold text-white">Daily Habits</span>
+            <span className="text-zinc-600 text-[11px]">v1.0</span>
           </div>
 
-          <p className="font-mono text-[11px] uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
-            Track • Improve • Achieve
-          </p>
-
-          <p className="text-[11px] text-zinc-400 dark:text-zinc-500">
-            Private & Secure • Cloud Powered
-          </p>
+          <div className="flex items-center gap-4 text-xs font-medium">
+            <a href="#features" className="hover:text-white transition-colors">
+              Features
+            </a>
+            <a href="#daily-run-showcase" className="hover:text-white transition-colors">
+              Daily Run
+            </a>
+            <a href="#daily-routes-showcase" className="hover:text-white transition-colors">
+              Daily Routes
+            </a>
+            <a href="#privacy" className="hover:text-white transition-colors">
+              Privacy
+            </a>
+          </div>
         </div>
       </footer>
     </div>

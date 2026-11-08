@@ -1,3 +1,5 @@
+export type { UserProfile } from '../../../types';
+
 export type RunStatus = 'idle' | 'acquiring_gps' | 'running' | 'paused' | 'finished';
 
 export type GPSStatus = 'acquiring' | 'ready' | 'weak' | 'lost';
@@ -62,6 +64,70 @@ export interface RunSession {
   updatedAt: string;
 }
 
+export interface FirestoreRunPoint {
+  latitude: number;
+  longitude: number;
+  timestamp: number;
+  accuracy?: number | null;
+}
+
+export interface FirestoreRunDocument {
+  runId: string;
+  userId: string;
+  title: string;
+  distanceMeters: number;
+  durationSeconds: number;
+  averagePaceSecondsPerKm: number | null;
+  averageSpeedKmh: number | null;
+  caloriesEstimate: number | null;
+  caloriesExplanation?: string | null;
+  notes?: string | null;
+  routeCoordinates: FirestoreRunPoint[];
+  routePointCount: number;
+  startedAt: string;
+  endedAt: string;
+  createdAt: string;
+  updatedAt: string;
+  status: 'completed';
+}
+
+/**
+ * Phase 5: Cloud Synchronization Statuses
+ */
+export type SyncStatus = 'synced' | 'pending' | 'syncing' | 'failed';
+
+/**
+ * Local IndexedDB Completed Run Record
+ */
+export interface LocalRunRecord extends FirestoreRunDocument {
+  syncStatus: SyncStatus;
+  syncError?: string | null;
+  lastSyncAttempt?: string | null;
+  syncedAt?: string | null;
+  retryCount?: number;
+}
+
+/**
+ * Persisted Active Run Session in IndexedDB (for recovery after reload/crash)
+ */
+export interface PersistedActiveSession {
+  runId: string;
+  userId: string;
+  title: string;
+  status: RunStatus;
+  startTime: string | null;
+  endTime: string | null;
+  durationSeconds: number;
+  accumulatedActiveMs: number;
+  activeSegmentStartTime: number | null;
+  totalDistanceMeters: number;
+  metrics: RunMetrics;
+  segments: RouteSegment[];
+  startPosition: GPSCoordinate | null;
+  currentPosition: GPSCoordinate | null;
+  lastSavedAt: number;
+}
+
 /**
  * Interface contract for Live GPS Location Tracker
  */
@@ -79,7 +145,7 @@ export interface IGPSTracker {
  * Interface contract for Local Storage & Persistence
  */
 export interface IRunStorageService {
-  getActiveRunSession: (userId: string) => RunSession | null;
+  getActiveRunSession: (userId: string) => Promise<PersistedActiveSession | null> | RunSession | null;
   saveActiveRunSession: (session: RunSession) => void;
   clearActiveRunSession: (userId: string) => void;
   getRunHistory: (userId: string) => RunSession[];
@@ -88,9 +154,13 @@ export interface IRunStorageService {
 }
 
 /**
- * Interface contract for Firebase Cloud Sync (Phase 3)
+ * Interface contract for Firebase Cloud Sync (Phase 4 & 5)
  */
 export interface IRunFirebaseSyncService {
   syncRunToCloud: (session: RunSession) => Promise<{ success: boolean; cloudId?: string; error?: string }>;
   fetchUserRunsFromCloud: (userId: string) => Promise<RunSession[]>;
 }
+
+export * from './routes';
+
+

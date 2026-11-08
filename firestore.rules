@@ -65,6 +65,33 @@ service cloud.firestore {
       match /achievements/{achievementId} {
         allow read, write: if isOwner(userId);
       }
+
+      // Completed daily runs subcollection
+      match /runs/{runId} {
+        allow get, list, delete: if isOwner(userId);
+        allow create: if isOwner(userId)
+          && request.resource.data.userId == userId
+          && request.resource.data.runId == runId
+          && request.resource.data.distanceMeters is number
+          && request.resource.data.durationSeconds is number
+          && request.resource.data.status == 'completed';
+        allow update: if isOwner(userId)
+          && request.resource.data.userId == userId
+          && request.resource.data.runId == runId;
+      }
+
+      // Saved favourite routes subcollection (Daily Routes loop planner)
+      match /savedRoutes/{routeId} {
+        allow get, list, delete: if isOwner(userId);
+        allow create: if isOwner(userId)
+          && request.resource.data.userId == userId
+          && request.resource.data.routeId == routeId
+          && request.resource.data.routeName is string
+          && request.resource.data.distanceMeters is number;
+        allow update: if isOwner(userId)
+          && request.resource.data.userId == userId
+          && request.resource.data.routeId == routeId;
+      }
     }
   }
 }

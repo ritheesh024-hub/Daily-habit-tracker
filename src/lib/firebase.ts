@@ -11,11 +11,12 @@ import fallbackConfig from '../../firebase-applet-config.json';
 
 // Resolves environment variables from Vercel / Vite env if provided, otherwise falls back to config file
 const rawFallback = fallbackConfig as Record<string, any>;
-const envProjectId = import.meta.env.VITE_FIREBASE_PROJECT_ID;
+const metaEnv = typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env : ({} as Record<string, any>);
+const envProjectId = metaEnv.VITE_FIREBASE_PROJECT_ID;
 const projectId = envProjectId || rawFallback.projectId || '';
 
 // Determine database ID: if custom project is set via env, only use (default) unless explicitly specified
-const envDatabaseId = import.meta.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID;
+const envDatabaseId = metaEnv.VITE_FIREBASE_FIRESTORE_DATABASE_ID;
 let firestoreDatabaseId = '(default)';
 
 if (envDatabaseId && envDatabaseId !== '(default)') {
@@ -25,13 +26,13 @@ if (envDatabaseId && envDatabaseId !== '(default)') {
 }
 
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || rawFallback.apiKey || '',
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || rawFallback.authDomain || '',
+  apiKey: metaEnv.VITE_FIREBASE_API_KEY || rawFallback.apiKey || '',
+  authDomain: metaEnv.VITE_FIREBASE_AUTH_DOMAIN || rawFallback.authDomain || '',
   projectId,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || rawFallback.storageBucket || '',
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || rawFallback.messagingSenderId || '',
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || rawFallback.appId || '',
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || rawFallback.measurementId || '',
+  storageBucket: metaEnv.VITE_FIREBASE_STORAGE_BUCKET || rawFallback.storageBucket || '',
+  messagingSenderId: metaEnv.VITE_FIREBASE_MESSAGING_SENDER_ID || rawFallback.messagingSenderId || '',
+  appId: metaEnv.VITE_FIREBASE_APP_ID || rawFallback.appId || '',
+  measurementId: metaEnv.VITE_FIREBASE_MEASUREMENT_ID || rawFallback.measurementId || '',
 };
 
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();

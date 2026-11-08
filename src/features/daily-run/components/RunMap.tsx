@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Navigation, Compass, Layers, Plus, Minus, MapPin, LocateFixed, Eye } from 'lucide-react';
-import { GPSCoordinate, GPSStatus, RouteSegment, RunStatus } from '../types';
+import { Navigation, Compass, Layers, Plus, Minus, MapPin, LocateFixed, Eye, WifiOff, Trees, Waves, Flag } from 'lucide-react';
+import { GPSCoordinate, GPSStatus, RouteSegment, RunStatus, PlannedRoute } from '../types';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
 
 interface RunMapProps {
   status: RunStatus;
@@ -12,6 +13,7 @@ interface RunMapProps {
   segments: RouteSegment[];
   className?: string;
   isSummaryMode?: boolean;
+  plannedRoute?: PlannedRoute | null;
 }
 
 export const RunMap: React.FC<RunMapProps> = ({
@@ -22,12 +24,17 @@ export const RunMap: React.FC<RunMapProps> = ({
   segments,
   className = '',
   isSummaryMode = false,
+  plannedRoute = null,
 }) => {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
   const polylineRef = useRef<L.Polyline | null>(null);
+  const plannedPolylineRef = useRef<L.Polyline | null>(null);
+  const landmarkMarkersRef = useRef<L.Marker[]>([]);
   const currentMarkerRef = useRef<L.Marker | null>(null);
   const startMarkerRef = useRef<L.Marker | null>(null);
+
+  const isOnline = useOnlineStatus();
 
   // Auto-follow state: true when active, temporarily false when user manually pans/zooms
   const [isAutoFollow, setIsAutoFollow] = useState<boolean>(true);
@@ -70,10 +77,82 @@ export const RunMap: React.FC<RunMapProps> = ({
       map.remove();
       mapInstanceRef.current = null;
       polylineRef.current = null;
+      if (plannedPolylineRef.current) {
+        plannedPolylineRef.current.remove();
+        plannedPolylineRef.current = null;
+      }
+      landmarkMarkersRef.current.forEach((m) => m.remove());
+      landmarkMarkersRef.current = [];
       currentMarkerRef.current = null;
       startMarkerRef.current = null;
     };
   }, []);
+
+  // Render Planned Reference Route (Daily Routes Integration)
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+
+    // Remove old planned polyline and landmarks
+    if (plannedPolylineRef.current) {
+      plannedPolylineRef.current.remove();
+      plannedPolylineRef.current = null;
+    }
+    landmarkMarkersRef.current.forEach((m) => m.remove());
+    landmarkMarkersRef.current = [];
+
+    if (!plannedRoute || !plannedRoute.routeCoordinates || plannedRoute.routeCoordinates.length === 0) {
+      return;
+    }
+
+    const latlngs: L.LatLngExpression[] = plannedRoute.routeCoordinates.map((pt) => [
+      pt.latitude,
+      pt.longitude,
+    ]);
+
+    // Planned reference polyline (distinct indigo line with dash styling)
+    plannedPolylineRef.current = L.polyline(latlngs, {
+      color: '#6366f1', // Indigo
+      weight: 4,
+      dashArray: '6, 8',
+      opacity: 0.85,
+      lineJoin: 'round',
+      lineCap: 'round',
+    }).addTo(map);
+
+    // Add intermediate landmark pins
+    if (Array.isArray(plannedRoute.landmarks)) {
+      plannedRoute.landmarks.forEach((lm) => {
+        const iconHtml = `
+          <div class="relative flex items-center justify-center group">
+            <span class="w-6 h-6 rounded-full bg-indigo-600 border border-white shadow-md flex items-center justify-center text-white text-[11px] font-bold">
+              ${lm.category === 'park' ? '🌳' : lm.category === 'water' ? '💧' : lm.category === 'track' ? '🏃' : '📍'}
+            </span>
+          </div>
+        `;
+        const lmIcon = L.divIcon({
+          className: 'custom-landmark-marker',
+          html: iconHtml,
+          iconSize: [24, 24],
+          iconAnchor: [12, 12],
+        });
+
+        const marker = L.marker([lm.latitude, lm.longitude], { icon: lmIcon, zIndexOffset: 40 })
+          .bindPopup(`<div class="text-xs font-semibold p-1"><strong>${lm.name}</strong><br/><span class="text-zinc-500 capitalize">${lm.category}</span></div>`)
+          .addTo(map);
+
+        landmarkMarkersRef.current.push(marker);
+      });
+    }
+
+    // If starting tracking and idle or acquiring, fit bounds to the planned route
+    if (status === 'idle' || status === 'acquiring_gps') {
+      const bounds = plannedPolylineRef.current.getBounds();
+      if (bounds.isValid()) {
+        map.fitBounds(bounds, { padding: [25, 25] });
+      }
+    }
+  }, [plannedRoute, status]);
 
   // Update Starting Marker
   useEffect(() => {
@@ -115,7 +194,7 @@ export const RunMap: React.FC<RunMapProps> = ({
 
     if (!polylineRef.current) {
       polylineRef.current = L.polyline(multiLatLngs, {
-        color: '#ea580c', // Strava orange
+        color: '#ea580c', // Athletic orange
         weight: 5,
         opacity: 0.95,
         lineJoin: 'round',
@@ -240,6 +319,14 @@ export const RunMap: React.FC<RunMapProps> = ({
             </span>
           )}
         </div>
+
+        {/* Offline Network Status Indicator (clearly separated from GPS hardware) */}
+        {!isOnline && (
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-800 dark:text-amber-200 text-[10px] sm:text-[11px] font-semibold backdrop-blur-md shadow-xs animate-fadeIn">
+            <WifiOff className="w-3 h-3 text-amber-600 dark:text-amber-400 shrink-0" />
+            <span>Offline (Route & GPS Active)</span>
+          </div>
+        )}
       </div>
 
       {/* Top Right: Auto-follow Indicator & Compass */}
