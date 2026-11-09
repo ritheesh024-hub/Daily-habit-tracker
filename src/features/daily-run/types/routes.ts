@@ -42,6 +42,8 @@ export interface PlannedRoute {
   name: string;
   targetDistanceKm: number; // 2, 3, 5, 8, 10
   actualDistanceMeters: number;
+  differenceMeters?: number;
+  differencePercent?: number;
   estimatedDurationSeconds: number;
   elevationGainMeters: number | null;
   startLocation: RouteStartLocation;

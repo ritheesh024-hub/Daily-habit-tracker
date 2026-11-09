@@ -124,6 +124,9 @@ export function syncUserProfile(
     weight: cached?.weight,
     weightUnit: cached?.weightUnit || 'kg',
     onboardingCompleted: cached?.onboardingCompleted,
+    onboardingStep: cached?.onboardingStep,
+    goals: cached?.goals,
+    activityLevel: cached?.activityLevel,
     lastWeightCheckInDate: cached?.lastWeightCheckInDate,
     googleCalendarConnected: cached?.googleCalendarConnected,
     googleCalendarEmail: cached?.googleCalendarEmail,
@@ -153,6 +156,9 @@ export function syncUserProfile(
           heightUnit: data.heightUnit || cached?.heightUnit || 'cm',
           weight: data.weight ?? cached?.weight,
           weightUnit: data.weightUnit || cached?.weightUnit || 'kg',
+          goals: Array.isArray(data.goals) ? data.goals : cached?.goals || [],
+          activityLevel: data.activityLevel || cached?.activityLevel,
+          onboardingStep: data.onboardingStep ?? cached?.onboardingStep,
           onboardingCompleted:
             typeof data.onboardingCompleted === 'boolean'
               ? data.onboardingCompleted
@@ -347,6 +353,88 @@ export async function updateUserDisplayName(userId: string, displayName: string)
 }
 
 /**
+ * Saves step-by-step progress during onboarding to Firestore and local cache,
+ * enabling seamless resumption if the user refreshes or re-authenticates.
+ */
+export async function saveOnboardingStepProgress(
+  userId: string,
+  stepNumber: number,
+  stepData: {
+    displayName?: string;
+    dateOfBirth?: string | null;
+    height?: number | null;
+    heightUnit?: 'cm' | 'in';
+    weight?: number | null;
+    weightUnit?: 'kg' | 'lbs';
+    goals?: string[];
+    activityLevel?: 'beginner' | 'moderately_active' | 'active' | 'highly_active';
+  }
+): Promise<UserProfile> {
+  const now = new Date().toISOString();
+  const cached = getCachedUserProfile(userId);
+
+  const cleanName = stepData.displayName?.trim() || cached?.displayName || 'User';
+
+  const mergedProfile: UserProfile = {
+    ...(cached || {
+      uid: userId,
+      displayName: cleanName,
+      name: cleanName,
+      email: auth.currentUser?.email || null,
+      photoURL: auth.currentUser?.photoURL || null,
+      createdAt: now,
+    }),
+    ...stepData,
+    displayName: cleanName,
+    name: cleanName,
+    onboardingCompleted: false,
+    onboardingStep: stepNumber,
+    updatedAt: now,
+  };
+
+  // 1. Immediately cache locally
+  setCachedUserProfile(mergedProfile);
+
+  // 2. Persist to Firestore with merge: true so partial fields don't erase existing values
+  try {
+    const userRef = doc(db, 'users', userId);
+    const firestorePayload: Record<string, any> = {
+      uid: userId,
+      onboardingStep: stepNumber,
+      updatedAt: now,
+    };
+
+    if (stepData.displayName !== undefined) {
+      firestorePayload.displayName = cleanName;
+      firestorePayload.name = cleanName;
+    }
+    if (stepData.dateOfBirth !== undefined) {
+      firestorePayload.dateOfBirth = stepData.dateOfBirth;
+    }
+    if (stepData.height !== undefined) {
+      firestorePayload.height = stepData.height;
+      firestorePayload.heightUnit = stepData.heightUnit || 'cm';
+    }
+    if (stepData.weight !== undefined) {
+      firestorePayload.weight = stepData.weight;
+      firestorePayload.weightUnit = stepData.weightUnit || 'kg';
+    }
+    if (stepData.goals !== undefined) {
+      firestorePayload.goals = stepData.goals;
+    }
+    if (stepData.activityLevel !== undefined) {
+      firestorePayload.activityLevel = stepData.activityLevel;
+    }
+
+    await setDoc(userRef, firestorePayload, { merge: true });
+  } catch (err) {
+    console.warn('saveOnboardingStepProgress Firestore notice (cached locally):', err);
+  }
+
+  return mergedProfile;
+}
+
+/**
  * Saves completed onboarding data (profile attributes & custom chosen habits).
  */
 export async function saveOnboardingProfileAndHabits(
@@ -358,14 +446,16 @@ export async function saveOnboardingProfileAndHabits(
     heightUnit?: 'cm' | 'in';
     weight?: number;
     weightUnit?: 'kg' | 'lbs';
+    goals?: string[];
+    activityLevel?: 'beginner' | 'moderately_active' | 'active' | 'highly_active';
   },
-  selectedHabits: HabitItem[]
+  selectedHabits?: HabitItem[]
 ): Promise<UserProfile> {
   const now = new Date().toISOString();
   const todayKey = getLocalDateKey();
   const cached = getCachedUserProfile(userId);
 
-  const cleanName = profileData.displayName.trim() || 'User';
+  const cleanName = profileData.displayName?.trim() || cached?.displayName || 'User';
   const cleanDob = profileData.dateOfBirth?.trim() || undefined;
 
   const updatedProfile: UserProfile = {
@@ -374,13 +464,16 @@ export async function saveOnboardingProfileAndHabits(
     name: cleanName,
     email: cached?.email || auth.currentUser?.email || null,
     photoURL: cached?.photoURL || auth.currentUser?.photoURL || null,
-    dateOfBirth: cleanDob,
-    height: profileData.height,
-    heightUnit: profileData.heightUnit || 'cm',
-    weight: profileData.weight,
-    weightUnit: profileData.weightUnit || 'kg',
+    dateOfBirth: cleanDob ?? cached?.dateOfBirth,
+    height: profileData.height ?? cached?.height,
+    heightUnit: profileData.heightUnit || cached?.heightUnit || 'cm',
+    weight: profileData.weight ?? cached?.weight,
+    weightUnit: profileData.weightUnit || cached?.weightUnit || 'kg',
+    goals: profileData.goals || cached?.goals || [],
+    activityLevel: profileData.activityLevel || cached?.activityLevel,
     onboardingCompleted: true,
-    lastWeightCheckInDate: profileData.weight ? todayKey : undefined,
+    onboardingStep: undefined,
+    lastWeightCheckInDate: profileData.weight ? todayKey : cached?.lastWeightCheckInDate,
     createdAt: cached?.createdAt || now,
     updatedAt: now,
     lastLoginAt: cached?.lastLoginAt || now,
@@ -408,7 +501,10 @@ export async function saveOnboardingProfileAndHabits(
       heightUnit: profileData.heightUnit || 'cm',
       weight: profileData.weight ?? null,
       weightUnit: profileData.weightUnit || 'kg',
+      goals: profileData.goals || [],
+      activityLevel: profileData.activityLevel || null,
       onboardingCompleted: true,
+      onboardingStep: 6,
       lastWeightCheckInDate: profileData.weight ? todayKey : null,
       updatedAt: now,
     },
@@ -416,15 +512,18 @@ export async function saveOnboardingProfileAndHabits(
   );
 
   // 3. Save selected habits to Firestore
+  const existingHabits = getCachedHabits(userId);
+  const habitsToSave: HabitItem[] = (selectedHabits && selectedHabits.length > 0)
+    ? selectedHabits
+    : (existingHabits && existingHabits.length > 0)
+    ? existingHabits
+    : DEFAULT_HABITS.map((h, index) => ({ ...h, order: index, updatedAt: now }));
+
   const habitBatch = writeBatch(db);
-  const habitsToSave: HabitItem[] = selectedHabits.map((h, index) => ({
-    ...h,
-    order: index,
-    updatedAt: now,
-  }));
-  for (const h of habitsToSave) {
+  for (let index = 0; index < habitsToSave.length; index++) {
+    const h = habitsToSave[index];
     const hRef = doc(db, 'users', userId, 'habitSettings', h.id);
-    habitBatch.set(hRef, h);
+    habitBatch.set(hRef, { ...h, order: index, updatedAt: now }, { merge: true });
   }
   await habitBatch.commit();
   setCachedHabits(userId, habitsToSave);

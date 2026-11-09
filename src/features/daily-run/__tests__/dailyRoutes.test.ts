@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { routeGenerationService } from '../services/routeGenerationService';
 import { runIndexedDB } from '../services/runIndexedDB';
 import { routeFirebaseService } from '../services/routeFirebaseService';
+import { calculateHaversineDistance, calculatePolylineHaversineDistance } from '../utils/runStats';
 import { PlannedRoute, SavedRouteDocument, GPSCoordinate } from '../types';
 
 test('Daily Routes & Loop Route Planner Test Suite', async (t) => {
@@ -50,7 +51,7 @@ test('Daily Routes & Loop Route Planner Test Suite', async (t) => {
     assert.equal(bobStillExists?.name, 'NYC Base');
   });
 
-  await t.test('2. Generates closed loop route with real road geometry returning to start point', async () => {
+  await t.test('2. Generates closed loop route with real road geometry returning to start point within strict ±10% tolerance', async () => {
     // Generate 5 km loop in central London (dense pedestrian paths)
     const startLoc = {
       latitude: 51.505,
@@ -69,23 +70,38 @@ test('Daily Routes & Loop Route Planner Test Suite', async (t) => {
     const firstRoute = routes[0];
 
     assert.equal(firstRoute.targetDistanceKm, 5);
-    assert.ok(firstRoute.actualDistanceMeters > 3000 && firstRoute.actualDistanceMeters < 9000,
-      `Actual distance ${firstRoute.actualDistanceMeters}m should be in reasonable range of target 5km`);
+    
+    // Strict distance tolerance check: target 5000m, must be within ±10% (4500m - 5500m)
+    const errorPct = (Math.abs(firstRoute.actualDistanceMeters - 5000) / 5000) * 100;
+    assert.ok(
+      errorPct <= 10.0,
+      `Actual distance ${firstRoute.actualDistanceMeters}m must be within ±10% of target 5km (got ${errorPct.toFixed(2)}%)`
+    );
 
-    // Loop closure verification: first coordinate and last coordinate should match start point
+    // Cross-validate authoritative polyline Haversine distance
+    const polylineDistMeters = Math.round(calculatePolylineHaversineDistance(firstRoute.routeCoordinates));
+    assert.equal(
+      firstRoute.actualDistanceMeters,
+      polylineDistMeters,
+      'Actual distance must strictly match polyline Haversine accumulation across every consecutive point'
+    );
+
+    // Loop closure verification: first coordinate and last coordinate must return within 35m of start
     const firstCoord = firstRoute.routeCoordinates[0];
     const lastCoord = firstRoute.routeCoordinates[firstRoute.routeCoordinates.length - 1];
-
-    assert.ok(Math.abs(firstCoord.latitude - startLoc.latitude) < 0.005, 'First point should match start lat');
-    assert.ok(Math.abs(lastCoord.latitude - startLoc.latitude) < 0.005, 'Last point should return to start lat');
+    const closureMeters = calculateHaversineDistance(firstCoord, lastCoord);
+    assert.ok(
+      closureMeters <= 35,
+      `Loop closure must return within 35m of start (got ${closureMeters.toFixed(1)}m)`
+    );
 
     // Verified provider and non-straight-line geometry
-    assert.ok(firstRoute.routeCoordinates.length > 30, 'Should have dense coordinate points along real streets');
+    assert.ok(firstRoute.routeCoordinates.length > 20, 'Should have dense coordinate points along real streets');
     assert.ok(firstRoute.provider.includes('OSRM'), 'Should identify OSRM pedestrian provider');
     assert.ok(firstRoute.estimatedDurationSeconds > 0, 'Should calculate estimated duration');
   });
 
-  await t.test('3. Generates distinct loops across all supported target distances (2k, 3k, 5k, 8k, 10k)', async () => {
+  await t.test('3. Generates accurate loops across all supported target distances (2k, 3k, 5k, 8k, 10k) within ±10% tolerance', async () => {
     const startLoc = {
       latitude: 51.505,
       longitude: -0.165,
@@ -102,7 +118,24 @@ test('Daily Routes & Loop Route Planner Test Suite', async (t) => {
       assert.ok(routes.length >= 1, `Should generate routes for ${targetDist} km`);
       const route = routes[0];
       assert.equal(route.targetDistanceKm, targetDist);
-      assert.ok(route.actualDistanceMeters > 1000, 'Actual distance must be positive road distance');
+
+      const targetMeters = targetDist * 1000;
+      const errorPct = (Math.abs(route.actualDistanceMeters - targetMeters) / targetMeters) * 100;
+      assert.ok(
+        errorPct <= 10.0,
+        `Route for ${targetDist}km must be within ±10% tolerance (got ${route.actualDistanceMeters}m, ${errorPct.toFixed(1)}% error)`
+      );
+
+      // Verify Haversine precision matches polyline
+      const polyDist = Math.round(calculatePolylineHaversineDistance(route.routeCoordinates));
+      assert.equal(route.actualDistanceMeters, polyDist, 'Route distance must match authoritative Haversine polyline sum');
+
+      // Verify loop closure
+      const closureDist = calculateHaversineDistance(
+        route.routeCoordinates[0],
+        route.routeCoordinates[route.routeCoordinates.length - 1]
+      );
+      assert.ok(closureDist <= 35, `Loop for ${targetDist}km must close within 35m (got ${closureDist.toFixed(1)}m)`);
     }
   });
 

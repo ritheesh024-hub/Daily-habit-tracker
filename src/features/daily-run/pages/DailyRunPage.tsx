@@ -68,11 +68,15 @@ export const DailyRunPage: React.FC<DailyRunPageProps> = ({
     gpsStatus,
     gpsError,
     setGpsError,
+    accuracyMeters,
+    permissionState,
+    requestLocationPermission,
     durationSeconds,
     metrics,
     currentPosition,
     startPosition,
     segments,
+    splits,
     completedSession,
     recoverableSession,
     recoverSession,
@@ -362,26 +366,48 @@ export const DailyRunPage: React.FC<DailyRunPageProps> = ({
 
           {/* GPS Live Quality Badge (Tracker View Only) */}
           {activeSubTab === 'tracker' && !isFinished && (
-            <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl glass-surface text-[11px] text-zinc-700 dark:text-zinc-300 border border-zinc-200/80 dark:border-white/10 shadow-xs">
+            <div
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl glass-surface text-[11px] border shadow-xs transition-colors ${
+                permissionState === 'denied'
+                  ? 'border-rose-500/30 text-rose-700 dark:text-rose-300 bg-rose-500/10 cursor-pointer'
+                  : permissionState === 'prompt'
+                  ? 'border-amber-500/30 text-amber-700 dark:text-amber-300 bg-amber-500/10 cursor-pointer'
+                  : 'border-zinc-200/80 dark:border-white/10 text-zinc-700 dark:text-zinc-300'
+              }`}
+              onClick={
+                permissionState === 'prompt' || permissionState === 'denied'
+                  ? requestLocationPermission
+                  : undefined
+              }
+              title={
+                permissionState === 'prompt' || permissionState === 'denied'
+                  ? 'Click to grant or verify location permissions'
+                  : undefined
+              }
+            >
               <span
                 className={`w-2 h-2 rounded-full ${
-                  gpsStatus === 'ready'
-                    ? 'bg-emerald-500'
-                    : gpsStatus === 'weak'
-                    ? 'bg-amber-500'
-                    : gpsStatus === 'lost'
+                  permissionState === 'denied' || gpsStatus === 'lost'
                     ? 'bg-rose-500'
+                    : permissionState === 'prompt' || gpsStatus === 'weak'
+                    ? 'bg-amber-500'
+                    : gpsStatus === 'ready'
+                    ? 'bg-emerald-500'
                     : 'bg-zinc-400 animate-pulse'
                 }`}
               />
-              <span className="font-mono capitalize font-medium">
-                {gpsStatus === 'ready'
-                  ? 'GPS Ready'
+              <span className="font-mono font-medium">
+                {permissionState === 'denied'
+                  ? 'Permission Denied'
+                  : permissionState === 'prompt'
+                  ? 'Location Required'
+                  : gpsStatus === 'ready'
+                  ? `GPS Ready${accuracyMeters ? ` · ±${Math.round(accuracyMeters)}m` : ''}`
                   : gpsStatus === 'weak'
-                  ? 'Signal Weak'
+                  ? `Weak GPS Signal${accuracyMeters ? ` · ±${Math.round(accuracyMeters)}m` : ''}`
                   : gpsStatus === 'lost'
-                  ? 'GPS Lost'
-                  : 'Acquiring GPS'}
+                  ? 'GPS Unavailable'
+                  : 'Locating Satellites...'}
               </span>
             </div>
           )}
@@ -456,6 +482,7 @@ export const DailyRunPage: React.FC<DailyRunPageProps> = ({
           session={completedSession}
           durationSeconds={durationSeconds}
           segments={segments}
+          splits={splits}
           startPosition={startPosition}
           currentPosition={currentPosition}
           isSaving={isSavingToCloud}
@@ -577,6 +604,9 @@ export const DailyRunPage: React.FC<DailyRunPageProps> = ({
           <RunMap
             status={status}
             gpsStatus={gpsStatus}
+            accuracyMeters={accuracyMeters}
+            permissionState={permissionState}
+            onRequestPermission={requestLocationPermission}
             currentPosition={currentPosition}
             startPosition={startPosition}
             segments={segments}
@@ -594,7 +624,9 @@ export const DailyRunPage: React.FC<DailyRunPageProps> = ({
               isHero={true}
               highlight={status === 'running'}
               subLabel={
-                metrics.caloriesBurned != null
+                status === 'idle'
+                  ? 'Calories: -- kcal'
+                  : metrics.caloriesBurned != null
                   ? `~${metrics.caloriesBurned} kcal (est)`
                   : metrics.caloriesExplanation || 'Calorie est. available'
               }
@@ -614,7 +646,7 @@ export const DailyRunPage: React.FC<DailyRunPageProps> = ({
                     : 'Status: Moving'
                   : status === 'paused'
                   ? 'Status: Paused'
-                  : undefined
+                  : 'Standby · Ready'
               }
               icon={<Clock className="w-4 h-4" />}
             />
@@ -623,12 +655,14 @@ export const DailyRunPage: React.FC<DailyRunPageProps> = ({
             <RunMetricCard
               id="metric-pace"
               label="Pace"
-              value={formatRunPace(metrics.currentPaceMinPerKm)}
-              unit="min/km"
+              value={formatRunPace(status === 'idle' ? null : metrics.currentPaceMinPerKm)}
+              unit="/km"
               subLabel={
-                metrics.averagePaceMinPerKm
+                status === 'idle'
+                  ? 'Avg: --:-- /km'
+                  : metrics.averagePaceMinPerKm
                   ? `Avg: ${formatRunPace(metrics.averagePaceMinPerKm)} /km`
-                  : 'Avg: -- min/km'
+                  : 'Avg: --:-- /km'
               }
               icon={<Gauge className="w-4 h-4" />}
             />
@@ -637,10 +671,12 @@ export const DailyRunPage: React.FC<DailyRunPageProps> = ({
             <RunMetricCard
               id="metric-speed"
               label="Speed"
-              value={formatRunSpeed(metrics.currentSpeedKmh)}
+              value={formatRunSpeed(status === 'idle' ? null : metrics.currentSpeedKmh)}
               unit="km/h"
               subLabel={
-                metrics.averageSpeedKmh
+                status === 'idle'
+                  ? 'Avg: -- km/h'
+                  : metrics.averageSpeedKmh
                   ? `Avg: ${formatRunSpeed(metrics.averageSpeedKmh)} km/h`
                   : 'Avg: -- km/h'
               }

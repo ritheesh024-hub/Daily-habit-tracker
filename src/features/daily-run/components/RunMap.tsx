@@ -1,8 +1,28 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Navigation, Compass, Layers, Plus, Minus, MapPin, LocateFixed, Eye, WifiOff, Trees, Waves, Flag } from 'lucide-react';
-import { GPSCoordinate, GPSStatus, RouteSegment, RunStatus, PlannedRoute } from '../types';
+import {
+  Navigation,
+  Compass,
+  Layers,
+  Plus,
+  Minus,
+  MapPin,
+  LocateFixed,
+  Eye,
+  WifiOff,
+  AlertTriangle,
+  Radio,
+  Lock,
+} from 'lucide-react';
+import {
+  GPSCoordinate,
+  GPSStatus,
+  RouteSegment,
+  RunStatus,
+  PlannedRoute,
+  LocationPermissionState,
+} from '../types';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 
 interface RunMapProps {
@@ -14,6 +34,9 @@ interface RunMapProps {
   className?: string;
   isSummaryMode?: boolean;
   plannedRoute?: PlannedRoute | null;
+  accuracyMeters?: number | null;
+  permissionState?: LocationPermissionState;
+  onRequestPermission?: () => void;
 }
 
 export const RunMap: React.FC<RunMapProps> = ({
@@ -25,6 +48,9 @@ export const RunMap: React.FC<RunMapProps> = ({
   className = '',
   isSummaryMode = false,
   plannedRoute = null,
+  accuracyMeters = null,
+  permissionState = 'granted',
+  onRequestPermission,
 }) => {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
@@ -32,9 +58,11 @@ export const RunMap: React.FC<RunMapProps> = ({
   const plannedPolylineRef = useRef<L.Polyline | null>(null);
   const landmarkMarkersRef = useRef<L.Marker[]>([]);
   const currentMarkerRef = useRef<L.Marker | null>(null);
+  const accuracyCircleRef = useRef<L.Circle | null>(null);
   const startMarkerRef = useRef<L.Marker | null>(null);
 
   const isOnline = useOnlineStatus();
+  const hasInitializedCenterRef = useRef<boolean>(false);
 
   // Auto-follow state: true when active, temporarily false when user manually pans/zooms
   const [isAutoFollow, setIsAutoFollow] = useState<boolean>(true);
@@ -46,15 +74,15 @@ export const RunMap: React.FC<RunMapProps> = ({
     if (!mapContainerRef.current) return;
     if (mapInstanceRef.current) return;
 
-    // Default center (either current position, start position, or global fallback)
-    const initialLat = currentPosition?.latitude || startPosition?.latitude || 20.5937;
-    const initialLng = currentPosition?.longitude || startPosition?.longitude || 78.9629;
-    const initialZoom = currentPosition ? 16 : 4;
+    // Center on user's real coordinate if available; fallback to neutral center
+    const initialLat = currentPosition?.latitude || startPosition?.latitude || 51.505;
+    const initialLng = currentPosition?.longitude || startPosition?.longitude || -0.165;
+    const initialZoom = currentPosition ? 16 : 14;
 
     const map = L.map(mapContainerRef.current, {
       center: [initialLat, initialLng],
       zoom: initialZoom,
-      zoomControl: false, // Custom styled zoom controls
+      zoomControl: false,
       attributionControl: true,
     });
 
@@ -72,7 +100,7 @@ export const RunMap: React.FC<RunMapProps> = ({
 
     mapInstanceRef.current = map;
 
-    // Cleanup on unmount to prevent duplicate maps and memory leaks
+    // Cleanup on unmount
     return () => {
       map.remove();
       mapInstanceRef.current = null;
@@ -83,10 +111,25 @@ export const RunMap: React.FC<RunMapProps> = ({
       }
       landmarkMarkersRef.current.forEach((m) => m.remove());
       landmarkMarkersRef.current = [];
+      if (accuracyCircleRef.current) {
+        accuracyCircleRef.current.remove();
+        accuracyCircleRef.current = null;
+      }
       currentMarkerRef.current = null;
       startMarkerRef.current = null;
     };
   }, []);
+
+  // Center map once real position becomes available
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map || !currentPosition || hasInitializedCenterRef.current) return;
+
+    map.setView([currentPosition.latitude, currentPosition.longitude], 16, {
+      animate: true,
+    });
+    hasInitializedCenterRef.current = true;
+  }, [currentPosition]);
 
   // Render Planned Reference Route (Daily Routes Integration)
   useEffect(() => {
@@ -112,7 +155,7 @@ export const RunMap: React.FC<RunMapProps> = ({
 
     // Planned reference polyline (distinct indigo line with dash styling)
     plannedPolylineRef.current = L.polyline(latlngs, {
-      color: '#6366f1', // Indigo
+      color: '#6366f1',
       weight: 4,
       dashArray: '6, 8',
       opacity: 0.85,
@@ -124,7 +167,7 @@ export const RunMap: React.FC<RunMapProps> = ({
     if (Array.isArray(plannedRoute.landmarks)) {
       plannedRoute.landmarks.forEach((lm) => {
         const iconHtml = `
-          <div class="relative flex items-center justify-center group">
+          <div class="relative flex items-center justify-center">
             <span class="w-6 h-6 rounded-full bg-indigo-600 border border-white shadow-md flex items-center justify-center text-white text-[11px] font-bold">
               ${lm.category === 'park' ? '🌳' : lm.category === 'water' ? '💧' : lm.category === 'track' ? '🏃' : '📍'}
             </span>
@@ -166,13 +209,13 @@ export const RunMap: React.FC<RunMapProps> = ({
           className: 'custom-start-marker',
           html: `
             <div class="relative flex items-center justify-center">
-              <span class="w-7 h-7 rounded-full bg-emerald-500 border-2 border-white shadow-md flex items-center justify-center text-white text-[10px] font-bold">
-                S
+              <span class="w-7 h-7 rounded-full bg-emerald-500 border-2 border-white shadow-md flex items-center justify-center text-white text-[10px] font-black tracking-tighter">
+                START
               </span>
             </div>
           `,
-          iconSize: [28, 28],
-          iconAnchor: [14, 14],
+          iconSize: [36, 36],
+          iconAnchor: [18, 18],
         });
 
         startMarkerRef.current = L.marker(latlng, { icon: startIcon, zIndexOffset: 50 }).addTo(map);
@@ -187,7 +230,6 @@ export const RunMap: React.FC<RunMapProps> = ({
     const map = mapInstanceRef.current;
     if (!map) return;
 
-    // Convert segments into array of LatLng arrays for multi-polyline rendering
     const multiLatLngs: L.LatLngExpression[][] = segments
       .map((seg) => seg.points.map((pt) => [pt.latitude, pt.longitude] as L.LatLngExpression))
       .filter((pts) => pts.length > 0);
@@ -213,39 +255,67 @@ export const RunMap: React.FC<RunMapProps> = ({
     }
   }, [segments, isSummaryMode]);
 
-  // Update Current Position Marker & Auto-Follow
+  // Update Current Position Marker, Heading, and Accuracy Radius Circle
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map || !currentPosition) return;
 
     const latlng: L.LatLngExpression = [currentPosition.latitude, currentPosition.longitude];
+    const heading = currentPosition.heading;
+    const hasHeading = heading != null && !isNaN(heading) && isFinite(heading);
+
+    // Accuracy Circle
+    const accuracy = currentPosition.accuracy || accuracyMeters || 10;
+    if (!accuracyCircleRef.current) {
+      accuracyCircleRef.current = L.circle(latlng, {
+        radius: accuracy,
+        color: '#ea580c',
+        weight: 1,
+        opacity: 0.5,
+        fillColor: '#ea580c',
+        fillOpacity: 0.12,
+      }).addTo(map);
+    } else {
+      accuracyCircleRef.current.setLatLng(latlng);
+      accuracyCircleRef.current.setRadius(accuracy);
+    }
+
+    // Custom athletic runner marker with heading cone
+    const runnerIconHtml = `
+      <div class="relative flex items-center justify-center">
+        <!-- Live Satellite Ping Ring -->
+        <span class="absolute w-8 h-8 rounded-full bg-orange-500/30 animate-ping"></span>
+        <!-- Directional Heading Pointer or Core Dot -->
+        <span class="relative w-6 h-6 rounded-full bg-orange-600 border-2 border-white shadow-lg flex items-center justify-center text-white" style="${
+          hasHeading ? `transform: rotate(${heading}deg); transition: transform 0.3s ease;` : ''
+        }">
+          ${
+            hasHeading
+              ? `<svg class="w-3.5 h-3.5 fill-white" viewBox="0 0 24 24"><path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/></svg>`
+              : `<span class="w-2 h-2 rounded-full bg-white"></span>`
+          }
+        </span>
+      </div>
+    `;
+
+    const runnerIcon = L.divIcon({
+      className: 'custom-runner-marker',
+      html: runnerIconHtml,
+      iconSize: [32, 32],
+      iconAnchor: [16, 16],
+    });
 
     if (!currentMarkerRef.current) {
-      const runnerIcon = L.divIcon({
-        className: 'custom-runner-marker',
-        html: `
-          <div class="relative flex items-center justify-center">
-            <span class="absolute w-8 h-8 rounded-full bg-orange-500/30 animate-ping"></span>
-            <span class="relative w-6 h-6 rounded-full bg-orange-600 border-2 border-white shadow-lg flex items-center justify-center text-white">
-              <svg class="w-3.5 h-3.5 fill-white" viewBox="0 0 24 24">
-                <path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/>
-              </svg>
-            </span>
-          </div>
-        `,
-        iconSize: [32, 32],
-        iconAnchor: [16, 16],
-      });
-
       currentMarkerRef.current = L.marker(latlng, { icon: runnerIcon, zIndexOffset: 100 }).addTo(map);
-      map.setView(latlng, 17);
     } else {
       currentMarkerRef.current.setLatLng(latlng);
+      currentMarkerRef.current.setIcon(runnerIcon);
+
       if (isAutoFollowRef.current && status === 'running') {
-        map.panTo(latlng, { animate: true, duration: 0.8 });
+        map.panTo(latlng, { animate: true, duration: 0.6 });
       }
     }
-  }, [currentPosition, status]);
+  }, [currentPosition, accuracyMeters, status]);
 
   // Recenter button action
   const handleRecenter = useCallback(() => {
@@ -272,19 +342,58 @@ export const RunMap: React.FC<RunMapProps> = ({
     mapInstanceRef.current?.zoomOut();
   };
 
-  // Status badge config
+  // Professional GPS status badge logic
   const getGpsStatusDisplay = () => {
+    if (permissionState === 'denied') {
+      return {
+        text: 'Permission Denied',
+        detail: 'Allow location in settings',
+        dotClass: 'bg-rose-500',
+        isWarning: true,
+      };
+    }
+
+    if (permissionState === 'prompt') {
+      return {
+        text: 'Location Permission Required',
+        detail: 'Tap to grant location',
+        dotClass: 'bg-amber-400',
+        isWarning: true,
+      };
+    }
+
+    const accuracyVal = currentPosition?.accuracy || accuracyMeters;
+
     switch (gpsStatus) {
-      case 'acquiring':
-        return { text: 'Acquiring GPS...', dotClass: 'bg-amber-400 animate-pulse' };
       case 'ready':
-        return { text: 'GPS Ready', dotClass: 'bg-emerald-500' };
+        return {
+          text: 'GPS Ready',
+          detail: accuracyVal ? `±${Math.round(accuracyVal)} m accuracy` : 'High accuracy',
+          dotClass: 'bg-emerald-500 shadow-xs shadow-emerald-500/50',
+          isWarning: false,
+        };
       case 'weak':
-        return { text: 'GPS Signal Weak', dotClass: 'bg-amber-500' };
+        return {
+          text: 'Weak GPS Signal',
+          detail: accuracyVal ? `±${Math.round(accuracyVal)} m · Move outdoors` : 'Move to open sky',
+          dotClass: 'bg-amber-500',
+          isWarning: true,
+        };
       case 'lost':
-        return { text: 'GPS Lost', dotClass: 'bg-rose-500' };
+        return {
+          text: 'GPS Unavailable',
+          detail: 'Searching for satellites',
+          dotClass: 'bg-rose-500',
+          isWarning: true,
+        };
+      case 'acquiring':
       default:
-        return { text: 'GPS Standby', dotClass: 'bg-zinc-400' };
+        return {
+          text: 'Locating Satellites...',
+          detail: 'Acquiring GPS fix',
+          dotClass: 'bg-amber-400 animate-pulse',
+          isWarning: false,
+        };
     }
   };
 
@@ -293,97 +402,98 @@ export const RunMap: React.FC<RunMapProps> = ({
   return (
     <div
       id="run-map-container"
-      className={`relative w-full h-64 sm:h-80 rounded-2xl overflow-hidden border border-zinc-200/90 dark:border-white/10 shadow-md bg-zinc-100 dark:bg-zinc-950 select-none transition-all ${className}`}
+      className={`relative w-full h-64 sm:h-80 md:h-96 rounded-2xl overflow-hidden border border-zinc-200/90 dark:border-white/10 shadow-sm bg-zinc-100 dark:bg-zinc-950 select-none transition-all ${className}`}
     >
       {/* Map DOM Element */}
       <div
         id="leaflet-map"
         ref={mapContainerRef}
-        className="w-full h-full relative z-0"
+        className="w-full h-full z-0"
+        aria-label="Outdoor Running GPS Map"
       />
 
-      {/* Top Left: OpenStreetMap & GPS Signal Status */}
-      <div className="absolute top-3 left-3 z-10 flex flex-col gap-1.5 pointer-events-auto">
-        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg glass-surface border border-zinc-200/80 dark:border-white/10 text-[11px] text-zinc-700 dark:text-zinc-300 font-medium shadow-xs">
-          <MapPin className="w-3.5 h-3.5 text-orange-500 shrink-0" />
-          <span>OpenStreetMap Live</span>
-        </div>
-
-        {/* GPS Live Status Badge */}
-        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md border border-zinc-200/80 dark:border-zinc-800 text-[10px] sm:text-[11px] font-mono text-zinc-700 dark:text-zinc-300 shadow-xs">
-          <span className={`w-2 h-2 rounded-full shrink-0 ${gpsInfo.dotClass}`} />
-          <span>{gpsInfo.text}</span>
-          {currentPosition?.accuracy && (
-            <span className="text-[9px] text-zinc-400 dark:text-zinc-500 ml-0.5">
-              (±{Math.round(currentPosition.accuracy)}m)
+      {/* Real-Time GPS Status Badge Overlay (Athletic styling) */}
+      <div className="absolute top-3 left-3 z-10 flex flex-col gap-1 pointer-events-none">
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-zinc-950/85 backdrop-blur-md text-white text-xs font-medium border border-white/10 shadow-sm pointer-events-auto">
+          <span className={`w-2 h-2 rounded-full ${gpsInfo.dotClass}`} />
+          <div className="flex flex-col">
+            <span className="font-bold text-[11px] sm:text-xs tracking-tight text-white leading-none">
+              {gpsInfo.text}
             </span>
-          )}
+            <span className="text-[10px] text-zinc-400 font-mono leading-none mt-0.5">
+              {gpsInfo.detail}
+            </span>
+          </div>
         </div>
 
-        {/* Offline Network Status Indicator (clearly separated from GPS hardware) */}
+        {/* Offline Map Layer Warning if device has lost connectivity */}
         {!isOnline && (
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-800 dark:text-amber-200 text-[10px] sm:text-[11px] font-semibold backdrop-blur-md shadow-xs animate-fadeIn">
-            <WifiOff className="w-3 h-3 text-amber-600 dark:text-amber-400 shrink-0" />
-            <span>Offline (Route & GPS Active)</span>
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-zinc-900/90 backdrop-blur-md text-amber-400 text-[10px] font-semibold border border-amber-500/30">
+            <WifiOff className="w-3 h-3 text-amber-400" />
+            <span>Offline · Tracking cached locally</span>
           </div>
         )}
       </div>
 
-      {/* Top Right: Auto-follow Indicator & Compass */}
-      <div className="absolute top-3 right-3 z-10 flex items-center gap-1.5 pointer-events-auto">
-        {status === 'running' && (
-          <button
-            type="button"
-            onClick={() => setIsAutoFollow(!isAutoFollow)}
-            title={isAutoFollow ? 'Auto-follow is ON' : 'Auto-follow paused. Tap to re-enable.'}
-            className={`px-2 py-1 rounded-lg text-[10px] font-semibold flex items-center gap-1 transition-all shadow-xs ${
-              isAutoFollow
-                ? 'bg-orange-500 text-white shadow-orange-500/20'
-                : 'glass-surface text-zinc-600 dark:text-zinc-400'
-            }`}
-          >
-            <Eye className="w-3 h-3" />
-            <span>Follow</span>
-          </button>
-        )}
-      </div>
-
-      {/* Bottom Right: Recenter & Zoom Controls */}
-      <div className="absolute bottom-3 right-3 z-10 flex flex-col gap-1.5 pointer-events-auto">
+      {/* Floating Map Actions: Recenter & Zoom Controls */}
+      <div className="absolute top-3 right-3 z-10 flex flex-col gap-1.5">
         <button
-          id="btn-recenter-map"
           type="button"
           onClick={handleRecenter}
-          title="Recenter location"
-          aria-label="Recenter location"
-          className="w-8 h-8 rounded-lg glass-surface border border-zinc-200/80 dark:border-white/10 flex items-center justify-center text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors shadow-xs cursor-pointer active:scale-95"
+          aria-label="Recenter on current location"
+          className={`p-2 sm:p-2.5 rounded-xl backdrop-blur-md shadow-md transition-all cursor-pointer flex items-center justify-center ${
+            isAutoFollow
+              ? 'bg-zinc-950/85 text-orange-500 border border-orange-500/30'
+              : 'bg-white/95 dark:bg-zinc-900/95 text-zinc-700 dark:text-zinc-200 border border-zinc-200 dark:border-white/10 hover:border-orange-500 active:scale-95'
+          }`}
+          title={isAutoFollow ? 'Centered on you' : 'Recenter map'}
         >
           <LocateFixed className="w-4 h-4 text-orange-500" />
         </button>
 
-        <div className="flex flex-col rounded-lg overflow-hidden border border-zinc-200/80 dark:border-white/10 glass-surface shadow-xs">
+        <div className="hidden sm:flex flex-col rounded-xl overflow-hidden glass-card shadow-md border border-zinc-200/90 dark:border-white/10">
           <button
-            id="btn-zoom-in"
             type="button"
             onClick={handleZoomIn}
-            title="Zoom In"
-            aria-label="Zoom In"
-            className="w-8 h-7 flex items-center justify-center text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors border-b border-zinc-200/60 dark:border-zinc-800 cursor-pointer"
+            aria-label="Zoom in"
+            className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 transition-colors cursor-pointer border-b border-zinc-200/60 dark:border-white/5"
           >
             <Plus className="w-3.5 h-3.5" />
           </button>
           <button
-            id="btn-zoom-out"
             type="button"
             onClick={handleZoomOut}
-            title="Zoom Out"
-            aria-label="Zoom Out"
-            className="w-8 h-7 flex items-center justify-center text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+            aria-label="Zoom out"
+            className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 transition-colors cursor-pointer"
           >
             <Minus className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
+
+      {/* Permission Request Prompt Banner when location is not yet granted */}
+      {permissionState === 'denied' && (
+        <div className="absolute inset-0 z-20 bg-zinc-950/80 backdrop-blur-xs flex items-center justify-center p-4 text-center">
+          <div className="max-w-xs p-4 rounded-2xl glass-card border border-rose-500/30 space-y-2.5">
+            <div className="w-10 h-10 rounded-full bg-rose-500/15 text-rose-500 flex items-center justify-center mx-auto">
+              <Lock className="w-5 h-5" />
+            </div>
+            <h4 className="text-sm font-bold text-white">Location Access Denied</h4>
+            <p className="text-xs text-zinc-400 leading-relaxed">
+              Daily Run requires browser GPS permissions to record your path, calculate pace, and track distance.
+            </p>
+            {onRequestPermission && (
+              <button
+                type="button"
+                onClick={onRequestPermission}
+                className="w-full py-2 px-3 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold transition-colors cursor-pointer"
+              >
+                Request Permission
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

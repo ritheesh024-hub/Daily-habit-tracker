@@ -1,40 +1,135 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
-  Check,
-  User,
-  Activity,
-  ListChecks,
-  Sparkles,
-  Plus,
-  Trash2,
-  Edit2,
-  Lock,
   ArrowRight,
   ArrowLeft,
+  Check,
   Calendar,
   ShieldCheck,
+  Sparkles,
+  Activity,
+  Footprints,
+  Target,
+  Heart,
+  TrendingUp,
+  Scale,
+  Ruler,
+  AlertCircle,
+  LogOut,
+  Flame,
+  CheckCircle2,
 } from 'lucide-react';
-import { HabitItem, UserProfile, DEFAULT_HABITS } from '../types';
-import { HabitIcon } from './HabitIcon';
+import { UserProfile, HabitItem, DEFAULT_HABITS } from '../types';
 import { calculateAge, isValidDateOfBirth, getLocalDateKey } from '../lib/dateUtils';
-import { HabitModal } from './HabitModal';
-import { DailyHabitsMark } from './DailyHabitsLogo';
+import { DailyHabitsLogo, DailyHabitsMark } from './DailyHabitsLogo';
+import { saveOnboardingStepProgress } from '../lib/habitService';
+
+export interface OnboardingCompleteData {
+  displayName: string;
+  dateOfBirth?: string;
+  height?: number;
+  heightUnit?: 'cm' | 'in';
+  weight?: number;
+  weightUnit?: 'kg' | 'lbs';
+  goals?: string[];
+  activityLevel?: 'beginner' | 'moderately_active' | 'active' | 'highly_active';
+  habits?: HabitItem[];
+}
 
 interface OnboardingModalProps {
   isOpen?: boolean;
   user: UserProfile;
-  onComplete: (data: {
-    displayName: string;
-    dateOfBirth?: string;
-    height?: number;
-    heightUnit: 'cm' | 'in';
-    weight?: number;
-    weightUnit: 'kg' | 'lbs';
-    habits: HabitItem[];
-  }) => Promise<void>;
+  onComplete: (data: OnboardingCompleteData) => Promise<void>;
   isLoading?: boolean;
   onSignOut?: () => void | Promise<void>;
 }
+
+export type OnboardingGoalId =
+  | 'habits'
+  | 'fitness'
+  | 'running'
+  | 'discipline'
+  | 'lifestyle'
+  | 'performance';
+
+interface GoalOption {
+  id: OnboardingGoalId;
+  label: string;
+  description: string;
+  icon: React.ReactNode;
+}
+
+const GOAL_OPTIONS: GoalOption[] = [
+  {
+    id: 'habits',
+    label: 'Build consistent habits',
+    description: 'Stack daily routines and maintain unbroken streaks.',
+    icon: <Sparkles className="w-4 h-4 text-emerald-500" />,
+  },
+  {
+    id: 'fitness',
+    label: 'Improve fitness',
+    description: 'Build stamina, functional strength, and vitality.',
+    icon: <Activity className="w-4 h-4 text-emerald-500" />,
+  },
+  {
+    id: 'running',
+    label: 'Run regularly',
+    description: 'Track outdoor runs, kilometer splits, and routes.',
+    icon: <Footprints className="w-4 h-4 text-orange-500" />,
+  },
+  {
+    id: 'discipline',
+    label: 'Improve daily discipline',
+    description: 'Stay accountable with morning and evening routines.',
+    icon: <Target className="w-4 h-4 text-emerald-500" />,
+  },
+  {
+    id: 'lifestyle',
+    label: 'Maintain a healthier lifestyle',
+    description: 'Balance nutrition, mindful sleep, and daily movement.',
+    icon: <Heart className="w-4 h-4 text-emerald-500" />,
+  },
+  {
+    id: 'performance',
+    label: 'Improve personal performance',
+    description: 'Level up training volume and personal records.',
+    icon: <TrendingUp className="w-4 h-4 text-orange-500" />,
+  },
+];
+
+interface ActivityOption {
+  id: 'beginner' | 'moderately_active' | 'active' | 'highly_active';
+  title: string;
+  description: string;
+  cadence: string;
+}
+
+const ACTIVITY_OPTIONS: ActivityOption[] = [
+  {
+    id: 'beginner',
+    title: 'Beginner',
+    description: 'Starting a fresh routine or returning after a break.',
+    cadence: '0–1 workouts / week',
+  },
+  {
+    id: 'moderately_active',
+    title: 'Moderately active',
+    description: 'Moving 1–2 times a week, building consistency.',
+    cadence: '1–2 workouts / week',
+  },
+  {
+    id: 'active',
+    title: 'Active',
+    description: 'Training or running 3–4 times a week regularly.',
+    cadence: '3–4 workouts / week',
+  },
+  {
+    id: 'highly_active',
+    title: 'Highly active',
+    description: 'Training 5+ times a week with structured workouts.',
+    cadence: '5+ workouts / week',
+  },
+];
 
 export const OnboardingModal: React.FC<OnboardingModalProps> = ({
   isOpen = true,
@@ -44,310 +139,506 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
   onSignOut,
 }) => {
   if (!isOpen) return null;
-  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
 
-  // Step 1: Profile State
-  const [displayName, setDisplayName] = useState(user.displayName || user.name || '');
-  const [dateOfBirth, setDateOfBirth] = useState(user.dateOfBirth || '');
-  const [profileError, setProfileError] = useState<string | null>(null);
+  // Initialize step from user's persisted progress if available (1-6)
+  const initialStep = useMemo(() => {
+    const s = user.onboardingStep;
+    if (typeof s === 'number' && s >= 1 && s <= 6) {
+      return s;
+    }
+    return 1;
+  }, [user.onboardingStep]);
 
-  // Step 2: Body Details State
+  const [step, setStep] = useState<number>(initialStep);
+
+  // STEP 01 — Name
+  const [displayName, setDisplayName] = useState<string>(() => {
+    return user.displayName || user.name || '';
+  });
+  const [nameError, setNameError] = useState<string | null>(null);
+
+  // STEP 02 — Date of Birth (Optional)
+  const [dateOfBirth, setDateOfBirth] = useState<string>(user.dateOfBirth || '');
+  const [dobError, setDobError] = useState<string | null>(null);
+
+  // STEP 03 — Height & Weight (Optional)
   const [heightInput, setHeightInput] = useState<string>(user.height ? String(user.height) : '');
   const [heightUnit, setHeightUnit] = useState<'cm' | 'in'>(user.heightUnit || 'cm');
   const [weightInput, setWeightInput] = useState<string>(user.weight ? String(user.weight) : '');
   const [weightUnit, setWeightUnit] = useState<'kg' | 'lbs'>(user.weightUnit || 'kg');
+  const [profileMetricsError, setProfileMetricsError] = useState<string | null>(null);
 
-  // Step 3: Habits Selection & Customization
-  const [habitsList, setHabitsList] = useState<HabitItem[]>(() =>
-    DEFAULT_HABITS.map((h) => ({ ...h }))
-  );
-  const [selectedHabitIds, setSelectedHabitIds] = useState<Set<string>>(
-    () => new Set(DEFAULT_HABITS.map((h) => h.id))
-  );
-
-  // Edit / Add Habit in Step 3
-  const [isHabitModalOpen, setIsHabitModalOpen] = useState(false);
-  const [editingHabit, setEditingHabit] = useState<HabitItem | null>(null);
-
-  const todayDate = useMemo(() => getLocalDateKey(), []);
-  const age = useMemo(() => calculateAge(dateOfBirth), [dateOfBirth]);
-
-  const activeHabits = useMemo(() => {
-    return habitsList.filter((h) => selectedHabitIds.has(h.id));
-  }, [habitsList, selectedHabitIds]);
-
-  const handleToggleHabitSelection = (habitId: string) => {
-    setSelectedHabitIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(habitId)) {
-        if (next.size <= 1) {
-          return prev; // keep at least 1 habit
-        }
-        next.delete(habitId);
-      } else {
-        next.add(habitId);
-      }
-      return next;
-    });
-  };
-
-  const handleOpenAddCustomHabit = () => {
-    setEditingHabit(null);
-    setIsHabitModalOpen(true);
-  };
-
-  const handleOpenEditHabit = (habit: HabitItem, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setEditingHabit(habit);
-    setIsHabitModalOpen(true);
-  };
-
-  const handleSaveHabit = (data: { name: string; target: string; icon: string }) => {
-    if (editingHabit) {
-      setHabitsList((prev) =>
-        prev.map((h) => (h.id === editingHabit.id ? { ...h, ...data } : h))
-      );
-    } else {
-      const newId = `habit_${Date.now()}`;
-      const newHabit: HabitItem = {
-        id: newId,
-        name: data.name,
-        target: data.target,
-        icon: data.icon,
-        order: habitsList.length,
-      };
-      setHabitsList((prev) => [...prev, newHabit]);
-      setSelectedHabitIds((prev) => new Set(prev).add(newId));
+  // STEP 04 — Goals (Multiple selection)
+  const [selectedGoals, setSelectedGoals] = useState<string[]>(() => {
+    if (Array.isArray(user.goals) && user.goals.length > 0) {
+      return user.goals;
     }
-    setIsHabitModalOpen(false);
-    setEditingHabit(null);
-  };
+    return ['Build consistent habits', 'Improve fitness'];
+  });
 
-  const handleDeleteHabit = (habitId: string) => {
-    setHabitsList((prev) => prev.filter((h) => h.id !== habitId));
-    setSelectedHabitIds((prev) => {
-      const next = new Set(prev);
-      next.delete(habitId);
-      return next;
+  // STEP 05 — Activity Level (Single selection)
+  const [activityLevel, setActivityLevel] = useState<
+    'beginner' | 'moderately_active' | 'active' | 'highly_active' | undefined
+  >(user.activityLevel || 'moderately_active');
+
+  // STEP 06 — Submission & Error State
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submissionError, setSubmissionError] = useState<string | null>(null);
+
+  // Computed values
+  const todayKey = useMemo(() => getLocalDateKey(), []);
+  const computedAge = useMemo(() => calculateAge(dateOfBirth), [dateOfBirth]);
+
+  // Persist step progress to Firestore in background
+  const persistProgress = (nextStep: number, customFields?: Partial<UserProfile>) => {
+    if (!user.uid) return;
+    const cleanName = displayName.trim() || user.displayName || 'User';
+    const numHeight = heightInput ? parseFloat(heightInput) : undefined;
+    const numWeight = weightInput ? parseFloat(weightInput) : undefined;
+
+    saveOnboardingStepProgress(user.uid, nextStep, {
+      displayName: cleanName,
+      name: cleanName,
+      dateOfBirth: dateOfBirth || null,
+      height: numHeight && !isNaN(numHeight) ? numHeight : null,
+      heightUnit,
+      weight: numWeight && !isNaN(numWeight) ? numWeight : null,
+      weightUnit,
+      goals: selectedGoals,
+      activityLevel,
+      ...customFields,
+    }).catch((err) => {
+      console.warn('Background onboarding progress sync notice:', err);
     });
-    setIsHabitModalOpen(false);
-    setEditingHabit(null);
   };
 
-  // Step 1 Validation
-  const handleNextFromStep1 = (e: React.FormEvent) => {
-    e.preventDefault();
-    setProfileError(null);
-
+  // STEP 1 HANDLER
+  const handleContinueStep1 = () => {
     const trimmed = displayName.trim();
     if (!trimmed) {
-      setProfileError('Please enter your name.');
+      setNameError('Please enter what we should call you.');
       return;
     }
-
-    if (dateOfBirth && !isValidDateOfBirth(dateOfBirth)) {
-      setProfileError('Please choose a valid date of birth.');
-      return;
-    }
-
+    setNameError(null);
     setStep(2);
+    persistProgress(2, { displayName: trimmed, name: trimmed });
   };
 
-  // Step 2 Validation
-  const handleNextFromStep2 = (e: React.FormEvent) => {
-    e.preventDefault();
+  // STEP 2 HANDLER
+  const handleContinueStep2 = (skip = false) => {
+    if (skip) {
+      setDateOfBirth('');
+      setDobError(null);
+      setStep(3);
+      persistProgress(3, { dateOfBirth: null });
+      return;
+    }
+
+    if (dateOfBirth) {
+      if (!isValidDateOfBirth(dateOfBirth)) {
+        setDobError('Please select a valid date in the past.');
+        return;
+      }
+    }
+    setDobError(null);
     setStep(3);
+    persistProgress(3, { dateOfBirth: dateOfBirth || null });
   };
 
-  // Step 3 Validation
-  const handleNextFromStep3 = () => {
-    if (selectedHabitIds.size === 0) return;
+  // STEP 3 HANDLER
+  const handleContinueStep3 = (skip = false) => {
+    if (skip) {
+      setHeightInput('');
+      setWeightInput('');
+      setProfileMetricsError(null);
+      setStep(4);
+      persistProgress(4, { height: null, weight: null });
+      return;
+    }
+
+    const numHeight = heightInput ? parseFloat(heightInput) : undefined;
+    const numWeight = weightInput ? parseFloat(weightInput) : undefined;
+
+    if (heightInput && (isNaN(numHeight!) || numHeight! <= 0 || numHeight! > 300)) {
+      setProfileMetricsError('Please enter a valid height.');
+      return;
+    }
+    if (weightInput && (isNaN(numWeight!) || numWeight! <= 0 || numWeight! > 400)) {
+      setProfileMetricsError('Please enter a valid weight.');
+      return;
+    }
+
+    setProfileMetricsError(null);
     setStep(4);
-  };
-
-  // Final Complete
-  const handleFinishOnboarding = async () => {
-    const numHeight = heightInput.trim() ? parseFloat(heightInput.trim()) : undefined;
-    const numWeight = weightInput.trim() ? parseFloat(weightInput.trim()) : undefined;
-
-    await onComplete({
-      displayName: displayName.trim() || 'User',
-      dateOfBirth: dateOfBirth || undefined,
-      height: numHeight && numHeight > 0 ? numHeight : undefined,
+    persistProgress(4, {
+      height: numHeight && !isNaN(numHeight) ? numHeight : null,
       heightUnit,
-      weight: numWeight && numWeight > 0 ? numWeight : undefined,
+      weight: numWeight && !isNaN(numWeight) ? numWeight : null,
       weightUnit,
-      habits: activeHabits,
     });
   };
 
-  return (
-    <div className="fixed inset-0 z-50 bg-black/60 dark:bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-      <div className="w-full max-w-xl glass-modal rounded-2xl shadow-2xl overflow-hidden flex flex-col my-auto transition-all">
-        {/* Step Indicator Top Bar */}
-        <div className="px-6 pt-6 pb-4 border-b border-zinc-200/70 dark:border-white/10 bg-zinc-100/50 dark:bg-zinc-900/40">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 font-mono">
-              Step {step} of 4
-            </span>
-            <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
-              {step === 1 && 'Profile Details'}
-              {step === 2 && 'Personal Metrics'}
-              {step === 3 && 'Choose Routines'}
-              {step === 4 && 'Ready to Begin'}
-            </span>
-          </div>
+  // STEP 4 HANDLER
+  const toggleGoal = (label: string) => {
+    setSelectedGoals((prev) => {
+      if (prev.includes(label)) {
+        return prev.filter((g) => g !== label);
+      } else {
+        return [...prev, label];
+      }
+    });
+  };
 
-          {/* Progress bar */}
-          <div className="h-2 w-full bg-zinc-200/80 dark:bg-zinc-800/80 rounded-full overflow-hidden flex p-0.5 border border-zinc-300/40 dark:border-white/5">
-            <div
-              className="h-full bg-zinc-900 dark:bg-zinc-100 transition-all duration-300 rounded-full shadow-sm"
-              style={{ width: `${(step / 4) * 100}%` }}
-            />
-          </div>
+  const handleContinueStep4 = (skip = false) => {
+    const finalGoals = skip ? [] : selectedGoals;
+    setStep(5);
+    persistProgress(5, { goals: finalGoals });
+  };
+
+  // STEP 5 HANDLER
+  const handleContinueStep5 = (skip = false) => {
+    const finalActivity = skip ? undefined : activityLevel;
+    setStep(6);
+    persistProgress(6, { activityLevel: finalActivity });
+  };
+
+  // STEP 6 FINALIZE HANDLER
+  const handleFinalizeOnboarding = async () => {
+    setIsSubmitting(true);
+    setSubmissionError(null);
+
+    const cleanName = displayName.trim() || user.displayName || user.name || 'User';
+    const numHeight = heightInput ? parseFloat(heightInput) : undefined;
+    const numWeight = weightInput ? parseFloat(weightInput) : undefined;
+
+    const completePayload: OnboardingCompleteData = {
+      displayName: cleanName,
+      dateOfBirth: dateOfBirth || undefined,
+      height: numHeight && !isNaN(numHeight) ? numHeight : undefined,
+      heightUnit,
+      weight: numWeight && !isNaN(numWeight) ? numWeight : undefined,
+      weightUnit,
+      goals: selectedGoals,
+      activityLevel,
+      habits: DEFAULT_HABITS,
+    };
+
+    try {
+      await onComplete(completePayload);
+    } catch (err: any) {
+      console.error('Failed to complete onboarding:', err);
+      setSubmissionError(
+        err?.message || 'Could not save your profile. Please check your connection and try again.'
+      );
+      setIsSubmitting(false);
+    }
+  };
+
+  // Step indicator string e.g. "01 / 06"
+  const stepNumberString = `0${step} / 06`;
+  const progressPercent = Math.round((step / 6) * 100);
+
+  // Personalized message for Step 6
+  const personalizedMessage = useMemo(() => {
+    const hasRunning = selectedGoals.some((g) => g.toLowerCase().includes('run'));
+    const hasDiscipline = selectedGoals.some(
+      (g) => g.toLowerCase().includes('discipline') || g.toLowerCase().includes('habit')
+    );
+    const hasFitness = selectedGoals.some((g) => g.toLowerCase().includes('fitness'));
+
+    if (hasRunning && hasFitness) {
+      return 'Your personal space is prepared. Build unbroken streaks, track outdoor runs with real GPS accuracy, and measure your stamina over time.';
+    }
+    if (hasRunning) {
+      return 'Your personal space is prepared. Discover circular loop routes, track your pace splits in real-time, and log your progress.';
+    }
+    if (hasDiscipline) {
+      return 'Your personal space is prepared. Stack daily morning and evening habits, maintain your momentum, and build reliable consistency.';
+    }
+    return 'Your personal space is prepared. Stack daily habits, monitor your progress, and improve a little more every day.';
+  }, [selectedGoals]);
+
+  return (
+    <div
+      id="onboarding-container"
+      className="w-full max-w-xl mx-auto flex flex-col justify-between py-4 sm:py-8 px-4 sm:px-6 min-h-[calc(100vh-2rem)] sm:min-h-0 animate-fadeIn"
+    >
+      {/* Top Header: Brand & Progress Indicator */}
+      <header className="w-full flex items-center justify-between pb-4 sm:pb-6 border-b border-zinc-200/80 dark:border-white/10">
+        <div className="flex items-center gap-2.5">
+          <DailyHabitsMark className="w-7 h-7" id="onboarding-brand-mark" />
+          <span className="font-bold tracking-tight text-sm text-zinc-900 dark:text-zinc-50">
+            Daily Habits
+          </span>
         </div>
 
-        {/* Content Body */}
-        <div className="p-6 sm:p-7">
-          {/* STEP 1: Basic Profile */}
-          {step === 1 && (
-            <form onSubmit={handleNextFromStep1} className="space-y-4">
-              <div className="mb-4">
-                <div className="flex items-center gap-2.5 mb-2.5">
-                  <DailyHabitsMark className="w-7 h-7" id="onboarding-step1-logo" />
-                  <span className="text-xs font-mono font-semibold uppercase text-emerald-600 dark:text-emerald-400">
-                    Welcome to Daily Habits
-                  </span>
-                </div>
-                <h2 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
-                  Set Up Your Profile
-                </h2>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-                  Let’s personalize your routine and fitness workspace. You can adjust these anytime.
-                </p>
-              </div>
+        <div className="flex items-center gap-4">
+          {/* Step Progress Number (Clean unboxed typography) */}
+          <span
+            id="onboarding-step-counter"
+            className="text-xs font-mono font-semibold text-zinc-500 dark:text-zinc-400 tracking-wider"
+          >
+            {stepNumberString}
+          </span>
 
-              {/* Name input */}
-              <div>
-                <label htmlFor="onboarding-name" className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
-                  Your Name
-                </label>
+          {onSignOut && (
+            <button
+              type="button"
+              onClick={onSignOut}
+              id="onboarding-signout-btn"
+              className="text-xs text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors flex items-center gap-1 cursor-pointer"
+              title="Sign out"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Sign out</span>
+            </button>
+          )}
+        </div>
+      </header>
+
+      {/* Progress Bar */}
+      <div className="w-full h-1 bg-zinc-200/70 dark:bg-zinc-800 rounded-full overflow-hidden mt-3 mb-6 sm:mb-8">
+        <div
+          id="onboarding-progress-bar"
+          className="h-full bg-emerald-500 transition-all duration-300 ease-out"
+          style={{ width: `${progressPercent}%` }}
+        />
+      </div>
+
+      {/* Main Step Content Card */}
+      <main className="flex-1 flex flex-col justify-center py-2 sm:py-4">
+        {/* ======================================================== */}
+        {/* STEP 01 — PERSONAL INTRODUCTION                          */}
+        {/* ======================================================== */}
+        {step === 1 && (
+          <div id="onboarding-step-1" className="space-y-6 sm:space-y-8 animate-fadeIn">
+            <div className="space-y-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                Step 01 · Personal Introduction
+              </span>
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50 leading-tight">
+                Let's make this personal.
+              </h1>
+              <p className="text-sm sm:text-base text-zinc-500 dark:text-zinc-400">
+                What should we call you?
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <label
+                htmlFor="onboarding-name-input"
+                className="block text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400"
+              >
+                Preferred Name
+              </label>
+              <div className="relative">
                 <input
-                  id="onboarding-name"
+                  id="onboarding-name-input"
                   type="text"
+                  autoFocus
                   value={displayName}
                   onChange={(e) => {
                     setDisplayName(e.target.value);
-                    setProfileError(null);
+                    if (nameError) setNameError(null);
                   }}
-                  placeholder="Enter your name"
-                  required
-                  maxLength={50}
-                  className="w-full px-3.5 py-2.5 text-sm font-medium glass-input rounded-xl focus:outline-none text-zinc-900 dark:text-zinc-100"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleContinueStep1();
+                    }
+                  }}
+                  placeholder="e.g. Alex"
+                  className={`w-full min-h-[54px] sm:min-h-[60px] px-4 sm:px-5 rounded-2xl glass-input text-lg sm:text-xl font-semibold text-zinc-900 dark:text-zinc-50 placeholder:text-zinc-400 focus:outline-none transition-all ${
+                    nameError
+                      ? 'border-rose-500 focus:border-rose-500'
+                      : 'focus:border-emerald-500'
+                  }`}
                 />
               </div>
 
-              {/* Date of Birth & Age Display */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label htmlFor="onboarding-dob" className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
-                    Date of Birth
-                  </label>
-                  <input
-                    id="onboarding-dob"
-                    type="date"
-                    max={todayDate}
-                    value={dateOfBirth}
-                    onChange={(e) => {
-                      setDateOfBirth(e.target.value);
-                      setProfileError(null);
-                    }}
-                    className="w-full px-3.5 py-2.5 text-sm font-mono glass-input rounded-xl focus:outline-none text-zinc-900 dark:text-zinc-100"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
-                    Calculated Age
-                  </label>
-                  <div className="w-full px-3.5 py-2.5 text-sm font-mono font-medium text-zinc-700 dark:text-zinc-300 bg-zinc-100/70 dark:bg-zinc-800/50 border border-zinc-200/70 dark:border-white/5 rounded-xl flex items-center min-h-[42px]">
-                    <span>{age !== null ? `${age} years old` : dateOfBirth ? 'Invalid date' : 'Optional'}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Google Gmail (Read-Only) */}
-              <div>
-                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
-                  Connected Gmail
-                </label>
-                <div className="relative">
-                  <input
-                    type="email"
-                    value={user.email || ''}
-                    readOnly
-                    disabled
-                    className="w-full px-3.5 py-2.5 text-xs font-mono text-zinc-500 dark:text-zinc-400 bg-zinc-100/70 dark:bg-zinc-800/50 border border-zinc-200/70 dark:border-white/5 rounded-xl cursor-not-allowed select-none pr-9"
-                  />
-                  <Lock className="w-3.5 h-3.5 text-zinc-400 absolute right-3 top-1/2 -translate-y-1/2" />
-                </div>
-              </div>
-
-              {profileError && (
-                <div className="p-3 bg-red-500/10 dark:bg-red-500/15 border border-red-500/30 text-xs text-red-700 dark:text-red-300 rounded-xl backdrop-blur-xs">
-                  {profileError}
-                </div>
+              {nameError ? (
+                <p id="onboarding-name-error" className="text-xs text-rose-500 font-medium flex items-center gap-1.5 pt-1">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  <span>{nameError}</span>
+                </p>
+              ) : (
+                <p className="text-[11px] sm:text-xs text-zinc-400 dark:text-zinc-500">
+                  Prefilled from your Google Account. Feel free to use your first name or a nickname.
+                </p>
               )}
 
-              <div className="pt-3 flex justify-end">
+              {/* Read-only connected Google Email */}
+              {user.email && (
+                <div className="pt-2 text-[11px] font-mono text-zinc-400 dark:text-zinc-500 flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  <span>Connected Account: {user.email}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="pt-4">
+              <button
+                id="onboarding-step1-continue"
+                type="button"
+                onClick={handleContinueStep1}
+                className="w-full min-h-[52px] sm:min-h-[58px] px-6 rounded-2xl bg-zinc-900 hover:bg-zinc-800 active:bg-black dark:bg-zinc-100 dark:hover:bg-white dark:active:bg-zinc-200 text-white dark:text-zinc-900 font-bold text-sm sm:text-base tracking-wide flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer active:scale-[0.99]"
+              >
+                <span>Continue</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ======================================================== */}
+        {/* STEP 02 — ABOUT YOU (Date of Birth)                      */}
+        {/* ======================================================== */}
+        {step === 2 && (
+          <div id="onboarding-step-2" className="space-y-6 sm:space-y-8 animate-fadeIn">
+            <div className="space-y-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                Step 02 · About You
+              </span>
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50 leading-tight">
+                A little about you.
+              </h1>
+              <p className="text-sm sm:text-base text-zinc-500 dark:text-zinc-400">
+                When were you born?
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <label
+                  htmlFor="onboarding-dob-input"
+                  className="block text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400"
+                >
+                  Date of Birth <span className="lowercase text-zinc-400">(optional)</span>
+                </label>
+                {computedAge !== null && (
+                  <span
+                    id="onboarding-computed-age"
+                    className="text-xs font-mono font-medium text-emerald-600 dark:text-emerald-400"
+                  >
+                    Age: {computedAge} years
+                  </span>
+                )}
+              </div>
+
+              <div className="relative">
+                <input
+                  id="onboarding-dob-input"
+                  type="date"
+                  max={todayKey}
+                  min="1920-01-01"
+                  value={dateOfBirth}
+                  onChange={(e) => {
+                    setDateOfBirth(e.target.value);
+                    if (dobError) setDobError(null);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleContinueStep2(false);
+                    }
+                  }}
+                  className={`w-full min-h-[54px] sm:min-h-[60px] px-4 sm:px-5 rounded-2xl glass-input text-base sm:text-lg font-mono text-zinc-900 dark:text-zinc-50 focus:outline-none transition-all ${
+                    dobError
+                      ? 'border-rose-500 focus:border-rose-500'
+                      : 'focus:border-emerald-500'
+                  }`}
+                />
+              </div>
+
+              {dobError && (
+                <p id="onboarding-dob-error" className="text-xs text-rose-500 font-medium flex items-center gap-1.5 pt-1">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  <span>{dobError}</span>
+                </p>
+              )}
+
+              {/* Privacy Explanation */}
+              <div className="p-3.5 rounded-2xl bg-zinc-100/70 dark:bg-zinc-900/50 border border-zinc-200/60 dark:border-white/5 flex items-start gap-2.5 text-xs text-zinc-500 dark:text-zinc-400">
+                <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                <p className="leading-relaxed">
+                  Used only to calculate your age and tailor training zones and recovery metrics. Kept strictly private and never shared.
+                </p>
+              </div>
+            </div>
+
+            {/* Navigation Buttons */}
+            <div className="pt-4 space-y-2.5">
+              <div className="grid grid-cols-2 gap-3">
                 <button
-                  type="submit"
-                  className="px-5 py-2.5 bg-zinc-900 hover:bg-black dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 text-sm font-semibold rounded-xl transition-all shadow-sm active:scale-95 cursor-pointer inline-flex items-center gap-2"
+                  id="onboarding-step2-back"
+                  type="button"
+                  onClick={() => setStep(1)}
+                  className="min-h-[52px] sm:min-h-[58px] px-4 rounded-2xl glass-card hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-semibold text-sm flex items-center justify-center gap-2 cursor-pointer transition-colors active:scale-[0.99]"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  <span>Back</span>
+                </button>
+
+                <button
+                  id="onboarding-step2-continue"
+                  type="button"
+                  onClick={() => handleContinueStep2(false)}
+                  className="min-h-[52px] sm:min-h-[58px] px-4 rounded-2xl bg-zinc-900 hover:bg-zinc-800 active:bg-black dark:bg-zinc-100 dark:hover:bg-white dark:active:bg-zinc-200 text-white dark:text-zinc-900 font-bold text-sm tracking-wide flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer active:scale-[0.99]"
                 >
                   <span>Continue</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </div>
-            </form>
-          )}
 
-          {/* STEP 2: Body Information */}
-          {step === 2 && (
-            <form onSubmit={handleNextFromStep2} className="space-y-4">
-              <div className="mb-4">
-                <h2 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
-                  Personal Tracking Metrics
-                </h2>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-                  Add your current metrics if you'd like to track physical routines.
-                </p>
-              </div>
+              <button
+                id="onboarding-step2-skip"
+                type="button"
+                onClick={() => handleContinueStep2(true)}
+                className="w-full py-2.5 text-xs text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 font-medium transition-colors cursor-pointer text-center"
+              >
+                Skip for now
+              </button>
+            </div>
+          </div>
+        )}
 
-              {/* Height Input & Unit Toggle */}
-              <div>
-                <label htmlFor="onboarding-height" className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
-                  Height (Optional)
-                </label>
-                <div className="flex items-center gap-2">
-                  <input
-                    id="onboarding-height"
-                    type="number"
-                    step="0.1"
-                    min="0"
-                    max="300"
-                    value={heightInput}
-                    onChange={(e) => setHeightInput(e.target.value)}
-                    placeholder={heightUnit === 'cm' ? 'e.g. 175' : 'e.g. 68'}
-                    className="flex-1 px-3.5 py-2.5 text-sm font-mono glass-input rounded-xl focus:outline-none text-zinc-900 dark:text-zinc-100"
-                  />
-                  <div className="flex rounded-xl border border-zinc-300/60 dark:border-white/10 overflow-hidden bg-zinc-100/80 dark:bg-zinc-800/80 p-0.5">
+        {/* ======================================================== */}
+        {/* STEP 03 — YOUR PROFILE (Height & Weight)                  */}
+        {/* ======================================================== */}
+        {step === 3 && (
+          <div id="onboarding-step-3" className="space-y-6 sm:space-y-8 animate-fadeIn">
+            <div className="space-y-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                Step 03 · Your Profile
+              </span>
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50 leading-tight">
+                Know your starting point.
+              </h1>
+              <p className="text-sm sm:text-base text-zinc-500 dark:text-zinc-400">
+                Height and weight allow Daily Habits to calculate realistic stride lengths and accurate GPS running calories.
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              {/* Height Input */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label
+                    htmlFor="onboarding-height-input"
+                    className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 flex items-center gap-1.5"
+                  >
+                    <Ruler className="w-3.5 h-3.5" />
+                    <span>Height</span>
+                  </label>
+
+                  <div className="flex items-center p-0.5 rounded-lg bg-zinc-200/60 dark:bg-zinc-800 text-xs">
                     <button
                       type="button"
                       onClick={() => setHeightUnit('cm')}
-                      className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                      className={`px-2.5 py-0.5 rounded-md text-[11px] font-semibold transition-colors cursor-pointer ${
                         heightUnit === 'cm'
-                          ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-2xs'
-                          : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
+                          ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-xs'
+                          : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100'
                       }`}
                     >
                       cm
@@ -355,43 +646,57 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                     <button
                       type="button"
                       onClick={() => setHeightUnit('in')}
-                      className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                      className={`px-2.5 py-0.5 rounded-md text-[11px] font-semibold transition-colors cursor-pointer ${
                         heightUnit === 'in'
-                          ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-2xs'
-                          : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
+                          ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-xs'
+                          : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100'
                       }`}
                     >
                       in
                     </button>
                   </div>
                 </div>
-              </div>
 
-              {/* Weight Input & Unit Toggle */}
-              <div>
-                <label htmlFor="onboarding-weight" className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
-                  Weight (Optional)
-                </label>
-                <div className="flex items-center gap-2">
+                <div className="relative">
                   <input
-                    id="onboarding-weight"
+                    id="onboarding-height-input"
                     type="number"
                     step="0.1"
-                    min="0"
-                    max="500"
-                    value={weightInput}
-                    onChange={(e) => setWeightInput(e.target.value)}
-                    placeholder={weightUnit === 'kg' ? 'e.g. 72.5' : 'e.g. 160'}
-                    className="flex-1 px-3.5 py-2.5 text-sm font-mono glass-input rounded-xl focus:outline-none text-zinc-900 dark:text-zinc-100"
+                    min="1"
+                    max="300"
+                    value={heightInput}
+                    onChange={(e) => {
+                      setHeightInput(e.target.value);
+                      if (profileMetricsError) setProfileMetricsError(null);
+                    }}
+                    placeholder={heightUnit === 'cm' ? 'e.g. 178' : 'e.g. 70'}
+                    className="w-full min-h-[54px] sm:min-h-[58px] px-4 sm:px-5 rounded-2xl glass-input text-base sm:text-lg font-mono text-zinc-900 dark:text-zinc-50 focus:outline-none focus:border-emerald-500 transition-all"
                   />
-                  <div className="flex rounded-xl border border-zinc-300/60 dark:border-white/10 overflow-hidden bg-zinc-100/80 dark:bg-zinc-800/80 p-0.5">
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-mono text-zinc-400">
+                    {heightUnit}
+                  </span>
+                </div>
+              </div>
+
+              {/* Weight Input */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label
+                    htmlFor="onboarding-weight-input"
+                    className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 flex items-center gap-1.5"
+                  >
+                    <Scale className="w-3.5 h-3.5" />
+                    <span>Weight</span>
+                  </label>
+
+                  <div className="flex items-center p-0.5 rounded-lg bg-zinc-200/60 dark:bg-zinc-800 text-xs">
                     <button
                       type="button"
                       onClick={() => setWeightUnit('kg')}
-                      className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                      className={`px-2.5 py-0.5 rounded-md text-[11px] font-semibold transition-colors cursor-pointer ${
                         weightUnit === 'kg'
-                          ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-2xs'
-                          : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
+                          ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-xs'
+                          : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100'
                       }`}
                     >
                       kg
@@ -399,260 +704,392 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                     <button
                       type="button"
                       onClick={() => setWeightUnit('lbs')}
-                      className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                      className={`px-2.5 py-0.5 rounded-md text-[11px] font-semibold transition-colors cursor-pointer ${
                         weightUnit === 'lbs'
-                          ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-2xs'
-                          : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
+                          ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-xs'
+                          : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100'
                       }`}
                     >
                       lbs
                     </button>
                   </div>
                 </div>
-              </div>
 
-              {/* Privacy Notice Banner */}
-              <div className="p-3.5 rounded-xl bg-zinc-100/70 dark:bg-zinc-800/50 border border-zinc-200/70 dark:border-white/5 flex items-start gap-2.5 text-xs text-zinc-600 dark:text-zinc-300">
-                <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
-                <div className="leading-relaxed">
-                  <strong className="text-zinc-900 dark:text-zinc-100 font-semibold block">Private Personal Records</strong>
-                  These metrics are strictly private to your personal account. Daily Habits does not enforce restrictive calorie targets, ideal weight calculations, or body comparisons.
+                <div className="relative">
+                  <input
+                    id="onboarding-weight-input"
+                    type="number"
+                    step="0.1"
+                    min="1"
+                    max="400"
+                    value={weightInput}
+                    onChange={(e) => {
+                      setWeightInput(e.target.value);
+                      if (profileMetricsError) setProfileMetricsError(null);
+                    }}
+                    placeholder={weightUnit === 'kg' ? 'e.g. 72' : 'e.g. 158'}
+                    className="w-full min-h-[54px] sm:min-h-[58px] px-4 sm:px-5 rounded-2xl glass-input text-base sm:text-lg font-mono text-zinc-900 dark:text-zinc-50 focus:outline-none focus:border-emerald-500 transition-all"
+                  />
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-mono text-zinc-400">
+                    {weightUnit}
+                  </span>
                 </div>
               </div>
 
-              <div className="pt-3 flex items-center justify-between">
+              {profileMetricsError && (
+                <p id="onboarding-metrics-error" className="text-xs text-rose-500 font-medium flex items-center gap-1.5 pt-1">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  <span>{profileMetricsError}</span>
+                </p>
+              )}
+
+              <p className="text-[11px] text-zinc-400 dark:text-zinc-500 pt-1">
+                Optional. If skipped, calorie estimation will remain disabled until you set your weight in Profile.
+              </p>
+            </div>
+
+            {/* Navigation Buttons */}
+            <div className="pt-4 space-y-2.5">
+              <div className="grid grid-cols-2 gap-3">
                 <button
+                  id="onboarding-step3-back"
                   type="button"
-                  onClick={() => setStep(1)}
-                  className="px-4 py-2 text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 inline-flex items-center gap-1.5 cursor-pointer"
+                  onClick={() => setStep(2)}
+                  className="min-h-[52px] sm:min-h-[58px] px-4 rounded-2xl glass-card hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-semibold text-sm flex items-center justify-center gap-2 cursor-pointer transition-colors active:scale-[0.99]"
                 >
                   <ArrowLeft className="w-4 h-4" />
                   <span>Back</span>
                 </button>
+
                 <button
-                  type="submit"
-                  className="px-5 py-2.5 bg-zinc-900 hover:bg-black dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 text-sm font-semibold rounded-xl transition-all shadow-sm active:scale-95 cursor-pointer inline-flex items-center gap-2"
+                  id="onboarding-step3-continue"
+                  type="button"
+                  onClick={() => handleContinueStep3(false)}
+                  className="min-h-[52px] sm:min-h-[58px] px-4 rounded-2xl bg-zinc-900 hover:bg-zinc-800 active:bg-black dark:bg-zinc-100 dark:hover:bg-white dark:active:bg-zinc-200 text-white dark:text-zinc-900 font-bold text-sm tracking-wide flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer active:scale-[0.99]"
                 >
                   <span>Continue</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </div>
-            </form>
-          )}
 
-          {/* STEP 3: Choose Your Habits */}
-          {step === 3 && (
-            <div className="space-y-4">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <h2 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
-                    Choose Your Habits
-                  </h2>
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-                    Select the routines you want on your daily checklist. You can edit or add custom habits.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleOpenAddCustomHabit}
-                  className="px-3 py-1.5 text-xs font-semibold bg-zinc-200/70 hover:bg-zinc-300/70 dark:bg-zinc-800/80 dark:hover:bg-zinc-700 text-zinc-900 dark:text-zinc-100 rounded-xl inline-flex items-center gap-1.5 transition-all cursor-pointer shrink-0 border border-zinc-300/40 dark:border-white/5"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Custom Habit</span>
-                </button>
-              </div>
+              <button
+                id="onboarding-step3-skip"
+                type="button"
+                onClick={() => handleContinueStep3(true)}
+                className="w-full py-2.5 text-xs text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 font-medium transition-colors cursor-pointer text-center"
+              >
+                Skip for now
+              </button>
+            </div>
+          </div>
+        )}
 
-              {/* Habits List */}
-              <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
-                {habitsList.map((habit) => {
-                  const isSelected = selectedHabitIds.has(habit.id);
-                  return (
+        {/* ======================================================== */}
+        {/* STEP 04 — YOUR GOALS (Multi-select)                      */}
+        {/* ======================================================== */}
+        {step === 4 && (
+          <div id="onboarding-step-4" className="space-y-6 sm:space-y-8 animate-fadeIn">
+            <div className="space-y-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                Step 04 · Your Goals
+              </span>
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50 leading-tight">
+                What would you like to achieve?
+              </h1>
+              <p className="text-sm sm:text-base text-zinc-500 dark:text-zinc-400">
+                Select one or more areas you want to focus on. You can adjust these anytime.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
+              {GOAL_OPTIONS.map((goal) => {
+                const isSelected = selectedGoals.includes(goal.label);
+                return (
+                  <button
+                    key={goal.id}
+                    id={`onboarding-goal-${goal.id}`}
+                    type="button"
+                    onClick={() => toggleGoal(goal.label)}
+                    className={`p-3.5 sm:p-4 rounded-2xl text-left transition-all cursor-pointer flex items-start gap-3 border ${
+                      isSelected
+                        ? 'bg-emerald-500/[0.08] dark:bg-emerald-500/[0.12] border-emerald-500/40 dark:border-emerald-500/30 shadow-xs'
+                        : 'glass-card border-zinc-200/80 dark:border-white/10 hover:border-zinc-300 dark:hover:border-zinc-700'
+                    }`}
+                  >
                     <div
-                      key={habit.id}
-                      onClick={() => handleToggleHabitSelection(habit.id)}
-                      className={`flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer select-none ${
+                      className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5 transition-colors ${
                         isSelected
-                          ? 'glass-tile border-zinc-400/50 dark:border-white/20'
-                          : 'bg-zinc-100/40 dark:bg-zinc-900/30 border-zinc-200/40 dark:border-white/5 opacity-60'
+                          ? 'bg-emerald-500 text-white'
+                          : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400'
                       }`}
                     >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div
-                          className={`w-5 h-5 rounded-lg flex items-center justify-center border transition-all shrink-0 ${
-                            isSelected
-                              ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 border-zinc-900 dark:border-zinc-100'
-                              : 'border-zinc-300 dark:border-zinc-700 bg-white/80 dark:bg-zinc-800/80'
-                          }`}
-                        >
-                          {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
-                        </div>
-
-                        {habit.icon && (
-                          <HabitIcon
-                            name={habit.icon}
-                            className={`w-4 h-4 shrink-0 ${
-                              isSelected ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-400'
-                            }`}
-                          />
-                        )}
-
-                        <div className="min-w-0">
-                          <p
-                            className={`text-xs font-semibold truncate ${
-                              isSelected ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-500 dark:text-zinc-400'
-                            }`}
-                          >
-                            {habit.name}
-                          </p>
-                          {habit.target && (
-                            <p className="text-[11px] text-zinc-500 dark:text-zinc-400 font-mono truncate">
-                              {habit.target}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Edit / Delete Buttons */}
-                      <div className="flex items-center gap-1 shrink-0 ml-2" onClick={(e) => e.stopPropagation()}>
-                        <button
-                          type="button"
-                          onClick={(e) => handleOpenEditHabit(habit, e)}
-                          className="p-1.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 rounded-lg hover:bg-zinc-200/50 dark:hover:bg-white/10 transition-colors"
-                          title="Edit Habit"
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteHabit(habit.id)}
-                          className="p-1.5 text-zinc-400 hover:text-red-600 dark:hover:text-red-400 rounded-lg hover:bg-red-500/10 dark:hover:bg-red-500/15 transition-colors"
-                          title="Remove Habit"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
+                      {isSelected ? <Check className="w-4 h-4 stroke-[3]" /> : goal.icon}
                     </div>
-                  );
-                })}
-              </div>
 
-              <div className="pt-3 flex items-center justify-between">
+                    <div className="space-y-0.5 min-w-0">
+                      <p className="text-xs sm:text-sm font-bold text-zinc-900 dark:text-zinc-50 leading-snug">
+                        {goal.label}
+                      </p>
+                      <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-tight">
+                        {goal.description}
+                      </p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Navigation Buttons */}
+            <div className="pt-4 space-y-2.5">
+              <div className="grid grid-cols-2 gap-3">
                 <button
+                  id="onboarding-step4-back"
                   type="button"
-                  onClick={() => setStep(2)}
-                  className="px-4 py-2 text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 inline-flex items-center gap-1.5 cursor-pointer"
+                  onClick={() => setStep(3)}
+                  className="min-h-[52px] sm:min-h-[58px] px-4 rounded-2xl glass-card hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-semibold text-sm flex items-center justify-center gap-2 cursor-pointer transition-colors active:scale-[0.99]"
                 >
                   <ArrowLeft className="w-4 h-4" />
                   <span>Back</span>
                 </button>
+
                 <button
+                  id="onboarding-step4-continue"
                   type="button"
-                  disabled={selectedHabitIds.size === 0}
-                  onClick={handleNextFromStep3}
-                  className="px-5 py-2.5 bg-zinc-900 hover:bg-black dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 text-sm font-semibold rounded-xl transition-all shadow-sm active:scale-95 cursor-pointer inline-flex items-center gap-2 disabled:opacity-40"
+                  onClick={() => handleContinueStep4(false)}
+                  className="min-h-[52px] sm:min-h-[58px] px-4 rounded-2xl bg-zinc-900 hover:bg-zinc-800 active:bg-black dark:bg-zinc-100 dark:hover:bg-white dark:active:bg-zinc-200 text-white dark:text-zinc-900 font-bold text-sm tracking-wide flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer active:scale-[0.99]"
                 >
-                  <span>Review & Continue</span>
+                  <span>Continue</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </div>
+
+              <button
+                id="onboarding-step4-skip"
+                type="button"
+                onClick={() => handleContinueStep4(true)}
+                className="w-full py-2.5 text-xs text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 font-medium transition-colors cursor-pointer text-center"
+              >
+                Skip for now
+              </button>
             </div>
-          )}
+          </div>
+        )}
 
-          {/* STEP 4: Finish & Review */}
-          {step === 4 && (
-            <div className="space-y-5">
-              <div>
-                <div className="mb-3">
-                  <DailyHabitsMark className="w-10 h-10" id="onboarding-step4-logo" />
-                </div>
-                <h2 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
-                  You're all set, {displayName || 'Friend'}!
-                </h2>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-                  Here is a quick summary of your Daily Habits configuration.
-                </p>
-              </div>
+        {/* ======================================================== */}
+        {/* STEP 05 — YOUR ACTIVITY LEVEL                            */}
+        {/* ======================================================== */}
+        {step === 5 && (
+          <div id="onboarding-step-5" className="space-y-6 sm:space-y-8 animate-fadeIn">
+            <div className="space-y-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                Step 05 · Activity Baseline
+              </span>
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50 leading-tight">
+                Where are you starting from?
+              </h1>
+              <p className="text-sm sm:text-base text-zinc-500 dark:text-zinc-400">
+                Help us calibrate your initial daily pace and targets.
+              </p>
+            </div>
 
-              <div className="glass-card rounded-xl p-4 space-y-3">
-                <div className="flex items-center justify-between text-xs pb-2 border-b border-zinc-200/70 dark:border-white/10">
-                  <span className="text-zinc-500 dark:text-zinc-400">Account</span>
-                  <span className="font-semibold text-zinc-900 dark:text-zinc-100">{displayName}</span>
-                </div>
-                {dateOfBirth && (
-                  <div className="flex items-center justify-between text-xs pb-2 border-b border-zinc-200/70 dark:border-white/10">
-                    <span className="text-zinc-500 dark:text-zinc-400">Age</span>
-                    <span className="font-mono font-medium text-zinc-900 dark:text-zinc-100">
-                      {age !== null ? `${age} years old` : dateOfBirth}
-                    </span>
-                  </div>
-                )}
-                {(heightInput || weightInput) && (
-                  <div className="flex items-center justify-between text-xs pb-2 border-b border-zinc-200/70 dark:border-white/10">
-                    <span className="text-zinc-500 dark:text-zinc-400">Metrics</span>
-                    <span className="font-mono font-medium text-zinc-900 dark:text-zinc-100">
-                      {heightInput ? `${heightInput} ${heightUnit}` : ''}
-                      {heightInput && weightInput ? ' • ' : ''}
-                      {weightInput ? `${weightInput} ${weightUnit}` : ''}
-                    </span>
-                  </div>
-                )}
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-zinc-500 dark:text-zinc-400">Daily Routines</span>
-                  <span className="font-semibold text-zinc-900 dark:text-zinc-100">
-                    {activeHabits.length} selected
-                  </span>
-                </div>
-              </div>
+            <div className="space-y-2.5 sm:space-y-3">
+              {ACTIVITY_OPTIONS.map((opt) => {
+                const isSelected = activityLevel === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    id={`onboarding-activity-${opt.id}`}
+                    type="button"
+                    onClick={() => setActivityLevel(opt.id)}
+                    className={`w-full p-4 rounded-2xl text-left transition-all cursor-pointer flex items-center justify-between gap-3 border ${
+                      isSelected
+                        ? 'bg-emerald-500/[0.08] dark:bg-emerald-500/[0.12] border-emerald-500/40 dark:border-emerald-500/30 shadow-xs'
+                        : 'glass-card border-zinc-200/80 dark:border-white/10 hover:border-zinc-300 dark:hover:border-zinc-700'
+                    }`}
+                  >
+                    <div className="space-y-0.5 min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-bold text-zinc-900 dark:text-zinc-50">
+                          {opt.title}
+                        </span>
+                        <span className="text-[11px] font-mono text-zinc-400 dark:text-zinc-500">
+                          · {opt.cadence}
+                        </span>
+                      </div>
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                        {opt.description}
+                      </p>
+                    </div>
 
-              <div className="pt-2 flex items-center justify-between">
+                    <div
+                      className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 transition-all ${
+                        isSelected
+                          ? 'border-emerald-500 bg-emerald-500 text-white'
+                          : 'border-zinc-300 dark:border-zinc-700 bg-transparent'
+                      }`}
+                    >
+                      {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Navigation Buttons */}
+            <div className="pt-4 space-y-2.5">
+              <div className="grid grid-cols-2 gap-3">
                 <button
+                  id="onboarding-step5-back"
                   type="button"
-                  onClick={() => setStep(3)}
-                  disabled={isLoading}
-                  className="px-4 py-2 text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  onClick={() => setStep(4)}
+                  className="min-h-[52px] sm:min-h-[58px] px-4 rounded-2xl glass-card hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-semibold text-sm flex items-center justify-center gap-2 cursor-pointer transition-colors active:scale-[0.99]"
                 >
                   <ArrowLeft className="w-4 h-4" />
                   <span>Back</span>
                 </button>
+
                 <button
+                  id="onboarding-step5-continue"
                   type="button"
-                  disabled={isLoading}
-                  onClick={handleFinishOnboarding}
-                  className="px-6 py-3 bg-zinc-900 hover:bg-black dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 text-sm font-semibold rounded-xl transition-all shadow-sm active:scale-95 cursor-pointer inline-flex items-center gap-2 disabled:opacity-50"
+                  onClick={() => handleContinueStep5(false)}
+                  className="min-h-[52px] sm:min-h-[58px] px-4 rounded-2xl bg-zinc-900 hover:bg-zinc-800 active:bg-black dark:bg-zinc-100 dark:hover:bg-white dark:active:bg-zinc-200 text-white dark:text-zinc-900 font-bold text-sm tracking-wide flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer active:scale-[0.99]"
                 >
-                  {isLoading ? (
-                    <>
-                      <span className="w-4 h-4 border-2 border-white/30 dark:border-zinc-900/30 border-t-white dark:border-t-zinc-900 rounded-full animate-spin" />
-                      <span>Setting up...</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>Start Daily Habits</span>
-                      <ArrowRight className="w-4 h-4" />
-                    </>
-                  )}
+                  <span>Continue</span>
+                  <ArrowRight className="w-4 h-4" />
                 </button>
               </div>
-            </div>
-          )}
-        </div>
-      </div>
 
-      {/* Add / Edit Habit Modal */}
-      <HabitModal
-        isOpen={isHabitModalOpen}
-        onClose={() => {
-          setIsHabitModalOpen(false);
-          setEditingHabit(null);
-        }}
-        onSave={async (data) => {
-          handleSaveHabit(data);
-        }}
-        onDelete={async (habitId) => {
-          handleDeleteHabit(habitId);
-        }}
-        initialHabit={editingHabit}
-      />
+              <button
+                id="onboarding-step5-skip"
+                type="button"
+                onClick={() => handleContinueStep5(true)}
+                className="w-full py-2.5 text-xs text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 font-medium transition-colors cursor-pointer text-center"
+              >
+                Skip for now
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ======================================================== */}
+        {/* STEP 06 — PERSONALIZED WELCOME                           */}
+        {/* ======================================================== */}
+        {step === 6 && (
+          <div id="onboarding-step-6" className="space-y-6 sm:space-y-8 animate-fadeIn">
+            <div className="space-y-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                Step 06 · Ready to Launch
+              </span>
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50 leading-tight">
+                Your next chapter starts now.
+              </h1>
+              <p className="text-sm sm:text-base text-zinc-500 dark:text-zinc-400">
+                Welcome, <strong className="text-zinc-900 dark:text-zinc-100">{displayName || 'Runner'}</strong>.
+              </p>
+            </div>
+
+            {/* Personalized Summary Card */}
+            <div className="p-4 sm:p-5 rounded-3xl glass-card border-zinc-200/80 dark:border-white/10 space-y-4">
+              <div className="space-y-1.5">
+                <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                  Your Focus Areas
+                </p>
+                {selectedGoals.length > 0 ? (
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {selectedGoals.map((g) => (
+                      <span
+                        key={g}
+                        className="text-xs font-semibold px-3 py-1.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200"
+                      >
+                        {g}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                    Balanced daily consistency & personal routine
+                  </p>
+                )}
+              </div>
+
+              {activityLevel && (
+                <div className="pt-2 border-t border-zinc-200/60 dark:border-white/5 flex items-center justify-between text-xs">
+                  <span className="text-zinc-500 dark:text-zinc-400">Starting Baseline</span>
+                  <span className="font-semibold text-zinc-900 dark:text-zinc-100 capitalize">
+                    {activityLevel.replace('_', ' ')}
+                  </span>
+                </div>
+              )}
+
+              <p className="pt-2 text-xs sm:text-sm text-zinc-600 dark:text-zinc-300 leading-relaxed border-t border-zinc-200/60 dark:border-white/5">
+                {personalizedMessage}
+              </p>
+            </div>
+
+            {/* Error state if submission fails */}
+            {submissionError && (
+              <div
+                role="alert"
+                className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-800 dark:text-rose-200 text-xs sm:text-sm flex items-center justify-between gap-3 animate-fadeIn"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                  <span className="truncate">{submissionError}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleFinalizeOnboarding}
+                  className="px-3 py-1 rounded-xl bg-rose-600 text-white font-semibold text-xs shrink-0 cursor-pointer hover:bg-rose-700"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
+
+            {/* Launch Action Button */}
+            <div className="pt-4 space-y-2.5">
+              <button
+                id="onboarding-enter-dashboard-btn"
+                type="button"
+                disabled={isSubmitting || isLoading}
+                onClick={handleFinalizeOnboarding}
+                className="w-full min-h-[54px] sm:min-h-[60px] px-6 rounded-2xl bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold text-base tracking-wide flex items-center justify-center gap-2.5 shadow-lg shadow-emerald-600/25 transition-all cursor-pointer active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {isSubmitting || isLoading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Preparing Your Space...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-5 h-5" />
+                    <span>Enter Daily Habits</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                id="onboarding-step6-back"
+                type="button"
+                disabled={isSubmitting || isLoading}
+                onClick={() => setStep(5)}
+                className="w-full py-2 text-xs text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 font-medium transition-colors cursor-pointer text-center disabled:opacity-40"
+              >
+                Back to Activity Level
+              </button>
+            </div>
+          </div>
+        )}
+      </main>
+
+      {/* Footer Privacy Guarantee */}
+      <footer className="pt-4 sm:pt-6 border-t border-zinc-200/60 dark:border-white/5 flex items-center justify-between text-[11px] text-zinc-400 dark:text-zinc-500">
+        <div className="flex items-center gap-1.5">
+          <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+          <span>Encrypted profile storage</span>
+        </div>
+        <span>Daily Habits · Private by design</span>
+      </footer>
     </div>
   );
 };

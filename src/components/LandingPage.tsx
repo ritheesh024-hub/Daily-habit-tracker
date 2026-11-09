@@ -10,17 +10,14 @@ import {
   Activity,
   ArrowRight,
   ShieldCheck,
-  Download,
   Check,
   Lock,
   Trophy,
   MapPin,
   Clock,
   Sparkles,
-  TrendingUp,
-  Zap,
 } from 'lucide-react';
-import { DailyHabitsMark, DailyHabitsLogo } from './DailyHabitsLogo';
+import { DailyHabitsMark } from './DailyHabitsLogo';
 
 interface LandingPageProps {
   onGetStarted: () => void;
@@ -29,7 +26,6 @@ interface LandingPageProps {
   notification?: string | null;
 }
 
-// Subtle motion variants for gentle reveals
 const fadeInUp: Variants = {
   hidden: { opacity: 0, y: 16 },
   visible: {
@@ -81,14 +77,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             <a href="#features" className="hover:text-white transition-colors">
               Features
             </a>
-            <a href="#daily-run-showcase" className="hover:text-white transition-colors">
+            <a href="#daily-run" className="hover:text-white transition-colors">
               Daily Run
             </a>
-            <a href="#daily-routes-showcase" className="hover:text-white transition-colors">
+            <a href="#daily-routes" className="hover:text-white transition-colors">
               Daily Routes
             </a>
             <a href="#how-it-works" className="hover:text-white transition-colors">
-              How it works
+              How It Works
             </a>
             <a href="#privacy" className="hover:text-white transition-colors">
               Privacy
@@ -101,15 +97,15 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               type="button"
               onClick={onGetStarted}
               disabled={isLoading}
-              className="text-xs sm:text-sm font-medium text-zinc-300 hover:text-white px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer"
+              className="text-xs sm:text-sm font-medium text-zinc-300 hover:text-white px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
             >
-              Sign in
+              Sign In
             </button>
             <button
               type="button"
               onClick={onGetStarted}
               disabled={isLoading}
-              className="hidden sm:inline-flex items-center gap-1.5 px-4 py-2 text-xs sm:text-sm font-semibold text-zinc-950 bg-emerald-400 hover:bg-emerald-300 rounded-xl transition-all shadow-sm active:scale-95 cursor-pointer"
+              className="hidden sm:inline-flex items-center gap-1.5 px-4 py-2 text-xs sm:text-sm font-semibold text-zinc-950 bg-emerald-400 hover:bg-emerald-300 rounded-xl transition-all shadow-sm active:scale-95 cursor-pointer disabled:opacity-50"
             >
               <span>Get Started</span>
               <ArrowRight className="w-3.5 h-3.5" />
@@ -118,15 +114,15 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         </div>
       </header>
 
-      {/* 2. Hero Section: Typography & Layout Driven */}
-      <section className="relative pt-12 sm:pt-20 pb-16 sm:pb-24 px-4 sm:px-6 overflow-hidden">
+      {/* 2. Hero Section */}
+      <section className="relative pt-12 sm:pt-20 pb-14 sm:pb-20 px-4 sm:px-6 overflow-hidden">
         {/* Subtle Ambient CSS Gradient Background */}
         <div
           aria-hidden="true"
-          className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-5xl h-[520px] bg-gradient-to-b from-emerald-500/10 via-zinc-900/30 to-transparent blur-3xl pointer-events-none -z-10"
+          className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-5xl h-[460px] bg-gradient-to-b from-emerald-500/10 via-zinc-900/30 to-transparent blur-3xl pointer-events-none -z-10"
         />
 
-        <div className="max-w-5xl mx-auto text-center flex flex-col items-center">
+        <div className="max-w-4xl mx-auto text-center flex flex-col items-center">
           {/* Eyebrow Tag */}
           <motion.div
             initial={{ opacity: 0, y: -8 }}
@@ -144,7 +140,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             initial={{ opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.08 }}
-            className="text-3xl sm:text-5xl md:text-6xl font-bold tracking-tight text-white leading-[1.12] max-w-3xl"
+            className="text-3xl sm:text-5xl md:text-6xl font-bold tracking-tight text-white leading-[1.14] max-w-3xl"
           >
             Build Better Habits.
             <br />
@@ -152,17 +148,17 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             <span className="text-zinc-400 font-medium">Improve Every Day.</span>
           </motion.h1>
 
-          {/* Supporting Text */}
+          {/* Description */}
           <motion.p
             initial={{ opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.16 }}
-            className="text-sm sm:text-base md:text-lg text-zinc-400 mt-5 max-w-xl leading-relaxed"
+            className="text-sm sm:text-base md:text-lg text-zinc-400 mt-5 max-w-2xl leading-relaxed"
           >
-            Your personal space to build consistent habits, track your daily progress, analyze your food and discover running routes — all in one unified application.
+            Your personal space to build consistent habits, track daily progress, analyze your food and discover running routes — all in one unified application.
           </motion.p>
 
-          {/* Status / Success Notification */}
+          {/* Status Notification */}
           {notification && (
             <motion.div
               id="landing-status-notification"
@@ -243,110 +239,70 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               Explore Features
             </a>
           </motion.div>
-
-          {/* Clean Typography-Driven Product Console (Zero Images, Zero 3D) */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.32 }}
-            className="w-full max-w-4xl mt-12 sm:mt-16 text-left"
-          >
-            <div className="rounded-2xl bg-zinc-900/80 border border-white/10 p-5 sm:p-7 shadow-2xl backdrop-blur-sm">
-              {/* Console Top Bar */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-5 border-b border-white/10 gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="flex gap-1.5">
-                    <span className="w-3 h-3 rounded-full bg-zinc-700/80" />
-                    <span className="w-3 h-3 rounded-full bg-zinc-700/80" />
-                    <span className="w-3 h-3 rounded-full bg-zinc-700/80" />
-                  </div>
-                  <span className="text-xs font-mono text-zinc-400">daily-habits.app · live preview</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-[11px] font-mono font-medium text-emerald-400">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                    Synchronized · Cloud Firestore
-                  </span>
-                </div>
-              </div>
-
-              {/* 4 Pillars Summary Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-5">
-                {/* 1. Habit Tracker Pillar */}
-                <div className="p-4 rounded-xl bg-zinc-950/70 border border-white/5 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="w-7 h-7 rounded-lg bg-emerald-500/15 text-emerald-400 flex items-center justify-center">
-                      <CheckCircle2 className="w-4 h-4" />
-                    </div>
-                    <span className="text-[10px] font-mono text-emerald-400 font-bold">100% TODAY</span>
-                  </div>
-                  <h4 className="text-xs font-bold text-white pt-1">Habit Consistency</h4>
-                  <p className="text-[11px] text-zinc-400 leading-snug">
-                    Morning Run, Reading, Hydration logged with daily notes.
-                  </p>
-                  <div className="text-[10px] font-mono text-zinc-500 pt-1">
-                    Streak: <span className="text-zinc-300 font-bold">7 consecutive days</span>
-                  </div>
-                </div>
-
-                {/* 2. Daily Run Pillar */}
-                <div className="p-4 rounded-xl bg-zinc-950/70 border border-white/5 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="w-7 h-7 rounded-lg bg-orange-500/15 text-orange-400 flex items-center justify-center">
-                      <Activity className="w-4 h-4" />
-                    </div>
-                    <span className="text-[10px] font-mono text-orange-400 font-bold">1 Hz GPS</span>
-                  </div>
-                  <h4 className="text-xs font-bold text-white pt-1">Outdoor Run</h4>
-                  <p className="text-[11px] text-zinc-400 leading-snug">
-                    5.02 km · 26:14 · 5:13 /km with weight-based calories.
-                  </p>
-                  <div className="text-[10px] font-mono text-zinc-500 pt-1">
-                    Personal Record: <span className="text-zinc-300 font-bold">Fastest 5K</span>
-                  </div>
-                </div>
-
-                {/* 3. Daily Routes Pillar */}
-                <div className="p-4 rounded-xl bg-zinc-950/70 border border-white/5 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="w-7 h-7 rounded-lg bg-indigo-500/15 text-indigo-400 flex items-center justify-center">
-                      <Compass className="w-4 h-4" />
-                    </div>
-                    <span className="text-[10px] font-mono text-indigo-400 font-bold">LOOP ENGINE</span>
-                  </div>
-                  <h4 className="text-xs font-bold text-white pt-1">Route Discovery</h4>
-                  <p className="text-[11px] text-zinc-400 leading-snug">
-                    5k circular loop from home through local parks & trails.
-                  </p>
-                  <div className="text-[10px] font-mono text-zinc-500 pt-1">
-                    Guidance: <span className="text-zinc-300 font-bold">Off-route alert</span>
-                  </div>
-                </div>
-
-                {/* 4. Food AI Pillar */}
-                <div className="p-4 rounded-xl bg-zinc-950/70 border border-white/5 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="w-7 h-7 rounded-lg bg-purple-500/15 text-purple-400 flex items-center justify-center">
-                      <Utensils className="w-4 h-4" />
-                    </div>
-                    <span className="text-[10px] font-mono text-purple-400 font-bold">VISION AI</span>
-                  </div>
-                  <h4 className="text-xs font-bold text-white pt-1">Food Analysis</h4>
-                  <p className="text-[11px] text-zinc-400 leading-snug">
-                    Instant calorie, protein, carb, and fiber estimates.
-                  </p>
-                  <div className="text-[10px] font-mono text-zinc-500 pt-1">
-                    Nutrients: <span className="text-zinc-300 font-bold">42g Protein logged</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </motion.div>
         </div>
       </section>
 
-      {/* 3. Section: Features Section (7 Core Capabilities with Clean Text Cards) */}
-      <section id="features" className="py-14 sm:py-20 px-4 sm:px-6 border-t border-white/10 bg-zinc-950">
+      {/* 3. Product Overview: Four Distinct Highlights */}
+      <section className="py-8 px-4 sm:px-6 border-y border-white/10 bg-zinc-950/60">
+        <div className="max-w-5xl mx-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Highlight 1 */}
+            <div className="p-4 rounded-xl bg-zinc-900/80 border border-white/10 flex items-start gap-3">
+              <div className="w-9 h-9 rounded-xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center shrink-0">
+                <CheckCircle2 className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <h3 className="text-sm font-bold text-white">Habit Tracking</h3>
+                <p className="text-xs text-zinc-400 mt-1 leading-relaxed">
+                  Daily routines, streaks and progress.
+                </p>
+              </div>
+            </div>
+
+            {/* Highlight 2 */}
+            <div className="p-4 rounded-xl bg-zinc-900/80 border border-white/10 flex items-start gap-3">
+              <div className="w-9 h-9 rounded-xl bg-orange-500/15 text-orange-400 flex items-center justify-center shrink-0">
+                <Activity className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <h3 className="text-sm font-bold text-white">Daily Run</h3>
+                <p className="text-xs text-zinc-400 mt-1 leading-relaxed">
+                  Real-time GPS outdoor running.
+                </p>
+              </div>
+            </div>
+
+            {/* Highlight 3 */}
+            <div className="p-4 rounded-xl bg-zinc-900/80 border border-white/10 flex items-start gap-3">
+              <div className="w-9 h-9 rounded-xl bg-indigo-500/15 text-indigo-400 flex items-center justify-center shrink-0">
+                <Compass className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <h3 className="text-sm font-bold text-white">Daily Routes</h3>
+                <p className="text-xs text-zinc-400 mt-1 leading-relaxed">
+                  Discover and save circular running routes.
+                </p>
+              </div>
+            </div>
+
+            {/* Highlight 4 */}
+            <div className="p-4 rounded-xl bg-zinc-900/80 border border-white/10 flex items-start gap-3">
+              <div className="w-9 h-9 rounded-xl bg-purple-500/15 text-purple-400 flex items-center justify-center shrink-0">
+                <Utensils className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <h3 className="text-sm font-bold text-white">Food Analysis</h3>
+                <p className="text-xs text-zinc-400 mt-1 leading-relaxed">
+                  AI-powered nutritional estimates.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 4. Features: Everything You Need in One Place (Seven Core Features Exactly Once) */}
+      <section id="features" className="py-14 sm:py-20 px-4 sm:px-6 bg-zinc-950">
         <div className="max-w-5xl mx-auto">
           <motion.div
             initial="hidden"
@@ -355,14 +311,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             variants={fadeInUp}
             className="text-center max-w-xl mx-auto mb-10 sm:mb-14"
           >
-            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-400 font-mono">
-              Complete Health & Routine Suite
-            </span>
-            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-white mt-1">
-              Everything in one unified space
+            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
+              Everything You Need in One Place
             </h2>
             <p className="text-xs sm:text-sm text-zinc-400 mt-2">
-              Integrated routine management, real-time GPS outdoor running, loop discovery, and nutrition analytics.
+              A single workspace designed for daily consistency, outdoor athletic tracking, and nutrition.
             </p>
           </motion.div>
 
@@ -373,229 +326,193 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             variants={staggerContainer}
             className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5"
           >
-            {/* 1. Smart Habit Tracking */}
+            {/* Feature 1 */}
             <motion.div
               variants={fadeInUp}
               whileHover={{ y: -3, transition: { duration: 0.2 } }}
               className="rounded-2xl p-6 bg-zinc-900/90 border border-white/10 hover:border-emerald-500/30 shadow-md flex flex-col justify-between transition-colors group"
             >
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="w-9 h-9 rounded-xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 flex items-center justify-center shrink-0">
-                    <CheckCircle2 className="w-5 h-5" />
-                  </div>
-                  <span className="text-[10px] font-mono uppercase text-zinc-400 font-semibold px-2 py-0.5 rounded bg-zinc-800/80 border border-white/5">
-                    Habit Suite
-                  </span>
+              <div className="space-y-3">
+                <div className="w-9 h-9 rounded-xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center">
+                  <CheckCircle2 className="w-5 h-5" />
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-white group-hover:text-emerald-300 transition-colors">
                     1. Smart Habit Tracking
                   </h3>
                   <p className="text-xs sm:text-sm text-zinc-400 mt-2 leading-relaxed">
-                    Organize, customize, and check off your daily routines with clean priorities, custom icons, and smart reminder schedules.
+                    Build and organize custom daily routines with flexible scheduling, priorities, and category tags.
                   </p>
                 </div>
               </div>
-
-              <div className="pt-5 mt-5 border-t border-white/5 space-y-1.5 text-xs text-zinc-400">
+              <div className="pt-4 mt-4 border-t border-white/5 space-y-1.5 text-xs text-zinc-400">
                 <div className="flex items-center gap-2">
                   <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                  <span>Flexible daily & custom frequencies</span>
+                  <span>Flexible daily & weekly schedules</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                  <span>Color tags and priority markers</span>
+                  <span>Priority levels and custom icons</span>
                 </div>
               </div>
             </motion.div>
 
-            {/* 2. Daily Progress & Streaks */}
+            {/* Feature 2 */}
             <motion.div
               variants={fadeInUp}
               whileHover={{ y: -3, transition: { duration: 0.2 } }}
               className="rounded-2xl p-6 bg-zinc-900/90 border border-white/10 hover:border-amber-500/30 shadow-md flex flex-col justify-between transition-colors group"
             >
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="w-9 h-9 rounded-xl bg-amber-500/15 text-amber-400 border border-amber-500/20 flex items-center justify-center shrink-0">
-                    <Flame className="w-5 h-5 fill-amber-500/30 text-amber-400" />
-                  </div>
-                  <span className="text-[10px] font-mono uppercase text-zinc-400 font-semibold px-2 py-0.5 rounded bg-zinc-800/80 border border-white/5">
-                    Momentum
-                  </span>
+              <div className="space-y-3">
+                <div className="w-9 h-9 rounded-xl bg-amber-500/15 text-amber-400 flex items-center justify-center">
+                  <Flame className="w-5 h-5 fill-amber-500/30 text-amber-400" />
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-white group-hover:text-amber-300 transition-colors">
                     2. Daily Progress & Streaks
                   </h3>
                   <p className="text-xs sm:text-sm text-zinc-400 mt-2 leading-relaxed">
-                    Build unstoppable momentum with automated streak calculations, milestone badges (3, 7, 30, 100 days), and daily notes.
+                    Build momentum with automated streak calculations, milestone badges, and daily reflections.
                   </p>
                 </div>
               </div>
-
-              <div className="pt-5 mt-5 border-t border-white/5 space-y-1.5 text-xs text-zinc-400">
+              <div className="pt-4 mt-4 border-t border-white/5 space-y-1.5 text-xs text-zinc-400">
                 <div className="flex items-center gap-2">
                   <Check className="w-3.5 h-3.5 text-amber-400 shrink-0" />
                   <span>Automatic streak preservation</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Check className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                  <span>Achievement milestone celebration</span>
+                  <span>Milestone badges and daily notes</span>
                 </div>
               </div>
             </motion.div>
 
-            {/* 3. AI Food Analysis */}
+            {/* Feature 3 */}
             <motion.div
               variants={fadeInUp}
               whileHover={{ y: -3, transition: { duration: 0.2 } }}
               className="rounded-2xl p-6 bg-zinc-900/90 border border-white/10 hover:border-purple-500/30 shadow-md flex flex-col justify-between transition-colors group"
             >
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="w-9 h-9 rounded-xl bg-purple-500/15 text-purple-400 border border-purple-500/20 flex items-center justify-center shrink-0">
-                    <Utensils className="w-5 h-5" />
-                  </div>
-                  <span className="text-[10px] font-mono uppercase text-zinc-400 font-semibold px-2 py-0.5 rounded bg-zinc-800/80 border border-white/5">
-                    Nutrition AI
-                  </span>
+              <div className="space-y-3">
+                <div className="w-9 h-9 rounded-xl bg-purple-500/15 text-purple-400 flex items-center justify-center">
+                  <Utensils className="w-5 h-5" />
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-white group-hover:text-purple-300 transition-colors">
                     3. AI Food Analysis
                   </h3>
                   <p className="text-xs sm:text-sm text-zinc-400 mt-2 leading-relaxed">
-                    Analyze meal photos with Gemini vision models for instant estimated calories, protein, carbs, fat, and fiber with nutritional tips.
+                    Analyze meal photos for estimated calories, protein, carbs, fat, and fiber with dietary tips.
                   </p>
                 </div>
               </div>
-
-              <div className="pt-5 mt-5 border-t border-white/5 space-y-1.5 text-xs text-zinc-400">
+              <div className="pt-4 mt-4 border-t border-white/5 space-y-1.5 text-xs text-zinc-400">
                 <div className="flex items-center gap-2">
                   <Check className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-                  <span>Instant macronutrient breakdown</span>
+                  <span>Macronutrient & calorie estimates</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Check className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-                  <span>Dietary balance & guidance tips</span>
+                  <span>Balanced meal recommendations</span>
                 </div>
               </div>
             </motion.div>
 
-            {/* 4. Daily Run GPS Tracker */}
+            {/* Feature 4 */}
             <motion.div
               variants={fadeInUp}
               whileHover={{ y: -3, transition: { duration: 0.2 } }}
               className="rounded-2xl p-6 bg-zinc-900/90 border border-white/10 hover:border-orange-500/30 shadow-md flex flex-col justify-between transition-colors group"
             >
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="w-9 h-9 rounded-xl bg-orange-500/15 text-orange-400 border border-orange-500/20 flex items-center justify-center shrink-0">
-                    <Activity className="w-5 h-5" />
-                  </div>
-                  <span className="text-[10px] font-mono uppercase text-zinc-400 font-semibold px-2 py-0.5 rounded bg-zinc-800/80 border border-white/5">
-                    Outdoor GPS
-                  </span>
+              <div className="space-y-3">
+                <div className="w-9 h-9 rounded-xl bg-orange-500/15 text-orange-400 flex items-center justify-center">
+                  <Activity className="w-5 h-5" />
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-white group-hover:text-orange-300 transition-colors">
                     4. Daily Run GPS Tracker
                   </h3>
                   <p className="text-xs sm:text-sm text-zinc-400 mt-2 leading-relaxed">
-                    Outdoor workout tracking with real-time GPS coordinates, interactive Leaflet route drawing, rolling pace, speed, and calories.
+                    Track outdoor running workouts with live GPS coordinates, rolling pace, active duration, and calories.
                   </p>
                 </div>
               </div>
-
-              <div className="pt-5 mt-5 border-t border-white/5 space-y-1.5 text-xs text-zinc-400">
+              <div className="pt-4 mt-4 border-t border-white/5 space-y-1.5 text-xs text-zinc-400">
                 <div className="flex items-center gap-2">
                   <Check className="w-3.5 h-3.5 text-orange-400 shrink-0" />
-                  <span>1 Hz live GPS with stationary noise filtering</span>
+                  <span>Real-time GPS route drawing</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Check className="w-3.5 h-3.5 text-orange-400 shrink-0" />
-                  <span>Weight-based MET calorie calculations</span>
+                  <span>Weight-based calorie calculation</span>
                 </div>
               </div>
             </motion.div>
 
-            {/* 5. Running History & Analytics */}
+            {/* Feature 5 */}
             <motion.div
               variants={fadeInUp}
               whileHover={{ y: -3, transition: { duration: 0.2 } }}
               className="rounded-2xl p-6 bg-zinc-900/90 border border-white/10 hover:border-blue-500/30 shadow-md flex flex-col justify-between transition-colors group"
             >
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="w-9 h-9 rounded-xl bg-blue-500/15 text-blue-400 border border-blue-500/20 flex items-center justify-center shrink-0">
-                    <BarChart3 className="w-5 h-5" />
-                  </div>
-                  <span className="text-[10px] font-mono uppercase text-zinc-400 font-semibold px-2 py-0.5 rounded bg-zinc-800/80 border border-white/5">
-                    Analytics
-                  </span>
+              <div className="space-y-3">
+                <div className="w-9 h-9 rounded-xl bg-blue-500/15 text-blue-400 flex items-center justify-center">
+                  <BarChart3 className="w-5 h-5" />
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-white group-hover:text-blue-300 transition-colors">
                     5. Running History & Analytics
                   </h3>
                   <p className="text-xs sm:text-sm text-zinc-400 mt-2 leading-relaxed">
-                    In-depth running dashboard with volume trend charts, monthly running calendar, personal records (longest run, fastest pace), and time filters.
+                    Review completed runs with weekly and monthly volume trend charts, running calendar, and personal records.
                   </p>
                 </div>
               </div>
-
-              <div className="pt-5 mt-5 border-t border-white/5 space-y-1.5 text-xs text-zinc-400">
+              <div className="pt-4 mt-4 border-t border-white/5 space-y-1.5 text-xs text-zinc-400">
                 <div className="flex items-center gap-2">
                   <Check className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                  <span>Weekly volume and pace distribution</span>
+                  <span>Weekly and monthly distance charts</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Check className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                  <span>All-time PRs for pace and distance</span>
+                  <span>All-time PRs for distance and pace</span>
                 </div>
               </div>
             </motion.div>
 
-            {/* 6. Offline Run Support */}
+            {/* Feature 6 */}
             <motion.div
               variants={fadeInUp}
               whileHover={{ y: -3, transition: { duration: 0.2 } }}
               className="rounded-2xl p-6 bg-zinc-900/90 border border-white/10 hover:border-emerald-500/30 shadow-md flex flex-col justify-between transition-colors group"
             >
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="w-9 h-9 rounded-xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 flex items-center justify-center shrink-0">
-                    <WifiOff className="w-5 h-5" />
-                  </div>
-                  <span className="text-[10px] font-mono uppercase text-zinc-400 font-semibold px-2 py-0.5 rounded bg-zinc-800/80 border border-white/5">
-                    Offline First
-                  </span>
+              <div className="space-y-3">
+                <div className="w-9 h-9 rounded-xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center">
+                  <WifiOff className="w-5 h-5" />
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-white group-hover:text-emerald-300 transition-colors">
                     6. Offline Run Support
                   </h3>
                   <p className="text-xs sm:text-sm text-zinc-400 mt-2 leading-relaxed">
-                    Keep recording GPS coordinates even without internet connectivity. Unfinished runs recover automatically and sync seamlessly to the cloud.
+                    Record GPS coordinates without internet connectivity, with local caching and seamless cloud synchronization.
                   </p>
                 </div>
               </div>
-
-              <div className="pt-5 mt-5 border-t border-white/5 space-y-1.5 text-xs text-zinc-400">
+              <div className="pt-4 mt-4 border-t border-white/5 space-y-1.5 text-xs text-zinc-400">
                 <div className="flex items-center gap-2">
                   <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                  <span>Local IndexedDB zero-data caching</span>
+                  <span>IndexedDB offline run recording</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                  <span>Automatic crash and refresh recovery</span>
+                  <span>Automatic cloud sync when reconnected</span>
                 </div>
               </div>
             </motion.div>
 
-            {/* 7. Daily Route Discovery (Prominent Wide Card) */}
+            {/* Feature 7 (Full Width Span) */}
             <motion.div
               variants={fadeInUp}
               whileHover={{ y: -3, transition: { duration: 0.2 } }}
@@ -603,38 +520,35 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             >
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                 <div className="space-y-3 max-w-2xl">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-indigo-500/15 text-indigo-400 border border-indigo-500/20 flex items-center justify-center shrink-0">
-                      <Compass className="w-5 h-5" />
-                    </div>
-                    <span className="text-[10px] font-mono uppercase text-indigo-400 font-semibold px-2 py-0.5 rounded bg-indigo-500/10 border border-indigo-500/20">
-                      Closed Loop Engine
-                    </span>
+                  <div className="w-9 h-9 rounded-xl bg-indigo-500/15 text-indigo-400 flex items-center justify-center">
+                    <Compass className="w-5 h-5" />
                   </div>
-                  <h3 className="text-lg font-bold text-white group-hover:text-indigo-300 transition-colors">
-                    7. Daily Route Discovery & Loop Planner
-                  </h3>
-                  <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed">
-                    Intelligent route discovery planning pedestrian loop routes (2k, 3k, 5k, 8k, 10k) from home or GPS location, routing through local parks and recreational landmarks with elevation profiles and live off-route deviation guidance.
-                  </p>
+                  <div>
+                    <h3 className="text-base sm:text-lg font-bold text-white group-hover:text-indigo-300 transition-colors">
+                      7. Daily Route Discovery
+                    </h3>
+                    <p className="text-xs sm:text-sm text-zinc-400 mt-2 leading-relaxed">
+                      Plan pedestrian-safe circular running loops (2k, 3k, 5k, 8k, 10k) from your home or live location.
+                    </p>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 shrink-0 text-xs text-zinc-300 border-t md:border-t-0 md:border-l border-white/10 pt-4 md:pt-0 md:pl-6">
                   <div className="flex items-center gap-2">
                     <Check className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-                    <span>2k–10k circular loops</span>
+                    <span>2k to 10k circular loops</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Check className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-                    <span>Park & green path discovery</span>
+                    <span>Park and sidewalk routing</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Check className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-                    <span>Real-time off-route guidance</span>
+                    <span>Saved home & GPS start points</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Check className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-                    <span>Saved home & GPS starting points</span>
+                    <span>Live off-route guidance</span>
                   </div>
                 </div>
               </div>
@@ -643,9 +557,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         </div>
       </section>
 
-      {/* 4. Daily Run Showcase: Pure CSS & Typography Telemetry Card */}
-      <section id="daily-run-showcase" className="py-16 sm:py-24 px-4 sm:px-6 border-t border-white/10 bg-[#090c10]">
+      {/* 5. Daily Run Dedicated Section */}
+      <section id="daily-run" className="py-16 sm:py-24 px-4 sm:px-6 border-t border-white/10 bg-[#090c10]">
         <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12 items-center">
+          {/* Information */}
           <motion.div
             initial="hidden"
             whileInView="visible"
@@ -653,37 +568,37 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             variants={fadeInUp}
             className="space-y-4"
           >
-            <span className="text-[11px] font-bold uppercase tracking-wider text-orange-400 font-mono">
+            <span className="text-xs font-mono font-bold uppercase tracking-wider text-orange-400">
               Live Outdoor Tracking
             </span>
             <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
-              Daily Run: Real-time GPS & Athletic Telemetry
+              Daily Run
             </h2>
             <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed">
-              Experience clean, distraction-free running tracking directly in your browser. Record your real outdoor routes on an interactive OpenStreetMap canvas with accurate Haversine distance, active duration, rolling pace, and estimated calories burned based on your verified body weight.
+              Record real outdoor running sessions with live GPS telemetry. Track your distance, duration, rolling pace, average speed, and estimated calories burned, with full history and personal records saved to your account.
             </p>
 
             <ul className="space-y-2.5 text-xs text-zinc-300">
               <li className="flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 text-orange-400 shrink-0" />
-                <span>Live GPS route polyline with stationary noise filtering</span>
+                <span>Real-time GPS tracking and route drawing</span>
               </li>
               <li className="flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 text-orange-400 shrink-0" />
-                <span>Instant pause and resume without straight-line GPS gaps</span>
+                <span>Distance and duration with pause deduction</span>
               </li>
               <li className="flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 text-orange-400 shrink-0" />
-                <span>Personal records for longest distance, fastest pace, and best duration</span>
+                <span>Pace, speed and weight-based calorie estimation</span>
               </li>
               <li className="flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 text-orange-400 shrink-0" />
-                <span>Monthly calendar and weekly volume analytics charts</span>
+                <span>Run history, calendar logs and personal records</span>
               </li>
             </ul>
           </motion.div>
 
-          {/* Clean Typography-Driven Workout Telemetry Card (Zero Images, Zero 3D) */}
+          {/* Compact Product Interface Preview */}
           <motion.div
             initial={{ opacity: 0, x: 16 }}
             whileInView={{ opacity: 1, x: 0 }}
@@ -694,103 +609,58 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             <div className="flex items-center justify-between pb-3 border-b border-white/10">
               <div className="flex items-center gap-2">
                 <Activity className="w-4 h-4 text-orange-400" />
-                <span className="text-xs font-bold text-white">Morning 5K Outdoor Run</span>
+                <span className="text-xs font-bold text-white">Active Workout Preview</span>
               </div>
-              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-orange-500/10 border border-orange-500/20 text-[10px] font-mono text-orange-400">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-orange-500/10 border border-orange-500/20 text-[10px] font-mono font-semibold text-orange-400">
                 <span className="w-1.5 h-1.5 rounded-full bg-orange-400 animate-pulse" />
-                GPS LOCKED · ±4m
+                GPS Active
               </span>
             </div>
 
-            {/* Key Metrics Grid */}
+            {/* Core Metrics Grid */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               <div className="p-3 rounded-xl bg-zinc-950/80 border border-white/5 text-center">
                 <span className="text-[10px] text-zinc-400 block font-mono">Distance</span>
-                <span className="text-xl font-bold font-mono text-white">5.02 km</span>
+                <span className="text-xl font-bold font-mono text-white">5.00 km</span>
               </div>
               <div className="p-3 rounded-xl bg-zinc-950/80 border border-white/5 text-center">
                 <span className="text-[10px] text-zinc-400 block font-mono">Duration</span>
-                <span className="text-xl font-bold font-mono text-white">00:26:14</span>
+                <span className="text-xl font-bold font-mono text-white">25:30</span>
               </div>
               <div className="p-3 rounded-xl bg-zinc-950/80 border border-white/5 text-center">
-                <span className="text-[10px] text-zinc-400 block font-mono">Rolling Pace</span>
-                <span className="text-xl font-bold font-mono text-orange-400">5:13 /km</span>
+                <span className="text-[10px] text-zinc-400 block font-mono">Pace</span>
+                <span className="text-xl font-bold font-mono text-orange-400">5:06 /km</span>
               </div>
               <div className="p-3 rounded-xl bg-zinc-950/80 border border-white/5 text-center">
-                <span className="text-[10px] text-zinc-400 block font-mono">Avg Speed</span>
-                <span className="text-lg font-bold font-mono text-white">11.5 km/h</span>
+                <span className="text-[10px] text-zinc-400 block font-mono">Speed</span>
+                <span className="text-lg font-bold font-mono text-white">11.8 km/h</span>
               </div>
               <div className="p-3 rounded-xl bg-zinc-950/80 border border-white/5 text-center">
-                <span className="text-[10px] text-zinc-400 block font-mono">Energy</span>
-                <span className="text-lg font-bold font-mono text-white">~348 kcal</span>
+                <span className="text-[10px] text-zinc-400 block font-mono">Calories</span>
+                <span className="text-lg font-bold font-mono text-white">345 kcal</span>
               </div>
               <div className="p-3 rounded-xl bg-zinc-950/80 border border-white/5 text-center">
-                <span className="text-[10px] text-zinc-400 block font-mono">Elevation</span>
-                <span className="text-lg font-bold font-mono text-emerald-400">+24 m</span>
+                <span className="text-[10px] text-zinc-400 block font-mono">Status</span>
+                <span className="text-lg font-bold font-mono text-emerald-400">Tracking</span>
               </div>
             </div>
 
-            {/* Structured Kilometer Splits Breakdown (Pure CSS & Typography) */}
-            <div className="p-3.5 rounded-xl bg-zinc-950/80 border border-white/5 space-y-2">
-              <div className="text-[11px] font-mono font-semibold text-zinc-400 flex items-center justify-between">
-                <span>KILOMETER SPLITS</span>
-                <span>PACE / ELEV</span>
-              </div>
-              <div className="space-y-1.5 text-xs font-mono">
-                <div className="flex items-center justify-between text-zinc-300">
-                  <span>KM 1</span>
-                  <div className="w-32 bg-zinc-800 h-1.5 rounded-full overflow-hidden mx-2 hidden sm:block">
-                    <div className="bg-orange-400 h-full w-[85%]" />
-                  </div>
-                  <span>5:22 /km · +4m</span>
-                </div>
-                <div className="flex items-center justify-between text-zinc-300">
-                  <span>KM 2</span>
-                  <div className="w-32 bg-zinc-800 h-1.5 rounded-full overflow-hidden mx-2 hidden sm:block">
-                    <div className="bg-orange-400 h-full w-[88%]" />
-                  </div>
-                  <span>5:18 /km · +8m</span>
-                </div>
-                <div className="flex items-center justify-between text-zinc-300">
-                  <span>KM 3</span>
-                  <div className="w-32 bg-zinc-800 h-1.5 rounded-full overflow-hidden mx-2 hidden sm:block">
-                    <div className="bg-orange-400 h-full w-[91%]" />
-                  </div>
-                  <span>5:11 /km · +2m</span>
-                </div>
-                <div className="flex items-center justify-between text-zinc-300">
-                  <span>KM 4</span>
-                  <div className="w-32 bg-zinc-800 h-1.5 rounded-full overflow-hidden mx-2 hidden sm:block">
-                    <div className="bg-orange-400 h-full w-[94%]" />
-                  </div>
-                  <span>5:08 /km · -6m</span>
-                </div>
-                <div className="flex items-center justify-between text-emerald-400 font-bold">
-                  <span>KM 5.02</span>
-                  <div className="w-32 bg-zinc-800 h-1.5 rounded-full overflow-hidden mx-2 hidden sm:block">
-                    <div className="bg-emerald-400 h-full w-[98%]" />
-                  </div>
-                  <span>5:04 /km · +16m</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Personal Record Indicator */}
-            <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-between text-xs font-medium text-amber-200">
+            {/* Personal Records Highlight */}
+            <div className="p-3 rounded-xl bg-zinc-950/80 border border-white/5 flex items-center justify-between text-xs font-medium text-zinc-300">
               <span className="flex items-center gap-2">
                 <Trophy className="w-4 h-4 text-amber-400" />
-                <span>Personal Record: Fastest 5K Pace</span>
+                <span>Personal Records</span>
               </span>
-              <span className="font-mono font-bold text-amber-400">5:13 /km</span>
+              <span className="font-mono text-zinc-400">Longest Run · Fastest 5K</span>
             </div>
           </motion.div>
         </div>
       </section>
 
-      {/* 5. Daily Routes Showcase: Pure CSS & Typography Route Planning Card */}
-      <section id="daily-routes-showcase" className="py-16 sm:py-24 px-4 sm:px-6 border-t border-white/10 bg-zinc-950">
+      {/* 6. Daily Routes Dedicated Section */}
+      <section id="daily-routes" className="py-16 sm:py-24 px-4 sm:px-6 border-t border-white/10 bg-zinc-950">
         <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12 items-center">
-          {/* Loop Route Planning Card (Zero Images, Zero 3D) */}
+          {/* Compact Product Interface Preview */}
           <motion.div
             initial={{ opacity: 0, x: -16 }}
             whileInView={{ opacity: 1, x: 0 }}
@@ -801,97 +671,59 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             <div className="flex items-center justify-between pb-3 border-b border-white/10">
               <div className="flex items-center gap-2">
                 <Compass className="w-4 h-4 text-indigo-400" />
-                <span className="text-xs font-bold text-white">Suggested Circular Loop</span>
+                <span className="text-xs font-bold text-white">Loop Route Planner</span>
               </div>
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-                LOOP VERIFIED
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                Circular
               </span>
             </div>
 
-            {/* Route Title & Telemetry Header */}
-            <div className="space-y-1.5 p-4 rounded-2xl bg-zinc-950/80 border border-white/5">
-              <h4 className="text-base font-bold text-white">
-                Queen's Park & Waterfront Trail Loop
-              </h4>
-              <div className="flex items-center gap-3 text-xs text-zinc-400 font-mono flex-wrap">
-                <span className="font-bold text-white">5.18 km distance</span>
-                <span aria-hidden="true">·</span>
-                <span>~27 min est</span>
-                <span aria-hidden="true">·</span>
-                <span className="text-emerald-400">+28m gain</span>
+            {/* Distance Options */}
+            <div className="p-3.5 rounded-xl bg-zinc-950/80 border border-white/5 space-y-2">
+              <div className="text-[11px] font-mono font-semibold text-zinc-400">
+                TARGET DISTANCE
+              </div>
+              <div className="flex items-center gap-2">
+                {['2 km', '3 km', '5 km', '8 km', '10 km'].map((dist, idx) => (
+                  <span
+                    key={dist}
+                    className={`flex-1 py-1.5 rounded-lg text-center font-mono text-xs font-semibold ${
+                      idx === 2
+                        ? 'bg-indigo-500/20 border border-indigo-500/40 text-indigo-300'
+                        : 'bg-zinc-900 border border-white/5 text-zinc-400'
+                    }`}
+                  >
+                    {dist}
+                  </span>
+                ))}
               </div>
             </div>
 
-            {/* Discovered Landmarks Timeline (Pure Typography & Badges) */}
-            <div className="p-4 rounded-2xl bg-zinc-950/80 border border-white/5 space-y-3">
-              <div className="text-[11px] font-mono font-semibold text-zinc-400 uppercase">
-                Route Waypoints & Discovered Landmarks
+            {/* Starting Point Options */}
+            <div className="p-3.5 rounded-xl bg-zinc-950/80 border border-white/5 space-y-2 text-xs text-zinc-300">
+              <div className="text-[11px] font-mono font-semibold text-zinc-400">
+                STARTING LOCATION
               </div>
-              <div className="space-y-2.5 text-xs text-zinc-300">
-                <div className="flex items-start gap-2.5">
-                  <div className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 mt-0.5 text-[10px] font-bold">
-                    01
-                  </div>
-                  <div>
-                    <span className="font-semibold text-white">Start / Finish Point</span>
-                    <span className="text-zinc-500 text-[11px] block">Saved Home location or current GPS fix</span>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-2.5">
-                  <div className="w-5 h-5 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center shrink-0 mt-0.5 text-[10px] font-bold">
-                    02
-                  </div>
-                  <div>
-                    <span className="font-semibold text-white">Queen's Park West Promenade</span>
-                    <span className="text-zinc-500 text-[11px] block">Traffic-free pedestrian trail · 1.6 km</span>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-2.5">
-                  <div className="w-5 h-5 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center shrink-0 mt-0.5 text-[10px] font-bold">
-                    03
-                  </div>
-                  <div>
-                    <span className="font-semibold text-white">Waterfront Esplanade Path</span>
-                    <span className="text-zinc-500 text-[11px] block">Scenic riverway sidewalk · 2.1 km</span>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-2.5">
-                  <div className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 mt-0.5 text-[10px] font-bold">
-                    04
-                  </div>
-                  <div>
-                    <span className="font-semibold text-white">Complete Loop Return</span>
-                    <span className="text-zinc-500 text-[11px] block">Seamless circular return to start</span>
-                  </div>
-                </div>
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <MapPin className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Current GPS or Saved Home</span>
+                </span>
+                <span className="text-[11px] font-mono text-zinc-400">Doorstep Return</span>
               </div>
             </div>
 
-            {/* Path Surface Breakdown Bar */}
-            <div className="p-3 rounded-xl bg-zinc-950/80 border border-white/5 space-y-1.5 text-xs">
-              <div className="flex justify-between text-[11px] font-mono text-zinc-400">
-                <span>SURFACE: 82% PAVED · 18% TRAIL</span>
-                <span>CROSSINGS: 2</span>
-              </div>
-              <div className="w-full bg-zinc-800 h-2 rounded-full overflow-hidden flex">
-                <div className="bg-indigo-400 h-full w-[82%]" title="Paved Sidewalk" />
-                <div className="bg-emerald-400 h-full w-[18%]" title="Park Trail" />
-              </div>
-            </div>
-
-            {/* Guidance Status */}
-            <div className="p-3 rounded-xl bg-emerald-950/30 border border-emerald-500/20 text-xs text-emerald-200 flex items-center justify-between">
+            {/* Route Features */}
+            <div className="p-3 rounded-xl bg-indigo-950/20 border border-indigo-500/20 text-xs text-indigo-200 flex items-center justify-between">
               <span className="flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                <span>Live off-route deviation guidance enabled</span>
+                <ShieldCheck className="w-4 h-4 text-indigo-400" />
+                <span>Pedestrian trails with off-route alerts</span>
               </span>
-              <span className="text-[10px] font-mono text-emerald-400 font-bold">ACTIVE</span>
+              <span className="text-[10px] font-mono text-indigo-400 font-bold">Enabled</span>
             </div>
           </motion.div>
 
+          {/* Information */}
           <motion.div
             initial="hidden"
             whileInView="visible"
@@ -899,39 +731,43 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             variants={fadeInUp}
             className="order-1 md:order-2 space-y-4"
           >
-            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-400 font-mono">
+            <span className="text-xs font-mono font-bold uppercase tracking-wider text-indigo-400">
               Loop Route Discovery
             </span>
             <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
-              Daily Routes: Intelligent Loop Route Planner
+              Daily Routes
             </h2>
             <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed">
-              Never get bored of your regular route. Pick your current GPS position or saved home location, choose your target distance (2k, 3k, 5k, 8k, or 10k), and discover scenic circular routes that start and finish at your doorstep.
+              Generate pedestrian-safe circular running routes that start and end at the same location. Plan customized loops from your home or live position, discover local parks, and save your favourite routes.
             </p>
 
             <ul className="space-y-2.5 text-xs text-zinc-300">
               <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span>Pedestrian-safe paths following actual sidewalks and park trails</span>
+                <CheckCircle2 className="w-4 h-4 text-indigo-400 shrink-0" />
+                <span>Circular routes from saved home or current GPS location</span>
               </li>
               <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span>Discovers nearby public parks, lakes, running tracks, and recreation grounds</span>
+                <CheckCircle2 className="w-4 h-4 text-indigo-400 shrink-0" />
+                <span>2k, 3k, 5k, 8k and 10k distance options</span>
               </li>
               <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span>Save favourite routes to your account with offline caching</span>
+                <CheckCircle2 className="w-4 h-4 text-indigo-400 shrink-0" />
+                <span>Nearby parks and pedestrian paths</span>
               </li>
               <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span>Live route guidance with off-route alerts and loop completion indicators</span>
+                <CheckCircle2 className="w-4 h-4 text-indigo-400 shrink-0" />
+                <span>Saved favourite routes with offline caching</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-indigo-400 shrink-0" />
+                <span>Live off-route deviation guidance</span>
               </li>
             </ul>
           </motion.div>
         </div>
       </section>
 
-      {/* 6. Section: How It Works */}
+      {/* 7. How It Works: Five-Step Process Exactly Once */}
       <section id="how-it-works" className="py-14 sm:py-20 px-4 sm:px-6 border-t border-white/10 bg-[#090c10]">
         <div className="max-w-4xl mx-auto">
           <motion.div
@@ -941,12 +777,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             variants={fadeInUp}
             className="text-center max-w-xl mx-auto mb-10 sm:mb-14"
           >
-            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-400 font-mono">
-              Simple 5-Step Process
-            </span>
-            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-white mt-1">
-              How Daily Habits works
+            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
+              How It Works
             </h2>
+            <p className="text-xs sm:text-sm text-zinc-400 mt-2">
+              Five simple steps to build consistency and track workouts.
+            </p>
           </motion.div>
 
           <motion.div
@@ -961,7 +797,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               <span className="text-xs font-mono font-bold text-emerald-400 mb-1.5 block">01</span>
               <h3 className="text-xs font-bold text-white">Sign in securely</h3>
               <p className="text-[11px] text-zinc-400 mt-1 leading-relaxed">
-                One-tap sign-in with your Google account. Your records stay isolated to your UID.
+                Connect with your Google account.
               </p>
             </motion.div>
 
@@ -970,7 +806,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               <span className="text-xs font-mono font-bold text-emerald-400 mb-1.5 block">02</span>
               <h3 className="text-xs font-bold text-white">Set daily habits</h3>
               <p className="text-[11px] text-zinc-400 mt-1 leading-relaxed">
-                Customize habits, priorities, and smart schedules for daily consistency.
+                Define your routines and schedules.
               </p>
             </motion.div>
 
@@ -979,7 +815,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               <span className="text-xs font-mono font-bold text-emerald-400 mb-1.5 block">03</span>
               <h3 className="text-xs font-bold text-white">Track activities</h3>
               <p className="text-[11px] text-zinc-400 mt-1 leading-relaxed">
-                Check off routines, scan meals with AI, and track outdoor runs with live GPS.
+                Log habits, meals, and outdoor runs.
               </p>
             </motion.div>
 
@@ -988,7 +824,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               <span className="text-xs font-mono font-bold text-emerald-400 mb-1.5 block">04</span>
               <h3 className="text-xs font-bold text-white">Discover routes</h3>
               <p className="text-[11px] text-zinc-400 mt-1 leading-relaxed">
-                Generate 2k–10k pedestrian loop routes starting and returning to your doorstep.
+                Find circular loops from your location.
               </p>
             </motion.div>
 
@@ -997,49 +833,71 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               <span className="text-xs font-mono font-bold text-emerald-400 mb-1.5 block">05</span>
               <h3 className="text-xs font-bold text-white">Review progress</h3>
               <p className="text-[11px] text-zinc-400 mt-1 leading-relaxed">
-                Inspect streak milestones, weekly volume trends, and personal records.
+                Inspect streaks, volume, and personal records.
               </p>
             </motion.div>
           </motion.div>
         </div>
       </section>
 
-      {/* 7. Privacy & Data Security Section */}
+      {/* 8. Privacy Section */}
       <section id="privacy" className="py-14 sm:py-20 px-4 sm:px-6 border-t border-white/10 bg-zinc-950">
         <motion.div
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true, margin: '-60px' }}
           variants={fadeInUp}
-          className="max-w-4xl mx-auto text-center space-y-4"
+          className="max-w-3xl mx-auto text-center space-y-4"
         >
           <div className="w-10 h-10 rounded-xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 flex items-center justify-center mx-auto shadow-xs">
             <Lock className="w-5 h-5" />
           </div>
 
           <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
-            Privacy & Strict User Data Isolation
+            Privacy & Data Security
           </h2>
 
-          <p className="text-xs sm:text-sm text-zinc-400 max-w-2xl mx-auto leading-relaxed">
-            Your personal habits, profile information, meal records, run telemetry, and saved routes belong exclusively to you. Every document is scoped under your private authenticated user identifier and strictly guarded by Cloud Firestore security rules. GPS location data is only captured when you explicitly start a run workout, and is never shared, sold, or monitored in the background.
+          <p className="text-xs sm:text-sm text-zinc-400 max-w-xl mx-auto leading-relaxed">
+            Your personal habits, profile details, meal records, run telemetry, and saved routes belong exclusively to you.
           </p>
 
-          <div className="pt-2 flex items-center justify-center gap-4 text-xs font-medium text-zinc-400">
-            <span className="flex items-center gap-1.5">
-              <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              <span>Firebase ABAC Protected</span>
-            </span>
-            <span aria-hidden="true">·</span>
-            <span className="flex items-center gap-1.5">
-              <Download className="w-4 h-4 text-emerald-400" />
-              <span>1-Tap Full Data Export</span>
-            </span>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-left max-w-xl mx-auto pt-2">
+            <div className="p-3.5 rounded-xl bg-zinc-900/80 border border-white/10 flex items-start gap-2.5">
+              <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+              <div className="text-xs text-zinc-300">
+                <span className="font-semibold text-white block">Secure Google Authentication</span>
+                <span>Direct login without storing sensitive third-party passwords.</span>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-zinc-900/80 border border-white/10 flex items-start gap-2.5">
+              <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+              <div className="text-xs text-zinc-300">
+                <span className="font-semibold text-white block">User-Specific Firestore Data</span>
+                <span>All documents are isolated to your authenticated account ID.</span>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-zinc-900/80 border border-white/10 flex items-start gap-2.5">
+              <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+              <div className="text-xs text-zinc-300">
+                <span className="font-semibold text-white block">GPS Only During Active Runs</span>
+                <span>Location is captured solely when you start a workout, never in background.</span>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-zinc-900/80 border border-white/10 flex items-start gap-2.5">
+              <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+              <div className="text-xs text-zinc-300">
+                <span className="font-semibold text-white block">No Unauthorized Sharing</span>
+                <span>Your personal health, habit, and location data is never shared.</span>
+              </div>
+            </div>
           </div>
         </motion.div>
       </section>
 
-      {/* 8. Final CTA */}
+      {/* 9. Final CTA */}
       <section className="py-16 sm:py-24 px-4 sm:px-6 border-t border-white/10 bg-[#090c10]">
         <motion.div
           initial="hidden"
@@ -1053,11 +911,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           </div>
 
           <h2 className="text-2xl sm:text-4xl font-bold tracking-tight text-white">
-            Start building better days.
+            Start Building Better Days.
           </h2>
 
           <p className="text-xs sm:text-sm md:text-base text-zinc-400 mt-2.5 max-w-md">
-            Build consistent habits. Track your outdoor runs. Discover local loop routes.
+            Build consistent habits, track your outdoor runs and discover new routes.
           </p>
 
           <div className="mt-6 w-full max-w-xs">
@@ -1074,7 +932,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         </motion.div>
       </section>
 
-      {/* 9. Footer */}
+      {/* 10. Footer */}
       <footer className="py-8 px-4 sm:px-6 border-t border-white/10 bg-zinc-950 text-xs text-zinc-500">
         <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2.5">
@@ -1087,11 +945,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             <a href="#features" className="hover:text-white transition-colors">
               Features
             </a>
-            <a href="#daily-run-showcase" className="hover:text-white transition-colors">
+            <a href="#daily-run" className="hover:text-white transition-colors">
               Daily Run
             </a>
-            <a href="#daily-routes-showcase" className="hover:text-white transition-colors">
+            <a href="#daily-routes" className="hover:text-white transition-colors">
               Daily Routes
+            </a>
+            <a href="#how-it-works" className="hover:text-white transition-colors">
+              How It Works
             </a>
             <a href="#privacy" className="hover:text-white transition-colors">
               Privacy

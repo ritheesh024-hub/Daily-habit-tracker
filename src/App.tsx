@@ -111,7 +111,7 @@ import { HistoryList } from './components/HistoryList';
 import { ProfileModal, TabType } from './components/ProfileModal';
 import { LoginView } from './components/LoginView';
 import { LandingPage } from './components/LandingPage';
-import { OnboardingModal } from './components/OnboardingModal';
+import { OnboardingModal, OnboardingCompleteData } from './components/OnboardingModal';
 import { WeeklyWeightModal } from './components/WeeklyWeightModal';
 import { BottomNav, MainNavTab } from './components/BottomNav';
 import { ManageHabitsView } from './components/ManageHabitsView';
@@ -745,29 +745,28 @@ export function App() {
   };
 
   // Complete Onboarding Flow
-  const handleOnboardingComplete = async (data: {
-    displayName: string;
-    dateOfBirth?: string;
-    height?: number;
-    heightUnit: 'cm' | 'in';
-    weight?: number;
-    weightUnit: 'kg' | 'lbs';
-    habits: HabitItem[];
-  }) => {
+  const handleOnboardingComplete = async (data: OnboardingCompleteData) => {
     if (!currentUser?.uid) return;
     const { habits: chosenHabits, ...profileData } = data;
-    const updated = await saveOnboardingProfileAndHabits(currentUser.uid, profileData, chosenHabits);
+    const habitsToUse =
+      chosenHabits && chosenHabits.length > 0
+        ? chosenHabits
+        : habits.length > 0
+        ? habits
+        : DEFAULT_HABITS;
+
+    const updated = await saveOnboardingProfileAndHabits(currentUser.uid, profileData, habitsToUse);
     setCurrentUser(updated);
     setCachedUserProfile(updated);
-    setHabits(chosenHabits);
-    setCachedHabits(currentUser.uid, chosenHabits);
+    setHabits(habitsToUse);
+    setCachedHabits(currentUser.uid, habitsToUse);
 
-    const activeIds = chosenHabits.map((h) => h.id);
+    const activeIds = habitsToUse.map((h) => h.id);
     const newCompletedCount = countCompletedInMap(dailyLog.completedHabits, activeIds);
     const updatedLog: DailyLogData = {
       ...dailyLog,
       completedCount: newCompletedCount,
-      totalActiveCount: chosenHabits.length,
+      totalActiveCount: habitsToUse.length,
     };
     setDailyLog(updatedLog);
     setCachedDailyLog(currentUser.uid, todayDate, updatedLog);
@@ -1546,17 +1545,10 @@ export function App() {
     );
   }
 
-  // If first-time user hasn't completed onboarding, render onboarding wizard
   if (currentUser.onboardingCompleted === false) {
     return (
       <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 flex flex-col font-sans antialiased">
-        <Header
-          user={currentUser}
-          currentDate={todayDate}
-          onOpenProfile={() => {}}
-          isSyncing={false}
-        />
-        <main className="flex-1 flex items-center justify-center p-4">
+        <main className="flex-1 flex items-center justify-center p-3 sm:p-6">
           <OnboardingModal
             isOpen={true}
             user={currentUser}

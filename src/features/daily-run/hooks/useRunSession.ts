@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   RunStatus,
   GPSStatus,
@@ -10,8 +10,10 @@ import {
   GPSFilterConfig,
   DEFAULT_GPS_FILTER_CONFIG,
   PersistedActiveSession,
+  LocationPermissionState,
+  KilometerSplit,
 } from '../types';
-import { gpsTrackerService } from '../services/gpsTrackerService';
+import { gpsTrackerService, GPSErrorPayload } from '../services/gpsTrackerService';
 import { runIndexedDB } from '../services/runIndexedDB';
 import { validateGPSCoordinate } from '../utils/geoUtils';
 import {
@@ -19,6 +21,7 @@ import {
   calculateAverageSpeed,
   calculateRollingSpeedAndPace,
   estimateRunCalories,
+  calculateKilometerSplits,
 } from '../utils/runStats';
 import { getDefaultRunTitle } from '../utils/formatters';
 
@@ -26,6 +29,7 @@ interface UseRunSessionOptions {
   userId?: string;
   userWeightKg?: number | null;
   filterConfig?: GPSFilterConfig;
+  autoStandbyGPS?: boolean;
 }
 
 export function useRunSession(options: UseRunSessionOptions = {}) {
@@ -33,12 +37,15 @@ export function useRunSession(options: UseRunSessionOptions = {}) {
     userId = 'guest',
     userWeightKg = null,
     filterConfig = DEFAULT_GPS_FILTER_CONFIG,
+    autoStandbyGPS = true,
   } = options;
 
   // Running State Machine: idle -> acquiring_gps -> running -> paused -> finished
   const [status, setStatus] = useState<RunStatus>('idle');
   const [gpsStatus, setGpsStatus] = useState<GPSStatus>('acquiring');
   const [gpsError, setGpsError] = useState<string | null>(null);
+  const [accuracyMeters, setAccuracyMeters] = useState<number | null>(null);
+  const [permissionState, setPermissionState] = useState<LocationPermissionState>('checking');
 
   // Position and Route State
   const [currentPosition, setCurrentPosition] = useState<GPSCoordinate | null>(null);
@@ -163,7 +170,11 @@ export function useRunSession(options: UseRunSessionOptions = {}) {
     runIndexedDB.getActiveSession(userId).then((saved) => {
       if (!isMounted || !saved) return;
       if (saved.status === 'running' || saved.status === 'paused') {
-        if (saved.durationSeconds > 0 || saved.totalDistanceMeters > 0 || (saved.segments && saved.segments.length > 0)) {
+        if (
+          saved.durationSeconds > 0 ||
+          saved.totalDistanceMeters > 0 ||
+          (saved.segments && saved.segments.length > 0)
+        ) {
           setRecoverableSession(saved);
         } else {
           runIndexedDB.clearActiveSession(userId);
@@ -175,6 +186,216 @@ export function useRunSession(options: UseRunSessionOptions = {}) {
       isMounted = false;
     };
   }, [userId]);
+
+  // Handle incoming GPS Coordinate
+  const handleGPSPosition = useCallback(
+    (coord: GPSCoordinate) => {
+      setCurrentPosition(coord);
+      currentPositionRef.current = coord;
+
+      if (coord.accuracy != null) {
+        setAccuracyMeters(coord.accuracy);
+      }
+
+      // Evaluate signal quality based on accuracy radius
+      let signalQuality: GPSStatus = 'ready';
+      if (coord.accuracy != null) {
+        if (coord.accuracy <= filterConfig.weakSignalAccuracyMeters) {
+          signalQuality = 'ready';
+        } else if (coord.accuracy <= filterConfig.maxAccuracyMeters) {
+          signalQuality = 'weak';
+        } else {
+          signalQuality = 'weak';
+        }
+      }
+      setGpsStatus(signalQuality);
+      gpsStatusRef.current = signalQuality;
+      setPermissionState('granted');
+      setGpsError(null);
+
+      // Case 1: Standby / Idle (User opened Run screen, not yet started)
+      if (statusRef.current === 'idle') {
+        // Only update current preview position on map, do not advance distance or segments
+        return;
+      }
+
+      // Case 2: Was ACQUIRING_GPS -> First valid point starts active run!
+      if (statusRef.current === 'acquiring_gps') {
+        if (coord.accuracy != null && coord.accuracy > filterConfig.maxAccuracyMeters) {
+          return; // Wait for higher accuracy fix
+        }
+
+        const now = Date.now();
+        activeSegmentStartTimeRef.current = now;
+        accumulatedActiveMsRef.current = 0;
+        lastValidPointRef.current = coord;
+        setStartPosition(coord);
+        startPositionRef.current = coord;
+
+        rollingPointsRef.current = [coord];
+
+        const initialSeg: RouteSegment = {
+          id: `seg_${now}`,
+          points: [coord],
+        };
+        currentSegmentIdRef.current = initialSeg.id;
+        setSegments([initialSeg]);
+        segmentsRef.current = [initialSeg];
+
+        setStatus('running');
+        setGpsError(null);
+        return;
+      }
+
+      // Case 3: WHILE RUNNING -> Validate and update rolling statistics and route
+      if (statusRef.current === 'running') {
+        const validation = validateGPSCoordinate(coord, lastValidPointRef.current, filterConfig);
+
+        if (!validation.isValid) {
+          // Inaccurate or impossible jump rejected
+          return;
+        }
+
+        // Add to rolling window for real-time speed and pace calculation
+        rollingPointsRef.current.push(coord);
+        if (rollingPointsRef.current.length > 8) {
+          rollingPointsRef.current.shift();
+        }
+
+        const rolling = calculateRollingSpeedAndPace(
+          rollingPointsRef.current,
+          signalQuality
+        );
+
+        if (validation.isStationaryJitter) {
+          // Stationary jitter filtered: live marker updates, distance does not advance
+          setMetrics((prev) => ({
+            ...prev,
+            currentSpeedKmh: 0,
+            currentPaceMinPerKm: null,
+            isStationary: true,
+          }));
+          return;
+        }
+
+        // Valid movement: accumulate distance
+        const newDistanceMetres = totalDistanceMetersRef.current + validation.distanceDeltaMetres;
+        totalDistanceMetersRef.current = newDistanceMetres;
+        setTotalDistanceMeters(newDistanceMetres);
+
+        lastValidPointRef.current = coord;
+
+        const distanceKm = newDistanceMetres / 1000;
+        const calorieResult = estimateRunCalories(distanceKm, userWeightKg);
+
+        setMetrics((prev) => ({
+          ...prev,
+          distanceKm,
+          currentSpeedKmh: rolling.currentSpeedKmh,
+          currentPaceMinPerKm: rolling.currentPaceMinPerKm,
+          isStationary: rolling.isStationary,
+          averagePaceMinPerKm: calculateAveragePace(distanceKm, durationSeconds),
+          averageSpeedKmh: calculateAverageSpeed(distanceKm, durationSeconds),
+          caloriesBurned: calorieResult.calories,
+          caloriesExplanation: calorieResult.explanation,
+        }));
+
+        // Append to active route segment
+        setSegments((prevSegments) => {
+          const updated = prevSegments.map((seg) => {
+            if (seg.id === currentSegmentIdRef.current) {
+              return {
+                ...seg,
+                points: [...seg.points, coord],
+              };
+            }
+            return seg;
+          });
+          segmentsRef.current = updated;
+          return updated;
+        });
+      }
+    },
+    [filterConfig, durationSeconds, userWeightKg]
+  );
+
+  // Handle GPS Tracker Error
+  const handleGPSError = useCallback((error: GPSErrorPayload) => {
+    if (error.code === 'permission_denied') {
+      setPermissionState('denied');
+      setGpsStatus('lost');
+      gpsStatusRef.current = 'lost';
+      setGpsError(error.message);
+    } else {
+      setGpsStatus('lost');
+      gpsStatusRef.current = 'lost';
+      setGpsError(error.message);
+    }
+
+    // Freeze current speed/pace when GPS signal is lost
+    setMetrics((prev) => ({
+      ...prev,
+      currentSpeedKmh: null,
+      currentPaceMinPerKm: null,
+    }));
+
+    // If permission was denied while starting, reset to idle
+    if (statusRef.current === 'acquiring_gps' && error.code === 'permission_denied') {
+      gpsTrackerService.stopTracking();
+      setStatus('idle');
+    }
+  }, []);
+
+  // AUTOMATIC GPS DETECTION ON MOUNT (Standby Mode)
+  useEffect(() => {
+    if (!autoStandbyGPS) return;
+
+    let isMounted = true;
+
+    // Check permission state first
+    gpsTrackerService.checkPermissionState().then((perm) => {
+      if (!isMounted) return;
+      setPermissionState(perm);
+
+      if (perm === 'denied') {
+        setGpsStatus('lost');
+        setGpsError(
+          'Location access is denied. Please enable location permissions in your browser or device settings.'
+        );
+        return;
+      }
+
+      // If granted or promptable, start standby preview tracking
+      if (statusRef.current === 'idle') {
+        setGpsStatus('acquiring');
+        gpsTrackerService.startStandbyTracking(handleGPSPosition, handleGPSError);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      // Stop standby tracking on unmount to preserve battery
+      gpsTrackerService.stopStandbyTracking();
+    };
+  }, [autoStandbyGPS, handleGPSPosition, handleGPSError]);
+
+  // Request location permission explicitly (e.g. from UI button)
+  const requestLocationPermission = useCallback(async () => {
+    setGpsError(null);
+    setGpsStatus('acquiring');
+    setPermissionState('checking');
+
+    try {
+      const pos = await gpsTrackerService.getCurrentPosition(15000);
+      handleGPSPosition(pos);
+      setPermissionState('granted');
+      if (statusRef.current === 'idle') {
+        gpsTrackerService.startStandbyTracking(handleGPSPosition, handleGPSError);
+      }
+    } catch (err: any) {
+      handleGPSError(err);
+    }
+  }, [handleGPSPosition, handleGPSError]);
 
   // Interval timer for UI duration updates, periodic stats calculation, and active session persistence
   useEffect(() => {
@@ -237,141 +458,6 @@ export function useRunSession(options: UseRunSessionOptions = {}) {
     };
   }, [status, userWeightKg, persistActiveSession]);
 
-  // Handle incoming GPS Coordinate
-  const handleGPSPosition = useCallback(
-    (coord: GPSCoordinate) => {
-      setCurrentPosition(coord);
-
-      // Evaluate signal quality based on accuracy radius
-      let signalQuality: GPSStatus = 'ready';
-      if (coord.accuracy != null) {
-        if (coord.accuracy <= filterConfig.weakSignalAccuracyMeters) {
-          signalQuality = 'ready';
-        } else if (coord.accuracy <= filterConfig.maxAccuracyMeters) {
-          signalQuality = 'weak';
-        } else {
-          signalQuality = 'weak';
-        }
-      }
-      setGpsStatus(signalQuality);
-      gpsStatusRef.current = signalQuality;
-
-      // Case 1: Was ACQUIRING_GPS -> First valid point starts active run!
-      if (statusRef.current === 'acquiring_gps') {
-        if (coord.accuracy != null && coord.accuracy > filterConfig.maxAccuracyMeters) {
-          return; // Wait for higher accuracy fix
-        }
-
-        const now = Date.now();
-        activeSegmentStartTimeRef.current = now;
-        accumulatedActiveMsRef.current = 0;
-        lastValidPointRef.current = coord;
-        setStartPosition(coord);
-
-        rollingPointsRef.current = [coord];
-
-        const initialSeg: RouteSegment = {
-          id: `seg_${now}`,
-          points: [coord],
-        };
-        currentSegmentIdRef.current = initialSeg.id;
-        setSegments([initialSeg]);
-
-        setStatus('running');
-        setGpsError(null);
-        return;
-      }
-
-      // Case 2: WHILE RUNNING -> Validate and update rolling statistics and route
-      if (statusRef.current === 'running') {
-        const validation = validateGPSCoordinate(coord, lastValidPointRef.current, filterConfig);
-
-        if (!validation.isValid) {
-          // Inaccurate or impossible jump rejected
-          return;
-        }
-
-        // Add to rolling window for real-time speed and pace calculation
-        rollingPointsRef.current.push(coord);
-        if (rollingPointsRef.current.length > 8) {
-          rollingPointsRef.current.shift();
-        }
-
-        const rolling = calculateRollingSpeedAndPace(
-          rollingPointsRef.current,
-          signalQuality
-        );
-
-        if (validation.isStationaryJitter) {
-          // Stationary jitter filtered: live marker updates, distance does not advance
-          setMetrics((prev) => ({
-            ...prev,
-            currentSpeedKmh: 0,
-            currentPaceMinPerKm: null,
-            isStationary: true,
-          }));
-          return;
-        }
-
-        // Valid movement: accumulate distance
-        const newDistanceMetres = totalDistanceMetersRef.current + validation.distanceDeltaMetres;
-        totalDistanceMetersRef.current = newDistanceMetres;
-        setTotalDistanceMeters(newDistanceMetres);
-
-        lastValidPointRef.current = coord;
-
-        const distanceKm = newDistanceMetres / 1000;
-        const calorieResult = estimateRunCalories(distanceKm, userWeightKg);
-
-        setMetrics((prev) => ({
-          ...prev,
-          distanceKm,
-          currentSpeedKmh: rolling.currentSpeedKmh,
-          currentPaceMinPerKm: rolling.currentPaceMinPerKm,
-          isStationary: rolling.isStationary,
-          averagePaceMinPerKm: calculateAveragePace(distanceKm, durationSeconds),
-          averageSpeedKmh: calculateAverageSpeed(distanceKm, durationSeconds),
-          caloriesBurned: calorieResult.calories,
-          caloriesExplanation: calorieResult.explanation,
-        }));
-
-        // Append to active route segment
-        setSegments((prevSegments) => {
-          return prevSegments.map((seg) => {
-            if (seg.id === currentSegmentIdRef.current) {
-              return {
-                ...seg,
-                points: [...seg.points, coord],
-              };
-            }
-            return seg;
-          });
-        });
-      }
-    },
-    [filterConfig, durationSeconds, userWeightKg]
-  );
-
-  // Handle GPS Tracker Error
-  const handleGPSError = useCallback((error: { code: GPSErrorCode; message: string }) => {
-    setGpsStatus('lost');
-    gpsStatusRef.current = 'lost';
-    setGpsError(error.message);
-
-    // Freeze current speed/pace when GPS signal is lost
-    setMetrics((prev) => ({
-      ...prev,
-      currentSpeedKmh: null,
-      currentPaceMinPerKm: null,
-    }));
-
-    // If permission was denied while starting, reset to idle
-    if (statusRef.current === 'acquiring_gps' && error.code === 'permission_denied') {
-      gpsTrackerService.stopTracking();
-      setStatus('idle');
-    }
-  }, []);
-
   // START RUN ACTION
   const startRun = useCallback(() => {
     if (!gpsTrackerService.isSupported()) {
@@ -396,8 +482,6 @@ export function useRunSession(options: UseRunSessionOptions = {}) {
     rollingPointsRef.current = [];
     setSegments([]);
     setGpsError(null);
-    setGpsStatus('acquiring');
-    gpsStatusRef.current = 'acquiring';
 
     const calorieResult = estimateRunCalories(0, userWeightKg);
     setMetrics({
@@ -413,12 +497,35 @@ export function useRunSession(options: UseRunSessionOptions = {}) {
       elevationGainMeters: null,
     });
 
-    // Enter acquiring_gps state
-    setStatus('acquiring_gps');
+    // Check if we already have a solid standby GPS fix
+    const existingFix = currentPositionRef.current;
+    if (existingFix && existingFix.accuracy != null && existingFix.accuracy <= filterConfig.maxAccuracyMeters) {
+      activeSegmentStartTimeRef.current = Date.now();
+      lastValidPointRef.current = existingFix;
+      setStartPosition(existingFix);
+      startPositionRef.current = existingFix;
+      rollingPointsRef.current = [existingFix];
 
-    // Request GPS permission and start live tracking
-    gpsTrackerService.startTracking(handleGPSPosition, handleGPSError);
-  }, [handleGPSPosition, handleGPSError, userWeightKg]);
+      const initialSeg: RouteSegment = {
+        id: `seg_${Date.now()}`,
+        points: [existingFix],
+      };
+      currentSegmentIdRef.current = initialSeg.id;
+      setSegments([initialSeg]);
+      segmentsRef.current = [initialSeg];
+
+      setStatus('running');
+      setGpsStatus('ready');
+      gpsStatusRef.current = 'ready';
+      gpsTrackerService.startTracking(handleGPSPosition, handleGPSError);
+    } else {
+      // Enter acquiring_gps state until first accurate coordinate arrives
+      setStatus('acquiring_gps');
+      setGpsStatus('acquiring');
+      gpsStatusRef.current = 'acquiring';
+      gpsTrackerService.startTracking(handleGPSPosition, handleGPSError);
+    }
+  }, [handleGPSPosition, handleGPSError, userWeightKg, filterConfig]);
 
   // PAUSE RUN ACTION
   const pauseRun = useCallback(() => {
@@ -517,7 +624,6 @@ export function useRunSession(options: UseRunSessionOptions = {}) {
     activeSegmentStartTimeRef.current = null;
     lastValidPointRef.current = null;
     rollingPointsRef.current = [];
-    setCurrentPosition(null);
     setStartPosition(null);
     setSegments([]);
     setStartTime(null);
@@ -538,7 +644,12 @@ export function useRunSession(options: UseRunSessionOptions = {}) {
       isStationary: false,
       elevationGainMeters: null,
     });
-  }, [userWeightKg, userId]);
+
+    // Resume standby tracking if enabled
+    if (autoStandbyGPS) {
+      gpsTrackerService.startStandbyTracking(handleGPSPosition, handleGPSError);
+    }
+  }, [userWeightKg, userId, autoStandbyGPS, handleGPSPosition, handleGPSError]);
 
   const discardRun = useCallback(() => {
     resetRun();
@@ -559,19 +670,15 @@ export function useRunSession(options: UseRunSessionOptions = {}) {
     setSegments(recoverableSession.segments || []);
     setStartPosition(recoverableSession.startPosition);
     setCurrentPosition(recoverableSession.currentPosition);
+
     setMetrics(recoverableSession.metrics);
 
+    // If recovering while running, resume active tracking
     if (recoverableSession.status === 'running') {
-      const now = Date.now();
-      activeSegmentStartTimeRef.current = now;
-      const newSegId = `seg_${now}`;
-      currentSegmentIdRef.current = newSegId;
-      setSegments((prev) => [...prev, { id: newSegId, points: [] }]);
+      activeSegmentStartTimeRef.current = Date.now();
       setStatus('running');
-      setGpsStatus('acquiring');
       gpsTrackerService.startTracking(handleGPSPosition, handleGPSError);
     } else {
-      activeSegmentStartTimeRef.current = null;
       setStatus('paused');
     }
 
@@ -583,45 +690,50 @@ export function useRunSession(options: UseRunSessionOptions = {}) {
     setRecoverableSession(null);
   }, [userId]);
 
-  // Clean up GPS watcher on unmount to prevent leaks and duplicate subscriptions
-  useEffect(() => {
-    return () => {
-      gpsTrackerService.stopTracking();
-    };
-  }, []);
-
   // Prepare completed RunSession object for saving/export
-  const completedSession: RunSession | null =
-    status === 'finished'
-      ? {
-          id: currentRunIdRef.current || `run_${Date.now()}`,
-          userId,
-          title,
-          status: 'finished',
-          startTime: startTime || new Date().toISOString(),
-          endTime: endTime || new Date().toISOString(),
-          metrics: {
-            ...metrics,
-            distanceKm: totalDistanceMetersRef.current / 1000,
-            durationSeconds,
-          },
-          routeCoordinates: segments.flatMap((s) => s.points),
-          segments,
-          createdAt: startTime || new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        }
-      : null;
+  const completedSession: RunSession | null = useMemo(() => {
+    if (status !== 'finished') return null;
+
+    const allPoints = segments.flatMap((s) => s.points);
+    return {
+      id: currentRunIdRef.current || `run_${Date.now()}`,
+      userId,
+      title,
+      status: 'finished',
+      startTime: startTime || new Date().toISOString(),
+      endTime: endTime || new Date().toISOString(),
+      metrics: {
+        ...metrics,
+        distanceKm: totalDistanceMetersRef.current / 1000,
+        durationSeconds,
+      },
+      routeCoordinates: allPoints,
+      segments,
+      createdAt: startTime || new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+  }, [status, userId, title, startTime, endTime, metrics, durationSeconds, segments]);
+
+  // Calculate 1.0 km splits from route coordinates
+  const splits: KilometerSplit[] = useMemo(() => {
+    const points = completedSession?.routeCoordinates || segments.flatMap((s) => s.points);
+    return calculateKilometerSplits(points);
+  }, [completedSession, segments]);
 
   return {
     status,
     gpsStatus,
     gpsError,
     setGpsError,
+    accuracyMeters,
+    permissionState,
+    requestLocationPermission,
     durationSeconds,
     metrics,
     currentPosition,
     startPosition,
     segments,
+    splits,
     title,
     setTitle,
     startTime,

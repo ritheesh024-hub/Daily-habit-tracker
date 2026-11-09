@@ -655,7 +655,15 @@ export const DailyRoutesView: React.FC<DailyRoutesViewProps> = ({
               <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
               <span>
                 {activeRoute
-                  ? `${activeRoute.name} (${formatRunDistance(activeRoute.actualDistanceMeters / 1000)} km)`
+                  ? `${activeRoute.name} · Actual: ${formatRunDistance(
+                      activeRoute.actualDistanceMeters / 1000
+                    )} km (Target: ${activeRoute.targetDistanceKm} km${
+                      activeRoute.differenceMeters != null
+                        ? `, ${activeRoute.differenceMeters >= 0 ? '+' : ''}${
+                            activeRoute.differenceMeters
+                          }m`
+                        : ''
+                    })`
                   : 'OpenStreetMap · OSRM Pedestrian Routing'}
               </span>
             </div>
@@ -704,9 +712,28 @@ export const DailyRoutesView: React.FC<DailyRoutesViewProps> = ({
                       <div>
                         {/* Header: Title & Distance */}
                         <div className="flex items-start justify-between gap-2 mb-1.5">
-                          <h4 className="text-sm font-bold text-zinc-900 dark:text-zinc-50 leading-tight">
-                            {route.name}
-                          </h4>
+                          <div>
+                            <h4 className="text-sm font-bold text-zinc-900 dark:text-zinc-50 leading-tight">
+                              {route.name}
+                            </h4>
+                            <div className="flex items-center gap-1.5 mt-0.5 text-[11px] text-zinc-500 dark:text-zinc-400">
+                              <span>Target: {route.targetDistanceKm} km</span>
+                              <span>·</span>
+                              <span
+                                className={
+                                  route.differencePercent != null && route.differencePercent <= 5
+                                    ? 'text-emerald-600 dark:text-emerald-400 font-semibold'
+                                    : 'text-zinc-600 dark:text-zinc-300 font-medium'
+                                }
+                              >
+                                {route.differenceMeters != null
+                                  ? `${route.differenceMeters >= 0 ? '+' : ''}${
+                                      route.differenceMeters
+                                    }m (${route.differencePercent}%)`
+                                  : 'Verified Loop'}
+                              </span>
+                            </div>
+                          </div>
                           <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20 shrink-0">
                             {formatRunDistance(route.actualDistanceMeters / 1000)} km
                           </span>

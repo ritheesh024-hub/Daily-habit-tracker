@@ -4,7 +4,14 @@ import {
   calculateAverageSpeed,
   calculateRollingSpeedAndPace,
   estimateRunCalories,
+  calculateKilometerSplits,
 } from '../utils/runStats';
+import {
+  formatRunDuration,
+  formatRunDistance,
+  formatRunPace,
+  formatRunCalories,
+} from '../utils/formatters';
 import { validateGPSCoordinate } from '../utils/geoUtils';
 import { GPSCoordinate, DEFAULT_GPS_FILTER_CONFIG } from '../types';
 
@@ -109,6 +116,78 @@ assert(inaccResult.isValid === false, 'GPS accuracy 45m (> 30m) rejected');
 const teleportPt: GPSCoordinate = { latitude: 37.7800, longitude: -122.4194, timestamp: now + 6000, accuracy: 5 };
 const teleportResult = validateGPSCoordinate(teleportPt, validPt2, filterConfig);
 assert(teleportResult.isValid === false, 'Impossible speed jump rejected');
+
+// 7. Kilometer Splits Tests
+const splitPoints: GPSCoordinate[] = [];
+// Generate a 2.5km path going North (1 degree lat ~= 111,000m -> 1000m ~= 0.009009 deg)
+const startLat = 37.7749;
+const startLng = -122.4194;
+const baseTime = 1700000000000;
+
+// KM 1: 10 points over 300 seconds (5:00/km pace)
+for (let i = 0; i <= 10; i++) {
+  const fraction = i / 10;
+  splitPoints.push({
+    latitude: startLat + fraction * 0.009009,
+    longitude: startLng,
+    timestamp: baseTime + fraction * 300000,
+    accuracy: 5,
+  });
+}
+
+// KM 2: 10 points over 330 seconds (5:30/km pace)
+const km1EndLat = startLat + 0.009009;
+const km1EndTime = baseTime + 300000;
+for (let i = 1; i <= 10; i++) {
+  const fraction = i / 10;
+  splitPoints.push({
+    latitude: km1EndLat + fraction * 0.009009,
+    longitude: startLng,
+    timestamp: km1EndTime + fraction * 330000,
+    accuracy: 5,
+  });
+}
+
+// KM 3 (partial 0.5km): 5 points over 150 seconds (5:00/km pace)
+const km2EndLat = km1EndLat + 0.009009;
+const km2EndTime = km1EndTime + 330000;
+for (let i = 1; i <= 5; i++) {
+  const fraction = i / 10; // goes to 0.5km
+  splitPoints.push({
+    latitude: km2EndLat + fraction * 0.009009,
+    longitude: startLng,
+    timestamp: km2EndTime + (fraction * 2) * 150000,
+    accuracy: 5,
+  });
+}
+
+const splits = calculateKilometerSplits(splitPoints);
+assert(splits.length === 3, `calculateKilometerSplits returns 3 splits for 2.5km route, got ${splits.length}`);
+assert(splits[0].splitNumber === 1, 'Split 1 has splitNumber 1');
+assert(Math.abs(splits[0].distanceKm - 1.0) < 0.02, `Split 1 distance ~1.0km, got ${splits[0].distanceKm}`);
+assert(Math.abs(splits[0].durationSeconds - 300) <= 5, `Split 1 duration ~300s, got ${splits[0].durationSeconds}`);
+
+assert(splits[1].splitNumber === 2, 'Split 2 has splitNumber 2');
+assert(Math.abs(splits[1].distanceKm - 1.0) < 0.02, `Split 2 distance ~1.0km, got ${splits[1].distanceKm}`);
+assert(Math.abs(splits[1].durationSeconds - 330) <= 5, `Split 2 duration ~330s, got ${splits[1].durationSeconds}`);
+
+assert(splits[2].splitNumber === 3, 'Split 3 (final partial) has splitNumber 3');
+assert(splits[2].distanceKm > 0.4 && splits[2].distanceKm < 0.6, `Split 3 partial distance ~0.5km, got ${splits[2].distanceKm}`);
+
+// Empty or short points
+assert(calculateKilometerSplits([]).length === 0, 'calculateKilometerSplits returns empty array for empty points');
+assert(calculateKilometerSplits([splitPoints[0]]).length === 0, 'calculateKilometerSplits returns empty array for 1 point');
+
+// 8. Formatter Tests
+assert(formatRunDuration(0) === '00:00', 'formatRunDuration(0) returns 00:00');
+assert(formatRunDuration(325) === '05:25', 'formatRunDuration(325) returns 05:25');
+assert(formatRunDuration(3665) === '01:01:05', 'formatRunDuration(3665) returns 01:01:05');
+assert(formatRunPace(null) === '--:--', 'formatRunPace(null) returns --:--');
+assert(formatRunPace(5.5) === '5:30', 'formatRunPace(5.5) returns 5:30');
+assert(formatRunCalories(null) === '--', 'formatRunCalories(null) returns --');
+assert(formatRunCalories(0) === '--', 'formatRunCalories(0) returns --');
+assert(formatRunCalories(350.4) === '350', 'formatRunCalories(350.4) returns 350');
+assert(formatRunDistance(0) === '0.00', 'formatRunDistance(0) returns 0.00');
 
 console.log(`\n========================================`);
 console.log(`TOTAL: ${passed} PASSED, ${failed} FAILED`);

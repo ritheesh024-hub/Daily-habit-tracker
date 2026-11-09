@@ -10,8 +10,11 @@ import {
   ArrowLeft,
   Check,
   AlertCircle,
+  Timer,
+  BarChart3,
+  Zap,
 } from 'lucide-react';
-import { RunSession, RouteSegment, GPSCoordinate } from '../types';
+import { RunSession, RouteSegment, GPSCoordinate, KilometerSplit } from '../types';
 import { RunMap } from './RunMap';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import {
@@ -26,6 +29,7 @@ interface RunSummaryViewProps {
   session: RunSession | null;
   durationSeconds: number;
   segments?: RouteSegment[];
+  splits?: KilometerSplit[];
   startPosition?: GPSCoordinate | null;
   currentPosition?: GPSCoordinate | null;
   isSaving?: boolean;
@@ -41,6 +45,7 @@ export const RunSummaryView: React.FC<RunSummaryViewProps> = ({
   session,
   durationSeconds,
   segments = [],
+  splits = [],
   startPosition = null,
   currentPosition = null,
   isSaving = false,
@@ -234,6 +239,86 @@ export const RunSummaryView: React.FC<RunSummaryViewProps> = ({
             {caloriesExplanation}
           </p>
         </div>
+      </div>
+
+      {/* Kilometer Splits Section */}
+      <div className="glass-card rounded-2xl p-3.5 sm:p-4 space-y-3 border-zinc-200/80 dark:border-white/10">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded-lg bg-orange-500/10 text-orange-600 dark:text-orange-400 flex items-center justify-center">
+              <Timer className="w-3.5 h-3.5" />
+            </div>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-900 dark:text-zinc-100">
+              Kilometer Splits
+            </h3>
+          </div>
+          {splits.length > 0 && (
+            <span className="text-[11px] font-mono text-zinc-400">
+              {splits.length} {splits.length === 1 ? 'split' : 'splits'}
+            </span>
+          )}
+        </div>
+
+        {splits.length > 0 ? (
+          <div className="space-y-2">
+            {splits.map((split) => {
+              const paceSecs = split.paceSecondsPerKm;
+              const paceFormatted = paceSecs
+                ? `${Math.floor(paceSecs / 60)}:${Math.round(paceSecs % 60).toString().padStart(2, '0')}`
+                : '--:--';
+              const isFullKm = split.distanceKm >= 0.99;
+              const splitLabel = isFullKm
+                ? `KM ${split.splitNumber}`
+                : `KM ${split.splitNumber} (${split.distanceKm.toFixed(2)} km)`;
+
+              // Compare with overall avg pace for relative pace coloring
+              const avgPaceSecs = pace ? pace * 60 : null;
+              const isFaster = avgPaceSecs && paceSecs ? paceSecs < avgPaceSecs : false;
+
+              return (
+                <div
+                  key={split.splitNumber}
+                  className="p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200/60 dark:border-white/5 flex items-center justify-between gap-3 text-xs"
+                >
+                  <div className="flex items-center gap-2.5 min-w-[100px]">
+                    <span className="w-6 h-6 rounded-lg bg-zinc-200/60 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-mono font-bold text-[11px] flex items-center justify-center">
+                      {split.splitNumber}
+                    </span>
+                    <span className="font-semibold text-zinc-800 dark:text-zinc-200 truncate">
+                      {splitLabel}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-4 text-right">
+                    <span className="font-mono text-zinc-500 dark:text-zinc-400">
+                      {formatRunDuration(split.durationSeconds)}
+                    </span>
+                    <div className="min-w-[70px] text-right">
+                      <span
+                        className={`font-mono font-bold ${
+                          isFaster
+                            ? 'text-emerald-600 dark:text-emerald-400'
+                            : 'text-zinc-900 dark:text-zinc-100'
+                        }`}
+                      >
+                        {paceFormatted}
+                      </span>
+                      <span className="text-[10px] text-zinc-400 ml-0.5">/km</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900/40 border border-dashed border-zinc-200 dark:border-zinc-800 text-center">
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+              {distance < 1.0
+                ? 'Runs over 1.0 km will automatically record and display kilometer splits here.'
+                : 'Detailed kilometer splits will be displayed here for runs with verified GPS tracking.'}
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Run Notes */}

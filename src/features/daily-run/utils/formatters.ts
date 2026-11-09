@@ -4,7 +4,7 @@
  */
 export function formatRunDuration(totalSeconds: number): string {
   if (!totalSeconds || totalSeconds < 0 || isNaN(totalSeconds)) {
-    return '00:00:00';
+    return '00:00';
   }
 
   const hours = Math.floor(totalSeconds / 3600);
@@ -12,7 +12,10 @@ export function formatRunDuration(totalSeconds: number): string {
   const seconds = Math.floor(totalSeconds % 60);
 
   const pad = (n: number) => n.toString().padStart(2, '0');
-  return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+  if (hours > 0) {
+    return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+  }
+  return `${pad(minutes)}:${pad(seconds)}`;
 }
 
 /**
@@ -28,21 +31,27 @@ export function formatRunDistance(km: number | null | undefined): string {
 
 /**
  * Formats running pace in minutes and seconds per kilometer
- * Example: null -> "--", 5.5 -> "5'30\" /km"
+ * Example: null -> "--:--", 5.5 -> "5:30"
  */
 export function formatRunPace(paceMinPerKm: number | null | undefined): string {
-  if (paceMinPerKm === null || paceMinPerKm === undefined || isNaN(paceMinPerKm) || paceMinPerKm <= 0 || !isFinite(paceMinPerKm)) {
-    return '--';
+  if (
+    paceMinPerKm === null ||
+    paceMinPerKm === undefined ||
+    isNaN(paceMinPerKm) ||
+    paceMinPerKm <= 0 ||
+    !isFinite(paceMinPerKm)
+  ) {
+    return '--:--';
   }
 
   const mins = Math.floor(paceMinPerKm);
   const secs = Math.round((paceMinPerKm - mins) * 60);
 
   if (secs === 60) {
-    return `${mins + 1}'00"`;
+    return `${mins + 1}:00`;
   }
 
-  return `${mins}'${secs.toString().padStart(2, '0')}"`;
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
 /**
@@ -50,7 +59,13 @@ export function formatRunPace(paceMinPerKm: number | null | undefined): string {
  * Example: null -> "--", 11.2 -> "11.2"
  */
 export function formatRunSpeed(speedKmh: number | null | undefined): string {
-  if (speedKmh === null || speedKmh === undefined || isNaN(speedKmh) || speedKmh <= 0 || !isFinite(speedKmh)) {
+  if (
+    speedKmh === null ||
+    speedKmh === undefined ||
+    isNaN(speedKmh) ||
+    speedKmh <= 0 ||
+    !isFinite(speedKmh)
+  ) {
     return '--';
   }
   return speedKmh.toFixed(1);

@@ -6,6 +6,16 @@ export type GPSStatus = 'acquiring' | 'ready' | 'weak' | 'lost';
 
 export type GPSErrorCode = 'permission_denied' | 'position_unavailable' | 'timeout' | 'unsupported' | null;
 
+export type LocationPermissionState = 'checking' | 'granted' | 'prompt' | 'denied' | 'unsupported';
+
+export interface KilometerSplit {
+  splitNumber: number; // e.g. 1 for 1st km
+  distanceKm: number; // e.g. 1.0 or partial final split
+  durationSeconds: number;
+  paceSecondsPerKm: number | null;
+  averageSpeedKmh: number | null;
+}
+
 export interface GPSCoordinate {
   latitude: number;
   longitude: number;

@@ -1,4 +1,4 @@
-import { GPSCoordinate } from '../types';
+import { GPSCoordinate, KilometerSplit } from '../types';
 
 /**
  * Earth's mean radius in metres (~6,371,000m)
@@ -44,6 +44,23 @@ export function calculateHaversineDistance(
 
   const distance = EARTH_RADIUS_METRES * c;
   return isNaN(distance) || distance < 0 ? 0 : distance;
+}
+
+/**
+ * Calculates authoritative total polyline distance in metres using the Haversine formula
+ * on every consecutive coordinate pair with Earth mean radius R = 6,371,000m.
+ */
+export function calculatePolylineHaversineDistance(
+  coordinates: { latitude: number; longitude: number }[]
+): number {
+  if (!coordinates || coordinates.length < 2) {
+    return 0;
+  }
+  let totalMetres = 0;
+  for (let i = 1; i < coordinates.length; i++) {
+    totalMetres += calculateHaversineDistance(coordinates[i - 1], coordinates[i]);
+  }
+  return totalMetres;
 }
 
 /**
@@ -273,4 +290,77 @@ export function estimateRunCalories(
     isAvailable: true,
     explanation: `Estimated based on ${Math.round(userWeightKg)} kg profile weight (~1.04 kcal/kg/km).`,
   };
+}
+
+/**
+ * Calculates kilometer splits (pace and time for each km) from recorded GPS coordinates.
+ * Returns an array of KilometerSplit objects for every completed 1.0 km milestone plus any final partial km.
+ */
+export function calculateKilometerSplits(coordinates: GPSCoordinate[]): KilometerSplit[] {
+  if (!coordinates || coordinates.length < 2) {
+    return [];
+  }
+
+  const splits: KilometerSplit[] = [];
+  let currentSplitIndex = 1;
+  let splitStartDistanceMetres = 0;
+  let splitStartTimeMs = coordinates[0].timestamp;
+  let cumulativeDistanceMetres = 0;
+
+  for (let i = 1; i < coordinates.length; i++) {
+    const prev = coordinates[i - 1];
+    const curr = coordinates[i];
+
+    const d = calculateHaversineDistance(prev, curr);
+    cumulativeDistanceMetres += d;
+
+    const nextMilestoneMetres = currentSplitIndex * 1000;
+
+    if (cumulativeDistanceMetres >= nextMilestoneMetres) {
+      // Interpolate the fraction of this segment that belongs to the current kilometer
+      const distIntoMilestone = cumulativeDistanceMetres - nextMilestoneMetres;
+      const legDist = Math.max(0.1, d);
+      const ratio = Math.max(0, Math.min(1, (d - distIntoMilestone) / legDist));
+
+      const timeDeltaMs = Math.max(0, curr.timestamp - prev.timestamp);
+      const milestoneTimestamp = prev.timestamp + timeDeltaMs * ratio;
+      const splitDurationSec = Math.max(1, Math.round((milestoneTimestamp - splitStartTimeMs) / 1000));
+
+      const paceSecPerKm = splitDurationSec; // For 1.0 km split, pace seconds/km = duration seconds
+      const speedKmh = Number((1.0 / (splitDurationSec / 3600)).toFixed(2));
+
+      splits.push({
+        splitNumber: currentSplitIndex,
+        distanceKm: 1.0,
+        durationSeconds: splitDurationSec,
+        paceSecondsPerKm: isFinite(paceSecPerKm) && paceSecPerKm <= 1800 ? paceSecPerKm : null,
+        averageSpeedKmh: isFinite(speedKmh) && speedKmh <= 45 ? speedKmh : null,
+      });
+
+      splitStartDistanceMetres = nextMilestoneMetres;
+      splitStartTimeMs = milestoneTimestamp;
+      currentSplitIndex++;
+    }
+  }
+
+  // Handle final partial split if at least 150m completed
+  const remainingMetres = cumulativeDistanceMetres - splitStartDistanceMetres;
+  const lastPoint = coordinates[coordinates.length - 1];
+  const finalDurationSec = Math.max(1, Math.round((lastPoint.timestamp - splitStartTimeMs) / 1000));
+
+  if (remainingMetres >= 150) {
+    const remKm = Number((remainingMetres / 1000).toFixed(2));
+    const paceSecPerKm = Math.round(finalDurationSec / remKm);
+    const speedKmh = Number((remKm / (finalDurationSec / 3600)).toFixed(2));
+
+    splits.push({
+      splitNumber: currentSplitIndex,
+      distanceKm: remKm,
+      durationSeconds: finalDurationSec,
+      paceSecondsPerKm: isFinite(paceSecPerKm) && paceSecPerKm <= 1800 ? paceSecPerKm : null,
+      averageSpeedKmh: isFinite(speedKmh) && speedKmh <= 45 ? speedKmh : null,
+    });
+  }
+
+  return splits;
 }

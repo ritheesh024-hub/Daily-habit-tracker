@@ -86,6 +86,9 @@ export interface UserProfile {
   weight?: number;
   weightUnit?: 'kg' | 'lbs';
   onboardingCompleted?: boolean;
+  onboardingStep?: number;
+  goals?: string[];
+  activityLevel?: 'beginner' | 'moderately_active' | 'active' | 'highly_active';
   lastWeightCheckInDate?: string; // YYYY-MM-DD
   googleCalendarConnected?: boolean;
   googleCalendarEmail?: string;
